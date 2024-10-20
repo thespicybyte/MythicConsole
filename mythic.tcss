@@ -1,0 +1,164 @@
+.login_screen {
+    align: center middle
+}
+
+.login_box {
+    align: center middle;
+    height: 20;
+    max-width: 50%;
+    background: $panel;
+    color: $text;
+    border: wide $accent 100%;
+    padding: 1 2;
+}
+
+.login_box > Input {
+    margin: 1 0 0 0;
+    border: tall $panel 100%;
+    &:focus {
+        text-style: bold;
+    }
+
+    &:dark {
+        &:focus {
+            background: $panel-lighten-1;
+            border: tall $panel-lighten-3 100%;
+        }
+
+    }
+
+    &:light {
+        &:focus {
+            background: $panel-darken-1;
+            border: tall $panel-darken-3 100%;
+        }
+
+    }
+}
+
+.login_box > Button {
+    width: 100w;
+    margin: 1 0 0 0;
+
+    &:dark {
+        background: $accent;
+        border: $accent;
+        &:hover {
+            background: $accent-lighten-1;
+            border: tall $accent-lighten-3 100%;
+            color: $text;
+            text-style: bold;
+        }
+        &:focus {
+            text-style: bold;
+            background: $accent-lighten-1;
+            border: tall $accent-lighten-3 100%;
+        }
+    }
+
+    &:light {
+        background: $accent-lighten-1;
+        border: $accent-lighten-1;
+
+        &:hover {
+            background: $accent-darken-1;
+            border: tall $accent-darken-3 100%;
+            color: $text;
+            text-style: bold;
+        }
+        &:focus {
+            text-style: bold;
+            background: $accent-darken-1;
+            border: tall $accent-darken-3 100%;
+        }
+    }
+
+
+}
+
+Sidebar {
+    width: 35%;
+    height: 100%;
+    dock: left;
+    background: $panel;
+    margin: 1 0;
+}
+
+Sidebar.-hidden {
+    display: none;
+}
+
+SidebarModule {
+    border: $accent;
+    margin: 1;
+    max-height: 12;
+    min-height: 12;
+}
+
+SessionInfo {
+    border: $accent;
+    margin: 1;
+    max-height: 15;
+    border-title-align: left;
+}
+
+ConsolePanel > Container > Vertical > AutoComplete {
+    min-height: 3;
+    max-height: 3;
+    content-align: left middle;
+    dock: bottom;
+}
+
+ConsolePanel > Container > Vertical > AutoComplete > Input {
+    border: solid $background-lighten-3 100%;
+    padding: 0 1;
+    &:focus {
+        border: solid $primary-background-lighten-3 100%;
+    }
+}
+
+YesNoPrompt {
+    align: center middle;
+}
+
+YesNoPrompt > Container {
+    width: auto;
+    height: auto;
+    padding: 1 2;
+    background: $panel;
+}
+
+YesNoPrompt > Container > Label {
+    width: 100%;
+    content-align-horizontal: center;
+    padding: 0 1;
+}
+
+YesNoPrompt > Container > Horizontal {
+    width: auto;
+    height: auto;
+}
+
+YesNoPrompt > Container > Horizontal > Button {
+    margin: 1 0 0 0;
+}
+
+ConsoleAreaPlus {
+    width: 1fr;
+    height: 1fr;
+    layer: main;
+
+    &:dark {
+        border: solid $primary-background-lighten-1 100%;
+        &:focus {
+            border: solid $primary-background-lighten-3 100%;
+        }
+    }
+
+    &:light {
+        border: solid $background-darken-1;
+        &:focus {
+            border: solid $background-darken-3;
+        }
+    }
+}

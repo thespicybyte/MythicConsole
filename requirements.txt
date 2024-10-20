@@ -1,0 +1,10 @@
+mythic~=0.2.4
+textual~=0.79.1
+textual-dev
+textual-textarea
+rich~=13.8.1
+pyperclip~=1.9.0
+typing_extensions~=4.12.2
+cmd2~=2.4.3
+asyncio~=3.4.3
+textual-autocomplete==2.1.0b0
