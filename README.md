@@ -26,7 +26,7 @@ source venv/bin/activate
 
 # windows
 .\venv\Scripts\activate
-[LICENSE](LICENSE)
+
 pip install -r requirements.txt
 ```
 
@@ -37,12 +37,15 @@ When you start the application, the user will be prompted for the username, pass
 These three values may be passed in and populated for you based on environment variables or the `.env` config file.
 Other variables may be passed to further configure your environment.
 
-| Name                    | Description                                                                 |
-|-------------------------|-----------------------------------------------------------------------------|
-| MYTHIC_CONSOLE_USER     | Populates the username field                                                |
-| MYTHIC_CONSOLE_PASSWORD | Populates the password field                                                |
-| MYTHIC_SERVER_URL       | Populates the server field                                                  |
-| DOWNLOAD_DIRECTORY      | Configures the base directory where files downloaded from Mythic are stored |
+| Name                    | Description                                                                                         |
+|-------------------------|-----------------------------------------------------------------------------------------------------|
+| MYTHIC_CONSOLE_USER     | Populates the username field                                                                        |
+| MYTHIC_CONSOLE_PASSWORD | Populates the password field                                                                        |
+| MYTHIC_SERVER_URL       | Populates the server field                                                                          |
+| DOWNLOAD_DIRECTORY      | Configures the base directory where files downloaded from Mythic are stored                         |
+| LOG_DIRECTORY           | Set the  directory logs are stored in. Default is cwd                                               |
+| LOG_FILE                | Set the log  file. Default is .console.log                                                          |
+| LOG_LEVEL               | Set the log level. Available options are `debug`, `info`, `warning`, and `error`. Default is `info` |
 
 ## Execution
 
