@@ -404,9 +404,6 @@ class ConsolePanel(Container):
         :param event: key event
         """
         key = event.key
-        console_input = self.query_one(Input)
-        logger.info(console_input.children)
-        return
         console_input = self.query_one(ConsoleInput)
         match key:
             case "up":
