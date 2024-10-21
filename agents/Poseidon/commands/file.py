@@ -1,6 +1,6 @@
 import argparse
 from pathlib import Path
-from typing import List, Dict, Coroutine
+from typing import List, Dict
 
 from cmd2 import cmd2, Cmd2ArgumentParser, argparse_custom
 from mythic import mythic
@@ -8,7 +8,6 @@ from mythic import mythic
 from backend import Task
 from backend.mythic_agent.mythic_agent import AgentCommand, AgentCommandAlias, MythicAgent, add_default_options
 from backend.task.task import TaskError
-from utils.logger import logger
 
 file_parser = Cmd2ArgumentParser()
 file_subparsers = file_parser.add_subparsers(title='subcommands', help='subcommand help')
