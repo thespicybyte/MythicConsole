@@ -16,70 +16,30 @@ class PoseidonFormatter(Formatter):
         command = task.command_name
 
         match command:
-            case "pwd":
-                return await self.format_plaintext(task)
-            case "shell":
-                return await self.format_plaintext(task)
-            case "cat":
-                return await self.format_plaintext(task)
-            case "cd":
-                return await self.format_plaintext(task)
             case "config":
                 return await self.format_pretty(task)
-            case "cp":
-                return await self.format_plaintext(task)
-            case "curl":
-                return await self.format_plaintext(task)
-            case "curl_env_clear":
-                return await self.format_plaintext(task)
             case "download":
                 return await self.download(task)
             case "drives":
                 return await self.drives(task)
             case "execute_library":
-                return await self.format_plaintext(task)
-            case "exit":
-                return await self.format_plaintext(task)
-            case "getenv":
                 return await self.get_env(task)
             case "getuser":
                 return await self.format_pretty(task, expand_all=True)
-            case "head":
-                return await self.format_plaintext(task)
             case "jobs":
                 return await self.jobs(task)
-            case "jobkill":
-                return await self.format_plaintext(task)
-            case "keylog":
-                return await self.format_plaintext(task)
             case "keys":
                 return await self.format_pretty(task, expand_all=True)
-            case "kill":
-                return await self.format_plaintext(task)
             case "ls":
                 return await self.ls(task)
-            case "mkdir":
-                return await self.format_plaintext(task)
-            case "mv":
-                return await self.format_plaintext(task)
             case "portscan":
                 return await self.portscan(task)
-            case "print_c2":
-                return await self.format_plaintext(task)
-            case "print_p2p":
-                return await self.format_plaintext(task)
-            case "rm":
-                return await self.format_plaintext(task)
-            case "rpfwd":
-                return await self.format_plaintext(task)
             case "ps":
                 return await self.ps(task)
-            case "run":
-                return await self.format_plaintext(task)
-            case "setenv":
-                return await self.format_plaintext(task)
+            case "sshauth":
+                return await self.ssh_auth(task)
             case _:
-                raise FormatterNotAvailable(command)
+                return await self.format_plaintext(task)
 
     async def ls(self, task: Task, encoding: str = "utf8") -> Table | Text:
         raw = await self.get_raw_output(task, encoding)
@@ -92,9 +52,8 @@ class PoseidonFormatter(Formatter):
         rows = []
         headers = ["permissions", "user", "size", "path"]
 
-        title = "ls of /etc"
-
         full_path = f"{output.get('parent_path') or ''}/{output.get('name')}"
+        title = f"ls of {full_path}"
         is_file = output.get('is_file')
         permissions = output.get('permissions').get('permissions')
         size = output.get('size')
@@ -229,6 +188,25 @@ class PoseidonFormatter(Formatter):
             user = process.get("user") or ""
             name = process.get("name") or ""
             rows.append([str(pid), str(ppid), arch, user, name])
+
+        table = self.build_table(*rows, headers=headers, title=title)
+        return table
+
+    async def ssh_auth(self, task: Task, encoding: str = "utf8") -> Table:
+        raw = await self.get_raw_output(task, encoding)
+
+        results = json.loads(raw) or []
+        rows = []
+        headers = ["Host", "Username", "Secret", "Copy Status", "Output"]
+
+        title = "SSH Execution"
+        for result in results:
+            host = result.get("host") or ""
+            username = result.get("username") or ""
+            secret = result.get("secret") or ""
+            copy = result.get("copy_status") or ""
+            output = result.get("output") or ""
+            rows.append([host, username, secret, copy, output])
 
         table = self.build_table(*rows, headers=headers, title=title)
         return table

@@ -13,16 +13,22 @@ command_run_parser = command_subparsers.add_parser('run', help='run a command')
 add_default_options(command_run_parser)
 command_run_parser.add_argument('command', nargs='+', help='command to run')
 
+command_config_parser = command_subparsers.add_parser('config', help='Configure how the "shell" command operates')
+add_default_options(command_config_parser)
+command_config_parser.add_argument('--shell', help='Specify which shell should be launched when running "shell"')
+
 
 class Command(AgentCommand):
     def __init__(self, agent: MythicAgent):
         super().__init__(agent=agent)
         self._name = "command"
         self._subcommand_parsers: Dict[str, argparse_custom.Cmd2ArgumentParser] = {
-            "run": command_run_parser
+            "run": command_run_parser,
+            "config": command_config_parser,
         }
         self._aliases = [
-            AgentCommandAlias("shell", self._name, "run")
+            AgentCommandAlias("shell", self._name, "run"),
+            AgentCommandAlias("shell_config", self._name, "config")
         ]
 
     @property
@@ -49,8 +55,7 @@ class Command(AgentCommand):
 
     def command_run(self, args: argparse.Namespace | str) -> Task:
         if isinstance(args, str):
-            subcommand_parser = self.get_subcommand_parser("run")
-            args = subcommand_parser.parse_args(args)
+            args = command_run_parser.parse_args(args)
 
         command_args = " ".join(args.command)
         task = Task(self._agent.instance, command="shell", args=command_args,
@@ -61,3 +66,19 @@ class Command(AgentCommand):
         return task
 
     command_run_parser.set_defaults(func=command_run)
+
+    def command_config(self, args: argparse.Namespace | str) -> Task:
+        if isinstance(args, str):
+            args = command_config_parser.parse_args(args)
+
+        command_args = {
+            "shell": args.shell,
+        }
+        task = Task(self._agent.instance, command="shell_config", args=command_args,
+                    callback_display_id=self._agent.tasker.callback.display_id)
+
+        task.console_args = args
+        task.background = args.background
+        return task
+
+    command_config_parser.set_defaults(func=command_config)

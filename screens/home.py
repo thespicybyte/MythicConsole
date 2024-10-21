@@ -327,10 +327,11 @@ class Home(Screen):
                 if resp.background:
                     return
                 await resp.query()
-                worker = self.run_worker(resp.wait_for_completion(), name=f"{resp.command_name}_{resp.id}")
+                worker = self.run_worker(resp.wait_for_completion(), name=f"{resp.command_name}_{resp.id}",
+                                         exit_on_error=False)
 
             if isinstance(resp, Coroutine):
-                worker = self.run_worker(resp)
+                worker = self.run_worker(resp, exit_on_error=False)
 
             if not worker:
                 return
@@ -354,6 +355,10 @@ class Home(Screen):
 
             if isinstance(resp, Coroutine):
                 output = worker.result
+                # this happens when task function needs to await something, such as upload
+                if isinstance(output, Task):
+                    await output.query()
+                    output = await self.current_agent.formatter.format_output(output)
 
             if output:
                 console_panel.write_string(output)
