@@ -317,7 +317,6 @@ class Home(Screen):
 
             worker = None
             if isinstance(resp, Task):
-                logger.info("here")
                 if resp.verify_prompt:
                     if not await self.app.push_screen_wait(resp.verify_prompt):
                         logger.debug("user bailed on task")
@@ -332,7 +331,6 @@ class Home(Screen):
                                          exit_on_error=False)
 
             if isinstance(resp, Coroutine):
-                logger.info("here")
                 worker = self.run_worker(resp, exit_on_error=False)
 
             if not worker:
