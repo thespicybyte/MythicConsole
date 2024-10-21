@@ -5,7 +5,7 @@ from cmd2 import cmd2, argparse_custom, Cmd2ArgumentParser
 from backend import Task
 from backend.mythic_agent.mythic_agent import AgentCommand, AgentCommandAlias, MythicAgent, add_default_options
 
-directory_parser = Cmd2ArgumentParser(argument_default=".")
+directory_parser = Cmd2ArgumentParser()
 directory_subparsers = directory_parser.add_subparsers(title='subcommands', help='subcommand help')
 
 directory_list_parser = directory_subparsers.add_parser('list', help='list a directory')
@@ -20,6 +20,9 @@ directory_create_parser = directory_subparsers.add_parser('create', help='create
 add_default_options(directory_create_parser)
 directory_create_parser.add_argument('path', nargs='+', help='directory to create')
 
+directory_working_parser = directory_subparsers.add_parser('working', help='Print the current working directory')
+add_default_options(directory_working_parser)
+
 
 class Directory(AgentCommand):
     def __init__(self, agent: MythicAgent):
@@ -29,11 +32,13 @@ class Directory(AgentCommand):
             "list": directory_list_parser,
             "change": directory_list_parser,
             "create": directory_create_parser,
+            "working": directory_working_parser,
         }
         self._aliases = [
             AgentCommandAlias("ls", self._name, "list"),
             AgentCommandAlias("cd", self._name, "change"),
             AgentCommandAlias("mkdir", self._name, "create"),
+            AgentCommandAlias("pwd", self._name, "working"),
         ]
 
     @property
@@ -102,3 +107,16 @@ class Directory(AgentCommand):
         return task
 
     directory_create_parser.set_defaults(func=directory_create)
+
+    def directory_pwd(self, args) -> Task:
+        if isinstance(args, str):
+            args = directory_working_parser.parse_args(args)
+
+        task = Task(self._agent.instance, command="pwd",
+                    callback_display_id=self._agent.tasker.callback.display_id)
+
+        task.console_args = args
+        task.background = args.background
+        return task
+
+    directory_working_parser.set_defaults(func=directory_pwd)

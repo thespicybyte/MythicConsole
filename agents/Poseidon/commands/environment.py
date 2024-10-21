@@ -17,6 +17,10 @@ add_default_options(env_set_parser)
 env_get_parser = env_subparsers.add_parser('get', help='get all environment')
 add_default_options(env_get_parser)
 
+env_unset_parser = env_subparsers.add_parser('unset', help='Unset an environment variable')
+env_unset_parser.add_argument('parameter', help='Parameter name')
+add_default_options(env_unset_parser)
+
 
 class Environment(AgentCommand):
     def __init__(self, agent: MythicAgent):
@@ -25,10 +29,12 @@ class Environment(AgentCommand):
         self._subcommand_parsers: Dict[str, argparse_custom.Cmd2ArgumentParser] = {
             "set": env_set_parser,
             "get": env_get_parser,
+            "unset": env_unset_parser,
         }
         self._aliases = [
             AgentCommandAlias("setenv", self._name, "set"),
-            AgentCommandAlias("getenv", self._name, "get")
+            AgentCommandAlias("getenv", self._name, "get"),
+            AgentCommandAlias("unsetenv", self._name, "unset")
         ]
 
     @property
@@ -81,3 +87,18 @@ class Environment(AgentCommand):
         return task
 
     env_get_parser.set_defaults(func=env_get)
+
+    def env_unset(self, args: argparse.Namespace | str) -> Task:
+        if isinstance(args, str):
+            args = env_unset_parser.parse_args(args)
+
+        command_args = args.parameter
+
+        task = Task(self._agent.instance, command="unsetenv", args=command_args,
+                    callback_display_id=self._agent.tasker.callback.display_id)
+
+        task.console_args = args
+        task.background = args.background
+        return task
+
+    env_unset_parser.set_defaults(func=env_unset)
