@@ -36,7 +36,7 @@ class Netstat(ScriptCommand):
 
     @cmd2.with_argparser(netstat_parser)
     async def do_netstat(self, _args) -> RenderableType:
-        task = self.command.command_run("sockstat > foo")
+        task = self.command.command_run("sockstat")
         await task.execute()
         await task.wait_for_completion()
         await task.query()
