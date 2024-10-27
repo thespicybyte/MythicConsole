@@ -16,7 +16,6 @@ from utils.logger import logger
 from . import mythic_command_parsers
 from ..operation.queries import OperationQueries
 from ..payload.queries import PayloadQueries
-from ..processor.processor import Processor
 from ..tasker.tasker import Tasker
 from ..formatter.formatter import Formatter, DefaultFormatter
 from ..user import UserQueries
@@ -129,12 +128,10 @@ ScriptCommand = AgentCommand
 
 # noinspection PyRedeclaration
 class MythicAgent:
-    def __init__(self, name: str, instance: MythicInstance, formatter: Formatter, processor: Processor,
-                 tasker: Tasker = None):
+    def __init__(self, name: str, instance: MythicInstance, formatter: Formatter, tasker: Tasker = None):
         self.instance = instance
         self.mythic = instance.mythic
         self.name = name
-        self.processor = processor
         self.formatter = formatter
         self.tasker = Tasker(instance)
         self._commands: List[AgentCommand] = []

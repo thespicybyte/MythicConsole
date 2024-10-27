@@ -7,7 +7,7 @@ from rich.table import Table
 from rich.text import Text
 
 import utils
-from backend import Formatter, Task, FormatterNotAvailable
+from backend import Formatter, Task
 from utils.environment import Environment
 
 
