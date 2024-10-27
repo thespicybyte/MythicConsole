@@ -59,6 +59,10 @@ Other variables may be passed to further configure your environment.
 python console.py
 ```
 
+# Extend Mythic Console
+
+Check out [customization page](customize.md) to learn how to extend Mythic Console.
+
 # Road Map
 
 - [ ] Add more Agents
