@@ -30,8 +30,9 @@ def add_default_options(parser: cmd2.argparse_custom.Cmd2ArgumentParser):
 
 
 class AgentCommandAlias:
-    def __init__(self, name: str, command: str, subcommand: str = "", options_prefix: str = ""):
+    def __init__(self, name: str, command: str, subcommand: str = "", description: str = "", options_prefix: str = ""):
         self.name = name
+        self.description = description
         self.command = command
         self.subcommand = subcommand
         self.options_prefix = options_prefix
@@ -70,6 +71,12 @@ class AgentCommand(ABC, cmd2.Cmd):
     @abstractmethod
     def name(self) -> str:
         """name of the command"""
+        pass
+
+    @property
+    @abstractmethod
+    def description(self) -> str:
+        """description of the command"""
         pass
 
     @property
@@ -243,6 +250,7 @@ class MythicAgent:
             return items
 
         if len(tokens) == 1:
+            items.append("help")
             # return only commands and aliases
             for command in self._get_commands():
                 items.append(command.name)
@@ -553,6 +561,7 @@ class MythicCommands(Cmd):
         tokens = shlex.split(line)
 
         if len(tokens) == 1:
+            # items.append("help")
             for command in self.commands:
                 items.append(command.removeprefix("do_"))
             for alias_name in self._get_aliases_names():

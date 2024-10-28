@@ -3,7 +3,7 @@ import io
 import shlex
 from typing import List, Optional, TYPE_CHECKING
 
-from rich.console import Console as RichConsole
+from rich.console import Console as RichConsole, RenderableType
 from textual import on, events
 from textual._text_area_theme import TextAreaTheme
 from textual.app import ComposeResult
@@ -363,7 +363,7 @@ class ConsolePanel(Container):
                 yield self.auto
                 logger.warning("yeilded auto")
 
-    def write_string(self, data: str) -> None:
+    def write_string(self, data: RenderableType) -> None:
         """
         Write a renderable value to the console
         :param data: any renderable value
