@@ -15,12 +15,17 @@ class Caffeinate(AgentCommand):
     def __init__(self, agent: MythicAgent):
         super().__init__(agent)
         self._name = "caffeinate"
+        self._description = "Prevent the system from sleeping"
         self._subcommand_parsers: Dict[str, argparse_custom.Cmd2ArgumentParser] = {}
         self._aliases = []
 
     @property
     def name(self) -> str:
         return self._name
+
+    @property
+    def description(self) -> str:
+        return self._description
 
     @property
     def subcommand_parsers(self) -> Dict[str, cmd2.argparse_custom.Cmd2ArgumentParser]:

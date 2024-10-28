@@ -27,6 +27,7 @@ class Rpfwd(AgentCommand):
     def __init__(self, agent: MythicAgent):
         super().__init__(agent=agent)
         self._name = "rpfwd"
+        self._description = "Start or Stop a Reverse Port Forward."
         self._subcommand_parsers: Dict[str, argparse_custom.Cmd2ArgumentParser] = {
             "start": rpfwd_start_parser,
             "stop": rpfwd_stop_parser,
@@ -36,6 +37,10 @@ class Rpfwd(AgentCommand):
     @property
     def name(self) -> str:
         return self._name
+
+    @property
+    def description(self) -> str:
+        return self._description
 
     @property
     def aliases(self) -> List[AgentCommandAlias]:

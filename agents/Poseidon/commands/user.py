@@ -17,16 +17,22 @@ class User(AgentCommand):
     def __init__(self, agent: MythicAgent):
         super().__init__(agent=agent)
         self._name = "user"
+        self._description = "Interact with users on a target"
         self._subcommand_parsers: Dict[str, argparse_custom.Cmd2ArgumentParser] = {
             "get": user_get_parser,
         }
         self._aliases = [
-            AgentCommandAlias("getuser", self._name, "get"),
+            AgentCommandAlias("getuser", self._name, "get",
+                              description="Get information regarding the current user context"),
         ]
 
     @property
     def name(self) -> str:
         return self._name
+
+    @property
+    def description(self) -> str:
+        return self._description
 
     @property
     def aliases(self) -> List[AgentCommandAlias]:

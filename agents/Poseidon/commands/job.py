@@ -22,18 +22,23 @@ class Job(AgentCommand):
     def __init__(self, agent: MythicAgent):
         super().__init__(agent=agent)
         self._name = "job"
+        self._description = "Interact with running tasks on target"
         self._subcommand_parsers: Dict[str, argparse_custom.Cmd2ArgumentParser] = {
             "list": job_list_parser,
             "kill": job_kill_parser,
         }
         self._aliases = [
-            AgentCommandAlias("jobs", self._name, "list"),
-            AgentCommandAlias("jobkill", self._name, "kill"),
+            AgentCommandAlias("jobs", self._name, "list", description="List running/killable jobs"),
+            AgentCommandAlias("jobkill", self._name, "kill", description="Kill a job with the specified ID"),
         ]
 
     @property
     def name(self) -> str:
         return self._name
+
+    @property
+    def description(self) -> str:
+        return self._description
 
     @property
     def aliases(self) -> List[AgentCommandAlias]:

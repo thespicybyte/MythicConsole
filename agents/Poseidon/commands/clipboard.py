@@ -26,6 +26,7 @@ class Clipboard(AgentCommand):
     def __init__(self, agent: MythicAgent):
         super().__init__(agent)
         self._name = "clipboard"
+        self._description = "Get the contents of the clipboard"
         self._subcommand_parsers: Dict[str, cmd2.argparse_custom.Cmd2ArgumentParser] = {
             "monitor": clipboard_monitor_parser
         }
@@ -34,6 +35,10 @@ class Clipboard(AgentCommand):
     @property
     def name(self) -> str:
         return self._name
+
+    @property
+    def description(self) -> str:
+        return self._description
 
     @property
     def subcommand_parsers(self) -> Dict[str, cmd2.argparse_custom.Cmd2ArgumentParser]:

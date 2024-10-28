@@ -57,6 +57,7 @@ class File(AgentCommand):
     def __init__(self, agent: MythicAgent):
         super().__init__(agent=agent)
         self._name = "file"
+        self._description = "Interact with a file on target"
         self._subcommand_parsers: Dict[str, argparse_custom.Cmd2ArgumentParser] = {
             "copy": file_copy_parser,
             "download": file_download_parser,
@@ -68,19 +69,23 @@ class File(AgentCommand):
             "upload": file_upload_parser,
         }
         self._aliases = [
-            AgentCommandAlias("cp", self._name, "copy"),
-            AgentCommandAlias("cat", self._name, "cat"),
-            AgentCommandAlias("download", self._name, "download"),
-            AgentCommandAlias("head", self._name, "head"),
-            AgentCommandAlias("tail", self._name, "tail"),
-            AgentCommandAlias("mv", self._name, "move"),
-            AgentCommandAlias("rm", self._name, "remove"),
-            AgentCommandAlias("upload", self._name, "upload"),
+            AgentCommandAlias("cp", self._name, "copy", description="Copy a file"),
+            AgentCommandAlias("cat", self._name, "cat", description="Cat a file"),
+            AgentCommandAlias("download", self._name, "download", description="Download a file from the target"),
+            AgentCommandAlias("head", self._name, "head", description="Read the first X lines from a file"),
+            AgentCommandAlias("tail", self._name, "tail", description="Read the last X lines from a file"),
+            AgentCommandAlias("mv", self._name, "move", description="Move a file"),
+            AgentCommandAlias("rm", self._name, "remove", description="Remove a file"),
+            AgentCommandAlias("upload", self._name, "upload", description="Upload a file to the target"),
         ]
 
     @property
     def name(self) -> str:
         return self._name
+
+    @property
+    def description(self) -> str:
+        return self._description
 
     @property
     def aliases(self) -> List[AgentCommandAlias]:

@@ -20,6 +20,7 @@ class Print(AgentCommand):
     def __init__(self, agent: MythicAgent):
         super().__init__(agent=agent)
         self._name = "print"
+        self._description = "Show c2 profiles"
         self._subcommand_parsers: Dict[str, argparse_custom.Cmd2ArgumentParser] = {
             "c2": print_c2_parser,
             "p2p": print_p2p_parser,
@@ -29,6 +30,10 @@ class Print(AgentCommand):
     @property
     def name(self) -> str:
         return self._name
+
+    @property
+    def description(self) -> str:
+        return self._description
 
     @property
     def aliases(self) -> List[AgentCommandAlias]:
