@@ -7,7 +7,7 @@ from backend import Task
 from backend.mythic_agent.mythic_agent import AgentCommand, AgentCommandAlias, MythicAgent, add_default_options
 
 c2_parser = Cmd2ArgumentParser()
-c2_subparsers = c2_parser.add_subparsers(title='subcommands', help='subcommand help')
+c2_subparsers = c2_parser.add_subparsers(title='subcommands', help='subcommand help', description="desc")
 
 c2_start_parser = c2_subparsers.add_parser('start', help='Start a C2 profile')
 c2_start_parser.add_argument('profile', help='The name of the c2 profile you want to configure')
@@ -28,6 +28,7 @@ class C2(AgentCommand):
     def __init__(self, agent: MythicAgent):
         super().__init__(agent=agent)
         self._name = "c2"
+        self._description = "Interact with C2 profiles"
         self._subcommand_parsers: Dict[str, argparse_custom.Cmd2ArgumentParser] = {
             "start": c2_start_parser,
             "stop": c2_stop_parser,
@@ -38,6 +39,10 @@ class C2(AgentCommand):
     @property
     def name(self) -> str:
         return self._name
+
+    @property
+    def description(self) -> str:
+        return self._description
 
     @property
     def aliases(self) -> List[AgentCommandAlias]:

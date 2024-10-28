@@ -26,20 +26,25 @@ class Environment(AgentCommand):
     def __init__(self, agent: MythicAgent):
         super().__init__(agent=agent)
         self._name = "environment"
+        self._description = "Interact with environment variables"
         self._subcommand_parsers: Dict[str, argparse_custom.Cmd2ArgumentParser] = {
             "set": env_set_parser,
             "get": env_get_parser,
             "unset": env_unset_parser,
         }
         self._aliases = [
-            AgentCommandAlias("setenv", self._name, "set"),
-            AgentCommandAlias("getenv", self._name, "get"),
-            AgentCommandAlias("unsetenv", self._name, "unset")
+            AgentCommandAlias("setenv", self._name, "set", description="set an environment variable"),
+            AgentCommandAlias("getenv", self._name, "get", description="get all environment"),
+            AgentCommandAlias("unsetenv", self._name, "unset", description="Unset an environment variable")
         ]
 
     @property
     def name(self) -> str:
         return self._name
+
+    @property
+    def description(self) -> str:
+        return self._description
 
     @property
     def aliases(self) -> List[AgentCommandAlias]:

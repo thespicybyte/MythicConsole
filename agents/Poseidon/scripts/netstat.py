@@ -14,6 +14,7 @@ class Netstat(ScriptCommand):
     def __init__(self, agent: MythicAgent):
         super().__init__(agent=agent)
         self._name = "netstat"
+        self._description = "get a netstat by calling sockstat"
         self._subcommand_parsers: Dict[str, argparse_custom.Cmd2ArgumentParser] = {}
         self._aliases = []
         self.command = Command(agent)
@@ -21,6 +22,10 @@ class Netstat(ScriptCommand):
     @property
     def name(self) -> str:
         return self._name
+
+    @property
+    def description(self) -> str:
+        pass
 
     @property
     def aliases(self) -> List[AgentCommandAlias]:
