@@ -7,6 +7,8 @@ import cmd2
 import pyperclip
 from cmd2.exceptions import EmptyStatement
 from mythic.mythic_classes import Mythic
+from rich.table import Table
+from rich.text import Text
 from textual import work, events, on
 from textual._context import NoActiveAppError
 from textual.app import ComposeResult
@@ -289,8 +291,8 @@ class Home(Screen):
         old_stdout = sys.stdout
         sys.stdout = stdout_capture
 
-        current_agent = None
-        console_panel = None
+        current_agent: Optional[MythicAgent] = None
+        console_panel: Optional[ConsolePanel] = None
         prompt = None
         try:
             if self.current_callback:
@@ -304,6 +306,10 @@ class Home(Screen):
             prompt.disabled = True
 
             console_panel.write_string(f"{self.prompt}{cmd}")
+
+            if cmd.strip() == "help":
+                self._show_help(console_panel, current_agent)
+                return
 
             tokens = cmd.split()
             actual_command = cmd
@@ -381,7 +387,7 @@ class Home(Screen):
             logger.exception(worker_error.error)
         except FormatterNotAvailable as e:
             if console_panel:
-                console_panel.write_string(e)
+                console_panel.write_string(Text(e))
             logger.error(e)
         except EmptyStatement:
             pass
@@ -393,6 +399,41 @@ class Home(Screen):
             if prompt:
                 prompt.disabled = False
                 prompt.focus()
+
+    @classmethod
+    def _show_help(cls, console_panel: ConsolePanel, current_agent: Optional[MythicAgent] = None):
+        command_table = Table()
+        command_table.add_column("Command")
+        command_table.add_column("Description", overflow="fold")
+
+        alias_table = Table()
+        alias_table.add_column("Alias")
+        alias_table.add_column("Target")
+        alias_table.add_column("Description", overflow="fold")
+
+        if current_agent:
+            command_table.title = f"{current_agent.name.capitalize()} Commands"
+            for command in current_agent.commands:
+                command_table.add_row(command.name, command.description)
+
+            console_panel.write_string(command_table)
+
+            alias_table.title = f"{current_agent.name.capitalize()} Aliases"
+            for alias in sorted(current_agent.aliases, key=lambda a: a.name):
+                target = f"{alias.command} {alias.subcommand}"
+                if alias.options_prefix:
+                    target += f" {alias.options_prefix}"
+                alias_table.add_row(alias.name, target, alias.description)
+
+            console_panel.write_string("\n")
+            console_panel.write_string(alias_table)
+            return
+
+        command_table.title = "Mythic Commands"
+        command_table.add_row("operation", "View, change, and create operations")
+        command_table.add_row("payload", "Create, download, show payloads")
+        command_table.add_row("user", "View/modify operators/spectators")
+        console_panel.write_string(command_table)
 
     @on(TasksTable.NewTask)
     def _new_task(self, message: TasksTable.NewTask) -> None:
@@ -487,18 +528,19 @@ class Home(Screen):
         tab_key = event.tab.id
 
         if "home" in tab_key:
+            logger.debug(tab_key)
             self.query_one(Sidebar).view_mode = ViewMode.HOME
             self.query_one("#callback_table", DataTable).show_cursor = False
+            # self.query_one(Input).focus()
             return
 
         row_key = tab_key.removeprefix("--content-tab-callback-")
-        logger.debug("new callback tab hit")
         try:
             self.query_one("#callback_table", DataTable).show_cursor = True
             self.query_one(Callbacks).current_tab_id = row_key
             self.query_one(Sidebar).view_mode = ViewMode.CALLBACK
-            logger.debug("populating sidebar")
             self._populate_sidebar()
+            # self.query_one(Input).focus()
 
         except Exception as e:
             logger.error(e)
