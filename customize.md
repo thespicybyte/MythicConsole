@@ -288,6 +288,49 @@ sub-commands.
        file_copy_parser.set_defaults(func=file_copy)
    ```
 
+### Verify Prompts
+
+The `Task` class has an attribute called `verify_prompt` that can be set when defining a command. 
+A verify prompt is a [Modal Screen](https://textual.textualize.io/guide/screens/#modal-screens) the is displayed before the command executes.
+They give the user one last chance to verify they want to run particularly dangerous commands, such as exit. 
+The verify prompt must have a base class of `TaskPrompt` and currently there is one built in, the `YesNoPrompt` class 
+which simply takes in a question which should be answered with a yes or no. 
+
+Example:
+
+```python
+import argparse
+from typing import List, Dict
+
+from cmd2 import cmd2, Cmd2ArgumentParser
+
+from backend import Task
+from backend.mythic_agent.mythic_agent import AgentCommand, MythicAgent
+from screens.prompts import YesNoPrompt
+
+exit_parser = Cmd2ArgumentParser(description="Exit the current session and kill the agent")
+
+
+class Exit(AgentCommand):
+    def __init__(self, agent: MythicAgent):
+        super().__init__(agent)
+        self._name = "exit"
+        self._description = "Exit the current session and kill the agent"
+        self._subcommand_parsers: Dict[str, cmd2.argparse_custom.Cmd2ArgumentParser] = {}
+        self._aliases = []
+
+    # snip....
+    
+    @cmd2.with_argparser(exit_parser)
+    def do_exit(self, _args: argparse.Namespace | str) -> Task:
+        task = Task(self._agent.instance, command="exit",
+                    callback_display_id=self._agent.tasker.callback.display_id)
+
+        task.verify_prompt = YesNoPrompt(question="Exit/kill the current session?")
+        task.background = True
+        return task
+```
+
 3. Last part is to define the formatter. Because copy just returns a plaintext string, we can use the inherited
    `format_plaintext` method.
 
