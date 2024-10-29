@@ -14,12 +14,17 @@ class Config(AgentCommand):
     def __init__(self, agent: MythicAgent):
         super().__init__(agent)
         self._name = "config"
+        self._description = "View current config and host information"
         self._subcommand_parsers: Dict[str, cmd2.argparse_custom.Cmd2ArgumentParser] = {}
         self._aliases = []
 
     @property
     def name(self) -> str:
         return self._name
+
+    @property
+    def description(self) -> str:
+        return self._description
 
     @property
     def subcommand_parsers(self) -> Dict[str, cmd2.argparse_custom.Cmd2ArgumentParser]:

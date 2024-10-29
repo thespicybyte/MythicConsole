@@ -35,17 +35,22 @@ class Ssh(AgentCommand):
     def __init__(self, agent: MythicAgent):
         super().__init__(agent=agent)
         self._name = "ssh"
+        self._description = "Execute/copy a file to another target via ssh"
         self._subcommand_parsers: Dict[str, argparse_custom.Cmd2ArgumentParser] = {
             "execute": ssh_execute_parser,
             "copy": ssh_copy_parser,
         }
         self._aliases = [
-            AgentCommandAlias("scp", self._name, "copy"),
+            AgentCommandAlias("scp", self._name, "copy", description="SCP a file to remote host"),
         ]
 
     @property
     def name(self) -> str:
         return self._name
+
+    @property
+    def description(self) -> str:
+        return self._description
 
     @property
     def aliases(self) -> List[AgentCommandAlias]:

@@ -22,14 +22,20 @@ class Command(AgentCommand):
     def __init__(self, agent: MythicAgent):
         super().__init__(agent=agent)
         self._name = "command"
+        self._description = "Run a command through a shell instance"
         self._subcommand_parsers: Dict[str, argparse_custom.Cmd2ArgumentParser] = {
             "run": command_run_parser,
             "config": command_config_parser,
         }
         self._aliases = [
-            AgentCommandAlias("shell", self._name, "run"),
-            AgentCommandAlias("shell_config", self._name, "config")
+            AgentCommandAlias("shell", self._name, "run", description="run a command"),
+            AgentCommandAlias("shell_config", self._name, "config",
+                              description="Configure how the shell command operates"),
         ]
+
+    @property
+    def description(self) -> str:
+        return self._description
 
     @property
     def name(self) -> str:
@@ -56,8 +62,10 @@ class Command(AgentCommand):
     def command_run(self, args: argparse.Namespace | str) -> Task:
         if isinstance(args, str):
             args = command_run_parser.parse_args(args)
+            command_args = "".join(args.command)
+        else:
+            command_args = " ".join(args.command)
 
-        command_args = " ".join(args.command)
         task = Task(self._agent.instance, command="shell", args=command_args,
                     callback_display_id=self._agent.tasker.callback.display_id)
 

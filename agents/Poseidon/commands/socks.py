@@ -26,6 +26,7 @@ class Socks(AgentCommand):
     def __init__(self, agent: MythicAgent):
         super().__init__(agent=agent)
         self._name = "socks"
+        self._description = "Start or Stop SOCKS5."
         self._subcommand_parsers: Dict[str, argparse_custom.Cmd2ArgumentParser] = {
             "start": socks_start_parser,
             "stop": socks_stop_parser,
@@ -35,6 +36,10 @@ class Socks(AgentCommand):
     @property
     def name(self) -> str:
         return self._name
+
+    @property
+    def description(self) -> str:
+        return self._description
 
     @property
     def aliases(self) -> List[AgentCommandAlias]:

@@ -3,7 +3,7 @@ from typing import List, Dict
 from cmd2 import cmd2, Cmd2ArgumentParser, argparse_custom
 from rich.console import RenderableType
 
-from backend.mythic_agent.mythic_agent import AgentCommand, AgentCommandAlias, MythicAgent, ScriptCommand
+from backend.mythic_agent.mythic_agent import AgentCommandAlias, MythicAgent, ScriptCommand
 from agents.Poseidon.commands.command import Command
 
 netstat_parser = Cmd2ArgumentParser(description="get a netstat by calling sockstat")
@@ -14,6 +14,7 @@ class Netstat(ScriptCommand):
     def __init__(self, agent: MythicAgent):
         super().__init__(agent=agent)
         self._name = "netstat"
+        self._description = "get a netstat by calling sockstat"
         self._subcommand_parsers: Dict[str, argparse_custom.Cmd2ArgumentParser] = {}
         self._aliases = []
         self.command = Command(agent)
@@ -21,6 +22,10 @@ class Netstat(ScriptCommand):
     @property
     def name(self) -> str:
         return self._name
+
+    @property
+    def description(self) -> str:
+        pass
 
     @property
     def aliases(self) -> List[AgentCommandAlias]:
@@ -36,7 +41,7 @@ class Netstat(ScriptCommand):
 
     @cmd2.with_argparser(netstat_parser)
     async def do_netstat(self, _args) -> RenderableType:
-        task = self.command.command_run("sockstat > foo")
+        task = self.command.command_run("sockstat")
         await task.execute()
         await task.wait_for_completion()
         await task.query()

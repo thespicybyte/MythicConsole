@@ -1,51 +1,89 @@
-from typing import Optional
+from enum import Enum
+from typing import List, Optional
 
-from textual import on
+import asyncio
 from textual.app import App, ComposeResult
-from textual.widgets import Header, Footer, Input
+from textual.reactive import var
+from textual.widgets import Header, Footer
 
 from backend import MythicInstance
-from screens.login import LoginScreen
 from screens.home import Home
+from screens.login import LoginScreen
 from utils.logger import logger
 
 
+class Focus(Enum):
+    Input = 1,
+    Console = 2,
+
+
+class State(Enum):
+    Login = 1,
+    LoggingIn = 2,
+    LoginFailed = 3,
+    Main = 4,
+    Interactive = 5,
+    ExtendedInteractive = 6,
+
+
 class MythicConsole(App, inherit_bindings=False):
-    BINDINGS = [("ctrl+q", "exit", "Quit")]
-    SCREENS = {
-        "login": LoginScreen,
-        "home": Home,
-    }
+    authenticated = var(False)
+    instance: Optional[MythicInstance] = None
+
     CSS_PATH = "mythic.tcss"
+    SCREENS = {
+        "home": Home
+    }
+
+    callbacks: List[str] = []
 
     def __init__(self):
-        self.instance: Optional[MythicInstance] = None
         super().__init__()
-        self.push_screen(LoginScreen())
+        self.state = State.Login
+
+    def watch_authenticated(self) -> None:
+        if self.authenticated:
+            self.push_screen(self.SCREENS["home"](self.instance))
+
+    def on_mount(self):
+        logger.debug("starting console")
+        self.push_screen(LoginScreen(), callback=self.handle_login_response)
 
     def compose(self) -> ComposeResult:
-        self.push_screen(LoginScreen(), callback=self.login_result)
         yield Header()
         yield Footer()
 
-    def action_exit(self) -> None:
-        self.app.exit()
+    def handle_login_response(self, response: MythicInstance):
+        self.instance = response
 
-    @on(Input.Submitted)
-    def _enter(self, event: Input.Submitted):
-        logger.info(event.value)
-
-    def login_result(self, instance: MythicInstance):
-        if instance.mythic:
-            self.instance = instance
-            self.push_screen(Home(self.instance))
+        err_message = self.instance.get_login_error()
+        logger.debug(err_message)
+        if err_message:
+            self.notify(f"login failed: {err_message}", severity="error", timeout=15)
+            self.push_screen(LoginScreen(), callback=self.handle_login_response)
             return
-        self.app.exit()
+
+        self.notify(f"login success")
+        loop = asyncio.get_running_loop()
+        if loop:
+            self.instance.loop = loop
+        self.authenticated = True
 
     def action_logout(self):
-        self.app.exit()
+        self.authenticated = False
+        self.instance = None
+
+        logger.debug(app.workers)
+        for worker in app.workers:
+            worker.cancel()
+
+        while len(self.screen_stack) > 1:
+            logger.debug(self.screen_stack[-1].id)
+            self.pop_screen()
+        logger.debug(self.screen_stack)
+        self.push_screen(LoginScreen(), callback=self.handle_login_response)
 
 
-if __name__ == "__main__":
+if __name__ == '__main__':
     app = MythicConsole()
     app.run()

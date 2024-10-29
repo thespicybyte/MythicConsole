@@ -30,20 +30,28 @@ class Process(AgentCommand):
     def __init__(self, agent: MythicAgent):
         super().__init__(agent=agent)
         self._name = "process"
+        self._description = "Interact with the processes on the target"
         self._subcommand_parsers: Dict[str, argparse_custom.Cmd2ArgumentParser] = {
             "list": process_list_parser,
             "kill": process_kill_parser,
             "start": process_start_parser,
         }
         self._aliases = [
-            AgentCommandAlias("ps", self._name, "list"),
-            AgentCommandAlias("kill", self._name, "kill"),
-            AgentCommandAlias("run", self._name, "start"),
+            AgentCommandAlias("ps", self._name, "list",
+                              description="Get a process listing (with optional regex filtering)."),
+            AgentCommandAlias("kill", self._name, "kill",
+                              description="Kill a process by specifying a PID"),
+            AgentCommandAlias("run", self._name, "start",
+                              description="Execute a command from disk with arguments."),
         ]
 
     @property
     def name(self) -> str:
         return self._name
+
+    @property
+    def description(self) -> str:
+        return self._description
 
     @property
     def aliases(self) -> List[AgentCommandAlias]:

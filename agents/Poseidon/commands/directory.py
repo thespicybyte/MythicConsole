@@ -28,6 +28,7 @@ class Directory(AgentCommand):
     def __init__(self, agent: MythicAgent):
         super().__init__(agent=agent)
         self._name = "directory"
+        self._description = "Interact with a directory on target"
         self._subcommand_parsers: Dict[str, argparse_custom.Cmd2ArgumentParser] = {
             "list": directory_list_parser,
             "change": directory_list_parser,
@@ -35,15 +36,19 @@ class Directory(AgentCommand):
             "working": directory_working_parser,
         }
         self._aliases = [
-            AgentCommandAlias("ls", self._name, "list"),
-            AgentCommandAlias("cd", self._name, "change"),
-            AgentCommandAlias("mkdir", self._name, "create"),
-            AgentCommandAlias("pwd", self._name, "working"),
+            AgentCommandAlias("ls", self._name, "list", description="list a directory"),
+            AgentCommandAlias("cd", self._name, "change", description="change a directory"),
+            AgentCommandAlias("mkdir", self._name, "create", description="create a directory"),
+            AgentCommandAlias("pwd", self._name, "working", description="Print the current working directory"),
         ]
 
     @property
     def name(self) -> str:
         return self._name
+
+    @property
+    def description(self) -> str:
+        return self._description
 
     @property
     def aliases(self) -> List[AgentCommandAlias]:
