@@ -14,6 +14,8 @@ users to interact with callbacks and operations.
 
 # Demo
 
+![](assets/demo1.mp4)
+
 # Quick Start
 
 ## Requirements
