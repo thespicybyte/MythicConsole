@@ -3,7 +3,7 @@
 Mythic Console is a terminal user interface that can be used to interact
 with [Mythic C2](https://github.com/its-a-feature/Mythic).
 Mythic Console is not designed to replace the web interface but rather provide an alternate interface to experience for
-users to interact with callbacks and operations.
+users to interact with callbacks and operations. This application was made with [Textual](https://textual.textualize.io/).
 
 > [!NOTE]
 > This is a pre-release under in active development.
