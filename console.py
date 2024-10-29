@@ -26,7 +26,7 @@ class State(Enum):
     ExtendedInteractive = 6,
 
 
-class MythicTUI(App, inherit_bindings=False):
+class MythicConsole(App, inherit_bindings=False):
     authenticated = var(False)
     instance: Optional[MythicInstance] = None
 
@@ -85,5 +85,5 @@ class MythicTUI(App, inherit_bindings=False):
 
 
 if __name__ == '__main__':
-    app = MythicTUI()
+    app = MythicConsole()
     app.run()
