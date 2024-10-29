@@ -62,8 +62,10 @@ class Command(AgentCommand):
     def command_run(self, args: argparse.Namespace | str) -> Task:
         if isinstance(args, str):
             args = command_run_parser.parse_args(args)
+            command_args = "".join(args.command)
+        else:
+            command_args = " ".join(args.command)
 
-        command_args = " ".join(args.command)
         task = Task(self._agent.instance, command="shell", args=command_args,
                     callback_display_id=self._agent.tasker.callback.display_id)
 
