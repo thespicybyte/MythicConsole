@@ -210,7 +210,6 @@ class Home(Screen):
         for callback_uuid in callback_uuids:
             cb = Callback(self.instance, callback_uuid=callback_uuid)
             await cb.query()
-            # await cb.get_all_tasks()
             callback_table.add_row(cb.display_id, cb.hostname, cb.payload_type_name, cb.uuid, key=cb.uuid)
             if cb.uuid not in self.active_callbacks.keys():
                 self.active_callbacks[cb.uuid] = cb
@@ -233,9 +232,6 @@ class Home(Screen):
                 continue
             callback.tasks.append(task)
             self.post_message(TasksTable.NewTask(task))
-            # if self.current_callback:
-            #     if self.current_callback.uuid == task.callback_uuid:
-            #         task_table.add_row(task.id, task.uuid, )
 
     @work()
     async def _monitor_tasks(self) -> None:
