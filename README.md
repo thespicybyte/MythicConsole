@@ -14,7 +14,7 @@ users to interact with callbacks and operations.
 
 # Demo
 
-https://github.com/thespicybyte/MythicConsole/blob/dev/assets/demo1.mp4
+https://github.com/user-attachments/assets/daace4bd-f779-4984-983c-5c38b7562d8d
 
 # Quick Start
 
