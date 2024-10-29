@@ -9,6 +9,7 @@ from rich.text import Text
 import utils
 from backend import Formatter, Task
 from utils.environment import Environment
+from utils.logger import logger
 
 
 class PoseidonFormatter(Formatter):
@@ -84,7 +85,7 @@ class PoseidonFormatter(Formatter):
             if not os.path.isdir(download_dir):
                 os.makedirs(download_dir, exist_ok=True)
 
-            local_path = os.path.join(download_dir, timestamped_name)
+            local_path = os.path.join(download_dir, timestamped_name.replace("/", "_"))
             success = await task.download_file(local_path)
         except Exception as e:
             return Text(f"failed to download file: {e}")
