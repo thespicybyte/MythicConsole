@@ -50,6 +50,7 @@ class Sidebar(Container):
         self.task_table_widget = TasksTable(self.instance)
         self.task_table_widget.visible = False
         self._cmd: Optional[MythicCmd] = None
+        self.operation = Operation(instance, operation_id=instance.mythic.current_operation_id)
 
     def _get_style_width_value(self) -> float:
         """
@@ -62,7 +63,7 @@ class Sidebar(Container):
 
     def compose(self) -> ComposeResult:
         with VerticalScroll():
-            yield SessionInfo(self.instance)
+            yield SessionInfo(self.instance, self.operation)
             yield self.callbacks_widget
             yield self.task_table_widget
 
