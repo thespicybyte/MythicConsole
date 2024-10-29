@@ -41,8 +41,6 @@ class MythicCmd(Cmd):
         for alias_name in alias_names:
             del self.aliases[alias_name]
 
-        logger.debug(self.aliases)
-
     def load_mythic_commands(self):
         self.unload_agent_commands()
         mythic_commands = MythicCommands(self._instance)
@@ -62,7 +60,6 @@ class MythicCmd(Cmd):
 
             self.aliases[alias.name] = alias_function
 
-        logger.debug(self.aliases)
         return
 
     def load_and_register_agent_commands(self):
@@ -108,8 +105,6 @@ class MythicCmd(Cmd):
                 setattr(self, method_name, method)
                 self._loaded_commands.append(method_name)
                 logger.info(f"successfully loaded script: {command_name}")
-
-        logger.debug(self.aliases)
 
     def onecmd(self, statement: Union[Statement, str], *, add_to_history: bool = True) -> Coroutine | None:
         """This executes the actual do_* method for a command.
