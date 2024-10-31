@@ -14,7 +14,7 @@ from textual.document._document import Location, EditResult
 from textual.events import Paste, MouseUp
 from textual.message import Message
 from textual.widget import Widget
-from textual.widgets import TextArea, Input, Label, Button
+from textual.widgets import TextArea, Input, Label
 from textual.widgets._text_area import ThemeDoesNotExist
 
 from textual_textarea import TextEditor
