@@ -558,7 +558,10 @@ class MythicCommands(Cmd):
 
     def get_completer_items(self, line: str) -> List[str]:
         items = []
-        tokens = shlex.split(line)
+        try:
+            tokens = shlex.split(line)
+        except:
+            return items
 
         if len(tokens) == 1:
             # items.append("help")

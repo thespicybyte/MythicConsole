@@ -28,7 +28,7 @@ from backend.task.task import TaskError
 from utils.logger import logger
 from widgets.calback_tabs import CallbackTabs
 from widgets.callbacks import Callbacks, CallbackTable
-from widgets.console import ConsolePanel
+from widgets.console import ConsolePanel, ConsoleInput
 from widgets.messages import TabClosed, CopyToClipboard, ClipboardReady, UpdateCurrentCallback
 from widgets.session_info import SessionInfo
 from widgets.tasks_table import TasksTable, ReplayTask
@@ -162,6 +162,17 @@ class Home(Screen):
             logger.error(e)
             self.app.notify(f"error copying to clipboard: {e}", severity="error", timeout=5)
         message.stop()
+
+    @on(ConsoleInput.Paste)
+    def _paste_to_input(self):
+        if not self.system_paste:
+            return
+
+        console_input = self.query_one(ConsoleInput)
+        content = self.system_paste()
+        content = content.replace("\n", " ")
+        if content:
+            console_input.append(content.strip())
 
     @work(thread=True)
     def _determine_clipboard(self) -> None:
