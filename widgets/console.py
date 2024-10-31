@@ -11,7 +11,7 @@ from textual.binding import Binding
 from textual.color import Color
 from textual.containers import Container, Vertical
 from textual.document._document import Location, EditResult
-from textual.events import Paste
+from textual.events import Paste, MouseUp
 from textual.message import Message
 from textual.widget import Widget
 from textual.widgets import TextArea, Input, Label
@@ -216,7 +216,17 @@ class Console(TextEditor, inherit_bindings=False):
 
 
 class ConsoleInput(Input):
-    pass
+    class Paste(Message):
+        pass
+
+    @on(MouseUp)
+    async def _on_click(self, event: events.MouseUp) -> None:
+        if event.button == 2:
+            self.post_message(self.Paste())
+
+    def append(self, value: str) -> None:
+        """Append a string to the current value in the input"""
+        self.value += value
 
 
 class CommandAutoComplete(AutoComplete):
