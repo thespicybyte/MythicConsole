@@ -170,14 +170,11 @@ class ConsoleAreaPlus(TextAreaPlus):
         self._set_theme(theme_name)
 
 
-class Console(TextEditor):
+class Console(TextEditor, inherit_bindings=False):
     BINDINGS = [
-        Binding("ctrl+s", "save", "Save Query", show=False),
         Binding("ctrl+o", "load", "Open Query", show=False),
         Binding("ctrl+f", "find", "Find", show=False),
         Binding("f3", "find(True)", "Find Next", show=False),
-        Binding("ctrl+g", "goto_line", "Go To Line", show=False),
-        # Binding("ctrl+q", "quit", "Quit"),
     ]
 
     def __init__(self, *children: Widget):
@@ -216,18 +213,6 @@ class Console(TextEditor):
         area = self.query_one(TextArea)
         area.insert(string_io.getvalue(), area.document.end)
         string_io.close()
-
-    def goto_line(self, message: Input.Submitted) -> None:
-        """Override base class behavior"""
-        return
-
-    def action_load(self) -> None:
-        """Override base class behavior"""
-        return
-
-    def action_save(self) -> None:
-        """Override base class behavior"""
-        return
 
 
 class ConsoleInput(Input):
