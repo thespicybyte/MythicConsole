@@ -15,7 +15,7 @@ class Exit(AgentCommand):
         super().__init__(agent)
         self._name = "exit"
         self._description = "Exit the current session and kill the agent"
-        self._subcommand_parsers: Dict[str, cmd2.argparse_custom.Cmd2ArgumentParser] = {}
+        self._subcommand_parsers: Dict[str, Cmd2ArgumentParser] = {}
         self._aliases = []
 
     @property
@@ -27,11 +27,11 @@ class Exit(AgentCommand):
         return self._description
 
     @property
-    def subcommand_parsers(self) -> Dict[str, cmd2.argparse_custom.Cmd2ArgumentParser]:
+    def subcommand_parsers(self) -> Dict[str, Cmd2ArgumentParser]:
         return self._subcommand_parsers
 
     @property
-    def command_parser(self) -> cmd2.argparse_custom.Cmd2ArgumentParser:
+    def command_parser(self) -> Cmd2ArgumentParser:
         return exit_parser
 
     @property

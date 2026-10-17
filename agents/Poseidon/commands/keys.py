@@ -2,7 +2,7 @@ import argparse
 from random import choice
 from typing import List, Dict
 
-from cmd2 import cmd2, Cmd2ArgumentParser, argparse_custom
+from cmd2 import cmd2, Cmd2ArgumentParser
 
 from backend import Task
 from backend.mythic_agent.mythic_agent import AgentCommand, AgentCommandAlias, MythicAgent, add_default_options
@@ -34,7 +34,7 @@ class Keys(AgentCommand):
         super().__init__(agent=agent)
         self._name = "keys"
         self._description = "Interact with the linux keyring"
-        self._subcommand_parsers: Dict[str, argparse_custom.Cmd2ArgumentParser] = {
+        self._subcommand_parsers: Dict[str, Cmd2ArgumentParser] = {
             "session": keys_session_parser,
             "user": keys_user_parser,
             "process": keys_process_parser,
@@ -55,11 +55,11 @@ class Keys(AgentCommand):
         return self._aliases
 
     @property
-    def subcommand_parsers(self) -> Dict[str, cmd2.argparse_custom.Cmd2ArgumentParser]:
+    def subcommand_parsers(self) -> Dict[str, Cmd2ArgumentParser]:
         return self._subcommand_parsers
 
     @property
-    def command_parser(self) -> cmd2.argparse_custom.Cmd2ArgumentParser:
+    def command_parser(self) -> Cmd2ArgumentParser:
         return keys_parser
 
     @cmd2.with_argparser(keys_parser)

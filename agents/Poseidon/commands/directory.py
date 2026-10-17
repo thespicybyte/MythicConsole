@@ -1,6 +1,6 @@
 from typing import List, Dict
 
-from cmd2 import cmd2, argparse_custom, Cmd2ArgumentParser
+from cmd2 import cmd2, Cmd2ArgumentParser
 
 from backend import Task
 from backend.mythic_agent.mythic_agent import AgentCommand, AgentCommandAlias, MythicAgent, add_default_options
@@ -29,7 +29,7 @@ class Directory(AgentCommand):
         super().__init__(agent=agent)
         self._name = "directory"
         self._description = "Interact with a directory on target"
-        self._subcommand_parsers: Dict[str, argparse_custom.Cmd2ArgumentParser] = {
+        self._subcommand_parsers: Dict[str, Cmd2ArgumentParser] = {
             "list": directory_list_parser,
             "change": directory_list_parser,
             "create": directory_create_parser,
@@ -55,11 +55,11 @@ class Directory(AgentCommand):
         return self._aliases
 
     @property
-    def subcommand_parsers(self) -> Dict[str, cmd2.argparse_custom.Cmd2ArgumentParser]:
+    def subcommand_parsers(self) -> Dict[str, Cmd2ArgumentParser]:
         return self._subcommand_parsers
 
     @property
-    def command_parser(self) -> cmd2.argparse_custom.Cmd2ArgumentParser:
+    def command_parser(self) -> Cmd2ArgumentParser:
         return directory_parser
 
     @cmd2.with_argparser(directory_parser)

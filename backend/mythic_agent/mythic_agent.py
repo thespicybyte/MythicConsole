@@ -5,7 +5,7 @@ from abc import ABC, abstractmethod
 from pathlib import Path
 from typing import List, Dict, Optional
 
-from cmd2 import cmd2, argparse_custom, with_argparser, Cmd, Cmd2ArgumentParser
+from cmd2 import cmd2, with_argparser, Cmd, Cmd2ArgumentParser
 from glob import glob
 
 from rich.console import RenderableType
@@ -25,7 +25,7 @@ class MythicAgent:
     pass
 
 
-def add_default_options(parser: cmd2.argparse_custom.Cmd2ArgumentParser):
+def add_default_options(parser: Cmd2ArgumentParser):
     parser.add_argument('-bg', '--background', action='store_true', help='run task in background')
 
 
@@ -81,13 +81,13 @@ class AgentCommand(ABC, cmd2.Cmd):
 
     @property
     @abstractmethod
-    def subcommand_parsers(self) -> Dict[str, cmd2.argparse_custom.Cmd2ArgumentParser]:
+    def subcommand_parsers(self) -> Dict[str, Cmd2ArgumentParser]:
         """List of sub command parsers"""
         pass
 
     @property
     @abstractmethod
-    def command_parser(self) -> cmd2.argparse_custom.Cmd2ArgumentParser:
+    def command_parser(self) -> Cmd2ArgumentParser:
         """return the parser for the command"""
 
     @property
@@ -117,7 +117,7 @@ class AgentCommand(ABC, cmd2.Cmd):
 
         return self.get_parser_options(parser)
 
-    def get_subcommand_parser(self, subcommand: str) -> cmd2.argparse_custom.Cmd2ArgumentParser | None:
+    def get_subcommand_parser(self, subcommand: str) -> Cmd2ArgumentParser | None:
         return self.subcommand_parsers.get(subcommand)
 
     @classmethod
@@ -342,14 +342,14 @@ class MythicAgent:
         return []
 
     def get_subcommand_parser(self, command_name: str,
-                              subcommand_name: str) -> cmd2.argparse_custom.Cmd2ArgumentParser | None:
+                              subcommand_name: str) -> Cmd2ArgumentParser | None:
         for command in self._commands:
             if command.name == command_name:
                 return command.get_subcommand_parser(subcommand_name)
 
         return None
 
-    def get_command_parser(self, command_name: str) -> cmd2.argparse_custom.Cmd2ArgumentParser | None:
+    def get_command_parser(self, command_name: str) -> Cmd2ArgumentParser | None:
         for command in self._commands:
             if command.name == command_name:
                 return command.command_parser
@@ -481,10 +481,10 @@ class MythicCommands(Cmd):
         self._aliases = [
             AgentCommandAlias("op", "operation"),
         ]
-        self._command_parsers: Dict[str, argparse_custom.Cmd2ArgumentParser] = {
+        self._command_parsers: Dict[str, Cmd2ArgumentParser] = {
             "operation": mythic_command_parsers.operation_parser,
         }
-        self._subcommand_parsers: Dict[str, argparse_custom.Cmd2ArgumentParser] = {
+        self._subcommand_parsers: Dict[str, Cmd2ArgumentParser] = {
             "operation list": mythic_command_parsers.operation_list_parser,
             "user list": mythic_command_parsers.user_list_parser,
             "user create": mythic_command_parsers.user_create_parser,
@@ -526,10 +526,10 @@ class MythicCommands(Cmd):
 
         return subcommands
 
-    def get_command_parser(self, command: str) -> cmd2.argparse_custom.Cmd2ArgumentParser | None:
+    def get_command_parser(self, command: str) -> Cmd2ArgumentParser | None:
         return self._command_parsers.get(command)
 
-    def get_subcommand_parser(self, subcommand: str) -> cmd2.argparse_custom.Cmd2ArgumentParser | None:
+    def get_subcommand_parser(self, subcommand: str) -> Cmd2ArgumentParser | None:
         return self._subcommand_parsers.get(subcommand)
 
     def get_subcommand_options(self, command_name: str, subcommand_name: str):

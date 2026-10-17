@@ -18,7 +18,7 @@ from textual.widgets import TextArea, Input, Label
 from textual.widgets._text_area import ThemeDoesNotExist
 
 from textual_textarea import TextEditor
-from textual_autocomplete import AutoComplete, Dropdown, DropdownItem, InputState
+from textual_autocomplete import AutoComplete, DropdownItem, TargetState
 from textual_textarea.autocomplete import CompletionList
 from textual_textarea.containers import TextContainer, FooterContainer
 from textual_textarea.text_editor import TextAreaPlus
@@ -97,7 +97,7 @@ class ConsoleAreaPlus(TextAreaPlus):
         super().__init__(text=text, language=language)
         self.register_theme(MYTHIC_DARK)
         self.register_theme(MYTHIC_LIGHT)
-        self._set_theme("mythic_dark" if self.app.dark else "mythic_light")
+        self._set_theme("mythic_dark" if self.app.current_theme.dark else "mythic_light")
 
     def _handle_tab(self, _event: events.Key) -> None:
         """Override editor behavior which would write a tab in the console"""
@@ -183,11 +183,11 @@ class Console(TextEditor, inherit_bindings=False):
         self.completion_list = CompletionList()
         self.footer = FooterContainer(classes="hide")
         self.footer_label = Label("", id="textarea__save_open_input_label")
-        self.watch(self.app, "dark", self._app_dark_toggled, init=False)
+        self.watch(self.app, "theme", self._app_dark_toggled, init=False)
         self.text_input = ConsoleAreaPlus(language=self._language, text=self._initial_text)
 
     def _app_dark_toggled(self):
-        if self.app.dark:
+        if self.app.current_theme.dark:
             self.text_input.set_theme("mythic_dark")
             return
         self.text_input.set_theme("mythic_light")
@@ -230,56 +230,63 @@ class ConsoleInput(Input):
 
 
 class CommandAutoComplete(AutoComplete):
-    def on_key(self, event: events.Key) -> None:
-        if not self.dropdown.display:
-            # only respond and stop the event if the dropdown is open
+    """Autocomplete which completes only the last word of the line in the target input"""
+
+    def __init__(self, target: Input, panel: "ConsolePanel"):
+        super().__init__(target)
+        self.panel = panel
+        # text recalled from history; no suggestions are offered until the text changes
+        self.suppressed_text: Optional[str] = None
+
+    def get_search_string(self, target_state: TargetState) -> str:
+        """Match against the last word of the line instead of the entire line"""
+        text = target_state.text
+        if not text or text.endswith(" ") or text.endswith("\""):
+            return ""
+
+        try:
+            tokens = shlex.split(text)
+        except ValueError:
+            return ""
+
+        return tokens[-1] if tokens else ""
+
+    def get_candidates(self, target_state: TargetState) -> List[DropdownItem]:
+        """
+        Generates a list of possible matches based on the current input state
+        :param target_state: Current text and cursor position of the input
+        :return: List of possible matches
+        """
+        if self.suppressed_text is not None:
+            if target_state.text == self.suppressed_text:
+                return []
+            self.suppressed_text = None
+
+        if not self.get_search_string(target_state):
+            return []
+
+        text = target_state.text
+        if self.panel.agent:
+            items = self.panel.agent.get_completer_items(text)
+        else:
+            items = self.panel.mythic_commands.get_completer_items(text)
+
+        return [DropdownItem(item) for item in items]
+
+    def apply_completion(self, value: str, state: TargetState) -> None:
+        """Replace the last word with the selected value without replacing the entire line"""
+        try:
+            tokens = shlex.split(state.text)
+        except ValueError:
             return
 
-        key = event.key
-        if key == "down":
-            self.dropdown.cursor_down()
-            event.stop()
-        elif key == "up":
-            self.dropdown.cursor_up()
-            event.stop()
-        elif key == "escape":
-            self.dropdown.close()
-            event.stop()
-        elif key == "tab" or key == "enter" or key == "right":
-            # Only interfere if there's a dropdown visible,
-            # otherwise, we want things to behave like a normal input.
-            if self.dropdown.display:
-                self._select_item()
-                if not self.tab_moves_focus:
-                    event.stop()  # Prevent focus change
-
-
-class CommandDropdown(Dropdown):
-    def reposition(
-            self,
-            input_cursor_position: int | None = None,
-            scroll_target_adjust_y: int = 0,
-    ) -> None:
-        if self.input_widget is None:
+        if not tokens:
             return
 
-        if input_cursor_position is None:
-            input_cursor_position = self.input_widget.cursor_position
-
-        top, right, bottom, left = self.styles.margin
-        x, y, width, height = self.input_widget.content_region
-        count = len(self.child.matches)
-        line_below_cursor = y - count + scroll_target_adjust_y
-
-        cursor_screen_position = x + (
-                input_cursor_position - self.input_widget.view_position
-        )
-        self.styles.margin = (
-            line_below_cursor,
-            right,
-            bottom,
-            cursor_screen_position,
-        )
+        tokens[-1] = value
+        result = " ".join(tokens) + " "
+        self.target.value = result
+        self.target.cursor_position = len(result)
 
 
 class ConsolePanel(Container):
@@ -294,59 +301,12 @@ class ConsolePanel(Container):
         super().__init__(*children)
         self.instance = instance
         self.agent: Optional[MythicAgent] = None
-        self.auto = CommandAutoComplete(ConsoleInput(), CommandDropdown(items=self._get_matches),
-                                        completion_strategy=self._complete)
         self.mythic_commands = MythicCommands(instance)
+        self.console_input = ConsoleInput()
+        self.auto = CommandAutoComplete(self.console_input, self)
         self._mythic_console = Console()
         self._history: List[str] = []
         self._history_index: int = -1
-
-    @classmethod
-    def _complete(cls, selected_value: str, old_state: InputState) -> InputState:
-        """
-        Replace the last word with the selected value from the `DropDown` without replacing the entire line
-        :param selected_value: Value the user selected from the `DropDown`
-        :param old_state: old `InputState` value which includes the value of the entire line
-        :return: Updated `InputState`
-        """
-        tokens = shlex.split(old_state.value)
-        tokens[-1] = selected_value
-        result = " ".join(tokens) + " "
-        new_state = InputState(value=result, cursor_position=len(result))
-        return new_state
-
-    def _get_matches(self, state: List[DropdownItem] | InputState) -> List[DropdownItem]:
-        """
-        Generates a list of possible matches based on what the current input state
-        :param state: Current input state or value in the input
-        :return: List of possible matches
-        """
-        if not isinstance(state, InputState):
-            # not handled, don't think this will hit
-            return []
-
-        if not state.value:
-            return []
-
-        if state.value.endswith(" ") or state.value.endswith("\""):
-            return []
-
-        if self.agent:
-            items = self.agent.get_completer_items(state.value)
-        else:
-            items = self.mythic_commands.get_completer_items(state.value)
-
-        try:
-            tokens = shlex.split(state.value)
-        except:
-            return []
-
-        matched_items = []
-        for item in items:
-            if item.__contains__(tokens[-1]):
-                matched_items.append(DropdownItem(item))
-
-        return matched_items
 
     def compose(self) -> ComposeResult:
         logger.info(self.auto)
@@ -354,6 +314,7 @@ class ConsolePanel(Container):
             with Vertical():
                 logger.warning("yeidling consle")
                 yield self._mythic_console
+                yield self.console_input
                 logger.warning("yeidling auto")
                 yield self.auto
                 logger.warning("yeilded auto")
@@ -392,6 +353,13 @@ class ConsolePanel(Container):
         if self._history[-1] != command:
             self._history.append(command)
 
+    def _recall(self, console_input: ConsoleInput, value: str) -> None:
+        """Put a history entry in the input without opening the autocomplete dropdown"""
+        self.auto.suppressed_text = value
+        console_input.value = value
+        console_input.cursor_position = len(value)
+        self.auto.action_hide()
+
     @on(events.Key)
     def key_press(self, event: events.Key) -> None:
         """
@@ -407,17 +375,14 @@ class ConsolePanel(Container):
                     return
                 if self._history_index < 0:
                     self._history_index = len(self._history) - 1
-                    console_input.value = self._history[self._history_index]
-                    console_input.cursor_position = len(console_input.value)
+                    self._recall(console_input, self._history[self._history_index])
                     return
 
                 self._history_index -= 1
                 if self._history_index <= 0:
                     self._history_index = 0
 
-                console_input.value = self._history[self._history_index]
-                self.auto.dropdown.visible = False
-                console_input.cursor_position = len(console_input.value)
+                self._recall(console_input, self._history[self._history_index])
             case "down":
                 event.stop()
                 if not self._history:
@@ -432,9 +397,7 @@ class ConsolePanel(Container):
                     console_input.value = ""
                     return
 
-                console_input.value = self._history[self._history_index]
-                self.auto.dropdown.visible = False
-                console_input.cursor_position = len(console_input.value)
+                self._recall(console_input, self._history[self._history_index])
             case "tab":
                 event.stop()
                 event.prevent_default()

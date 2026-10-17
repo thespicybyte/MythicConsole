@@ -17,7 +17,7 @@ class Sleep(AgentCommand):
         super().__init__(agent)
         self._name = "sleep"
         self._description = "Update the sleep interval of the agent."
-        self._subcommand_parsers: Dict[str, cmd2.argparse_custom.Cmd2ArgumentParser] = {}
+        self._subcommand_parsers: Dict[str, Cmd2ArgumentParser] = {}
         self._aliases = []
 
     @property
@@ -29,11 +29,11 @@ class Sleep(AgentCommand):
         return self._description
 
     @property
-    def subcommand_parsers(self) -> Dict[str, cmd2.argparse_custom.Cmd2ArgumentParser]:
+    def subcommand_parsers(self) -> Dict[str, Cmd2ArgumentParser]:
         return self._subcommand_parsers
 
     @property
-    def command_parser(self) -> cmd2.argparse_custom.Cmd2ArgumentParser:
+    def command_parser(self) -> Cmd2ArgumentParser:
         return sleep_parser
 
     @property

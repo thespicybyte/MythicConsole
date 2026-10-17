@@ -102,14 +102,11 @@ SessionInfo {
     border-title-align: left;
 }
 
-ConsolePanel > Container > Vertical > AutoComplete {
+ConsolePanel > Container > Vertical > ConsoleInput {
     min-height: 3;
     max-height: 3;
     content-align: left middle;
     dock: bottom;
-}
-
-ConsolePanel > Container > Vertical > AutoComplete > Input {
     border: solid $background-lighten-3 100%;
     padding: 0 1;
     &:focus {
