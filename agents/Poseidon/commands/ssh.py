@@ -1,6 +1,6 @@
 from typing import List, Dict
 
-from cmd2 import cmd2, argparse_custom, Cmd2ArgumentParser
+from cmd2 import cmd2, Cmd2ArgumentParser
 
 from backend import Task
 from backend.mythic_agent.mythic_agent import AgentCommand, AgentCommandAlias, MythicAgent, add_default_options
@@ -36,7 +36,7 @@ class Ssh(AgentCommand):
         super().__init__(agent=agent)
         self._name = "ssh"
         self._description = "Execute/copy a file to another target via ssh"
-        self._subcommand_parsers: Dict[str, argparse_custom.Cmd2ArgumentParser] = {
+        self._subcommand_parsers: Dict[str, Cmd2ArgumentParser] = {
             "execute": ssh_execute_parser,
             "copy": ssh_copy_parser,
         }
@@ -57,11 +57,11 @@ class Ssh(AgentCommand):
         return self._aliases
 
     @property
-    def subcommand_parsers(self) -> Dict[str, cmd2.argparse_custom.Cmd2ArgumentParser]:
+    def subcommand_parsers(self) -> Dict[str, Cmd2ArgumentParser]:
         return self._subcommand_parsers
 
     @property
-    def command_parser(self) -> cmd2.argparse_custom.Cmd2ArgumentParser:
+    def command_parser(self) -> Cmd2ArgumentParser:
         return ssh_parser
 
     @cmd2.with_argparser(ssh_parser)

@@ -1,7 +1,7 @@
 import argparse
 from typing import List, Dict
 
-from cmd2 import cmd2, Cmd2ArgumentParser, argparse_custom
+from cmd2 import cmd2, Cmd2ArgumentParser
 
 from backend import Task
 from backend.mythic_agent.mythic_agent import AgentCommand, AgentCommandAlias, MythicAgent, add_default_options
@@ -27,7 +27,7 @@ class Socks(AgentCommand):
         super().__init__(agent=agent)
         self._name = "socks"
         self._description = "Start or Stop SOCKS5."
-        self._subcommand_parsers: Dict[str, argparse_custom.Cmd2ArgumentParser] = {
+        self._subcommand_parsers: Dict[str, Cmd2ArgumentParser] = {
             "start": socks_start_parser,
             "stop": socks_stop_parser,
         }
@@ -46,11 +46,11 @@ class Socks(AgentCommand):
         return self._aliases
 
     @property
-    def subcommand_parsers(self) -> Dict[str, cmd2.argparse_custom.Cmd2ArgumentParser]:
+    def subcommand_parsers(self) -> Dict[str, Cmd2ArgumentParser]:
         return self._subcommand_parsers
 
     @property
-    def command_parser(self) -> cmd2.argparse_custom.Cmd2ArgumentParser:
+    def command_parser(self) -> Cmd2ArgumentParser:
         return socks_parser
 
     @cmd2.with_argparser(socks_parser)

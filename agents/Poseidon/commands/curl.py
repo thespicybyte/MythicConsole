@@ -35,7 +35,7 @@ class Curl(AgentCommand):
         super().__init__(agent)
         self._name = "curl"
         self._description = "Execute a single web request"
-        self._subcommand_parsers: Dict[str, cmd2.argparse_custom.Cmd2ArgumentParser] = {
+        self._subcommand_parsers: Dict[str, Cmd2ArgumentParser] = {
             "env-set": curl_env_set_parser,
             "env-get": curl_env_get_parser,
             "env-clear": curl_env_clear_parser,
@@ -51,11 +51,11 @@ class Curl(AgentCommand):
         return self._description
 
     @property
-    def subcommand_parsers(self) -> Dict[str, cmd2.argparse_custom.Cmd2ArgumentParser]:
+    def subcommand_parsers(self) -> Dict[str, Cmd2ArgumentParser]:
         return self._subcommand_parsers
 
     @property
-    def command_parser(self) -> cmd2.argparse_custom.Cmd2ArgumentParser:
+    def command_parser(self) -> Cmd2ArgumentParser:
         return curl_parser
 
     @property

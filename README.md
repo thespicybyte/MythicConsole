@@ -20,7 +20,7 @@ https://github.com/user-attachments/assets/daace4bd-f779-4984-983c-5c38b7562d8d
 
 ## Requirements
 
-Mythic Console requires python 3.8 or greater.
+Mythic Console requires python 3.11 or greater.
 
 ## Installation
 

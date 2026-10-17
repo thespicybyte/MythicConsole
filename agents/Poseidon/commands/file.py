@@ -2,7 +2,7 @@ import argparse
 from pathlib import Path
 from typing import List, Dict
 
-from cmd2 import cmd2, Cmd2ArgumentParser, argparse_custom
+from cmd2 import cmd2, Cmd2ArgumentParser
 from mythic import mythic
 
 from backend import Task
@@ -58,7 +58,7 @@ class File(AgentCommand):
         super().__init__(agent=agent)
         self._name = "file"
         self._description = "Interact with a file on target"
-        self._subcommand_parsers: Dict[str, argparse_custom.Cmd2ArgumentParser] = {
+        self._subcommand_parsers: Dict[str, Cmd2ArgumentParser] = {
             "copy": file_copy_parser,
             "download": file_download_parser,
             "move": file_move_parser,
@@ -92,11 +92,11 @@ class File(AgentCommand):
         return self._aliases
 
     @property
-    def subcommand_parsers(self) -> Dict[str, cmd2.argparse_custom.Cmd2ArgumentParser]:
+    def subcommand_parsers(self) -> Dict[str, Cmd2ArgumentParser]:
         return self._subcommand_parsers
 
     @property
-    def command_parser(self) -> cmd2.argparse_custom.Cmd2ArgumentParser:
+    def command_parser(self) -> Cmd2ArgumentParser:
         return file_parser
 
     @cmd2.with_argparser(file_parser)

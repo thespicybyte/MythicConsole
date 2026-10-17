@@ -33,6 +33,9 @@ from widgets.messages import TabClosed, CopyToClipboard, ClipboardReady, UpdateC
 from widgets.session_info import SessionInfo
 from widgets.tasks_table import TasksTable, ReplayTask
 
+# captured cmd2 help text is shown in the console panel, so it must be plain text
+cmd2.rich_utils.ALLOW_STYLE = cmd2.rich_utils.AllowStyle.NEVER
+
 
 class ViewMode(Enum):
     HOME = 1

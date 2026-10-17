@@ -1,3 +1,4 @@
+import sys
 from typing import Optional, List, Union, Coroutine
 
 from cmd2 import Cmd, Statement
@@ -123,7 +124,7 @@ class MythicCmd(Cmd):
             statement = self._input_line_to_statement(statement)
 
         result = None
-        func = self.cmd_func(statement.command)
+        func = self.get_command_func(statement.command)
         if func:
             # Check to see if this command should be stored in history
             if (
@@ -132,6 +133,11 @@ class MythicCmd(Cmd):
                     and add_to_history
             ):
                 self.history.append(statement)
+
+            # cmd2 4.x renders argparse help to the owning instance's stdout, which is fixed at construction.
+            # Point it at the live (captured) sys.stdout so help text lands in the console panel.
+            owner = getattr(func, "__self__", self)
+            owner.stdout = sys.stdout
 
             # result = await func(statement)
             return func(statement)

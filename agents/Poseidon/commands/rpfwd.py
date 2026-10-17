@@ -1,7 +1,7 @@
 import argparse
 from typing import List, Dict
 
-from cmd2 import cmd2, Cmd2ArgumentParser, argparse_custom
+from cmd2 import cmd2, Cmd2ArgumentParser
 
 from backend import Task
 from backend.mythic_agent.mythic_agent import AgentCommand, AgentCommandAlias, MythicAgent, add_default_options
@@ -28,7 +28,7 @@ class Rpfwd(AgentCommand):
         super().__init__(agent=agent)
         self._name = "rpfwd"
         self._description = "Start or Stop a Reverse Port Forward."
-        self._subcommand_parsers: Dict[str, argparse_custom.Cmd2ArgumentParser] = {
+        self._subcommand_parsers: Dict[str, Cmd2ArgumentParser] = {
             "start": rpfwd_start_parser,
             "stop": rpfwd_stop_parser,
         }
@@ -47,11 +47,11 @@ class Rpfwd(AgentCommand):
         return self._aliases
 
     @property
-    def subcommand_parsers(self) -> Dict[str, cmd2.argparse_custom.Cmd2ArgumentParser]:
+    def subcommand_parsers(self) -> Dict[str, Cmd2ArgumentParser]:
         return self._subcommand_parsers
 
     @property
-    def command_parser(self) -> cmd2.argparse_custom.Cmd2ArgumentParser:
+    def command_parser(self) -> Cmd2ArgumentParser:
         return rpfwd_parser
 
     @cmd2.with_argparser(rpfwd_parser)
