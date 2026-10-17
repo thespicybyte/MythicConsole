@@ -1,4 +1,4 @@
-mythic~=0.2.4
+mythic~=0.2.11
 textual~=0.79.1
 textual-dev
 textual-textarea
