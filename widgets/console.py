@@ -235,6 +235,8 @@ class CommandAutoComplete(AutoComplete):
     def __init__(self, target: Input, panel: "ConsolePanel"):
         super().__init__(target)
         self.panel = panel
+        # text recalled from history; no suggestions are offered until the text changes
+        self.suppressed_text: Optional[str] = None
 
     def get_search_string(self, target_state: TargetState) -> str:
         """Match against the last word of the line instead of the entire line"""
@@ -255,6 +257,11 @@ class CommandAutoComplete(AutoComplete):
         :param target_state: Current text and cursor position of the input
         :return: List of possible matches
         """
+        if self.suppressed_text is not None:
+            if target_state.text == self.suppressed_text:
+                return []
+            self.suppressed_text = None
+
         if not self.get_search_string(target_state):
             return []
 
@@ -346,6 +353,13 @@ class ConsolePanel(Container):
         if self._history[-1] != command:
             self._history.append(command)
 
+    def _recall(self, console_input: ConsoleInput, value: str) -> None:
+        """Put a history entry in the input without opening the autocomplete dropdown"""
+        self.auto.suppressed_text = value
+        console_input.value = value
+        console_input.cursor_position = len(value)
+        self.auto.action_hide()
+
     @on(events.Key)
     def key_press(self, event: events.Key) -> None:
         """
@@ -361,17 +375,14 @@ class ConsolePanel(Container):
                     return
                 if self._history_index < 0:
                     self._history_index = len(self._history) - 1
-                    console_input.value = self._history[self._history_index]
-                    console_input.cursor_position = len(console_input.value)
+                    self._recall(console_input, self._history[self._history_index])
                     return
 
                 self._history_index -= 1
                 if self._history_index <= 0:
                     self._history_index = 0
 
-                console_input.value = self._history[self._history_index]
-                self.auto.action_hide()
-                console_input.cursor_position = len(console_input.value)
+                self._recall(console_input, self._history[self._history_index])
             case "down":
                 event.stop()
                 if not self._history:
@@ -386,9 +397,7 @@ class ConsolePanel(Container):
                     console_input.value = ""
                     return
 
-                console_input.value = self._history[self._history_index]
-                self.auto.action_hide()
-                console_input.cursor_position = len(console_input.value)
+                self._recall(console_input, self._history[self._history_index])
             case "tab":
                 event.stop()
                 event.prevent_default()
