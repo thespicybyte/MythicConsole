@@ -1,25 +1,25 @@
 import io
 import sys
 from enum import Enum
-from typing import Optional, Callable, Any, Coroutine
+from typing import Optional, Coroutine
 
 import cmd2
-import pyperclip
 from cmd2.exceptions import EmptyStatement
 from mythic.mythic_classes import Mythic
 from rich.table import Table
 from rich.text import Text
 from textual import work, events, on
-from textual._context import NoActiveAppError
 from textual.app import ComposeResult
 from textual.binding import Binding
 from textual.containers import Container, VerticalScroll
 from textual.reactive import reactive, var
 from textual.screen import Screen
 from textual.widget import Widget
-from textual.widgets import Footer, Header, Input, DataTable, TabbedContent, TabPane
+from textual.widgets import Footer, Header, DataTable, TabbedContent, TabPane
 from textual.widgets._data_table import DuplicateKey, CellDoesNotExist
 from textual.worker import WorkerFailed
+
+from textual_console import ConsoleInput
 
 from agents import get_agent
 from backend import Callback, MythicInstance, User, Operation, Task, MythicAgent, FormatterNotAvailable
@@ -28,8 +28,8 @@ from backend.task.task import TaskError
 from utils.logger import logger
 from widgets.calback_tabs import CallbackTabs
 from widgets.callbacks import Callbacks, CallbackTable
-from widgets.console import ConsolePanel, ConsoleInput
-from widgets.messages import TabClosed, CopyToClipboard, ClipboardReady, UpdateCurrentCallback
+from widgets.console import ConsolePanel
+from widgets.messages import TabClosed, UpdateCurrentCallback
 from widgets.session_info import SessionInfo
 from widgets.tasks_table import TasksTable, ReplayTask
 
@@ -122,13 +122,9 @@ class Home(Screen):
         self.current_user = User(instance, instance.username)
         self.current_operation = Operation(instance, operation_id=instance.mythic.current_operation_id)
         self.mythic: Mythic = self.instance.mythic
-        self.system_copy: Callable[[Any], None] | None = None
-        self.system_paste: Callable[[], str] | None = None
-        self.clipboard: str = ""
         self.cmd = MythicCmd(instance)
         super().__init__()
         self.displayed_tabs["Mythic"] = TabPane("Mythic", ConsolePanel(instance=instance), id="home")
-        self._determine_clipboard()
 
     BINDINGS = [
         Binding(key="ctrl+s", action="toggle_sidebar", description="toggle sidebar", key_display="^s"),
@@ -148,43 +144,6 @@ class Home(Screen):
         await worker.wait()
         self._get_and_monitor_tasks()
         self._monitor_tasks()
-
-    @on(ClipboardReady)
-    def _set_clipboard(self, message: ClipboardReady) -> None:
-        self.system_copy = message.copy
-        self.system_paste = message.paste
-
-    @on(CopyToClipboard)
-    def _copy_to_clipboard(self, message: CopyToClipboard):
-        content = message.content
-        try:
-            self.system_copy(content)
-            if message.success_message:
-                self.app.notify(message.success_message, timeout=2)
-        except pyperclip.PyperclipException as e:
-            logger.error(e)
-            self.app.notify(f"error copying to clipboard: {e}", severity="error", timeout=5)
-        message.stop()
-
-    @on(ConsoleInput.Paste)
-    def _paste_to_input(self):
-        if not self.system_paste:
-            return
-
-        console_input = self.query_one(ConsoleInput)
-        content = self.system_paste()
-        content = content.replace("\n", " ")
-        if content:
-            console_input.append(content.strip())
-
-    @work(thread=True)
-    def _determine_clipboard(self) -> None:
-        copy, paste = pyperclip.determine_clipboard()
-        try:
-            self.post_message(ClipboardReady(copy=copy, paste=paste))
-        except NoActiveAppError:
-            # not sure what causes this, but handling this doesn't seem to break anything
-            logger.error("no app error")
 
     @on(TabClosed)
     def tab_closed(self, message: TabClosed):
@@ -304,7 +263,13 @@ class Home(Screen):
 
         current_agent: Optional[MythicAgent] = None
         console_panel: Optional[ConsolePanel] = None
-        prompt = None
+        prompt: Optional[ConsoleInput] = None
+
+        # Resolve the panel (and its prompt) unconditionally, ahead of and separate from
+        # the fallible command-execution try below, so a failure here can never leave
+        # `prompt` unassigned and strand focus on the (non-focusable) console output.
+        # OP#84: the no-current-callback / panel-resolution-failure path used to skip the
+        # `finally` refocus entirely.
         try:
             if self.current_callback:
                 console_panel = self.current_callback.console_panel
@@ -312,10 +277,20 @@ class Home(Screen):
             else:
                 pane = self.displayed_tabs.get("Mythic")
                 console_panel = pane.query_one(ConsolePanel)
+        except Exception as e:
+            logger.error(f"failed to resolve console panel: {e}")
+            pane = self.displayed_tabs.get("Mythic")
+            if pane is not None:
+                try:
+                    console_panel = pane.query_one(ConsolePanel)
+                except Exception as fallback_error:
+                    logger.error(f"failed to resolve fallback console panel: {fallback_error}")
 
-            prompt = console_panel.query_one(Input)
-            prompt.disabled = True
+        if console_panel is not None:
+            prompt = console_panel.console_input
+            prompt.read_only = True
 
+        try:
             console_panel.write_string(f"{self.prompt}{cmd}")
 
             if cmd.strip() == "help":
@@ -408,7 +383,7 @@ class Home(Screen):
             logger.exception(e)
         finally:
             if prompt:
-                prompt.disabled = False
+                prompt.read_only = False
                 prompt.focus()
 
     @classmethod
