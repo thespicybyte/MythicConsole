@@ -1,0 +1,16 @@
+[
+  {
+    "process_id": 1,
+    "parent_process_id": 0,
+    "architecture": "x64",
+    "user": "root",
+    "name": "init"
+  },
+  {
+    "process_id": 42,
+    "parent_process_id": 1,
+    "architecture": "x64",
+    "user": "user",
+    "name": "bash"
+  }
+]

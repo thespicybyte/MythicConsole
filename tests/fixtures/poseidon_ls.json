@@ -1,0 +1,30 @@
+{
+  "parent_path": "/home/user",
+  "name": "docs",
+  "is_file": false,
+  "size": 4096,
+  "permissions": {
+    "permissions": "drwxr-xr-x",
+    "user": "user"
+  },
+  "files": [
+    {
+      "full_name": "/home/user/docs/readme.txt",
+      "is_file": true,
+      "size": 120,
+      "permissions": {
+        "permissions": "-rw-r--r--",
+        "user": "user"
+      }
+    },
+    {
+      "full_name": "/home/user/docs/notes.txt",
+      "is_file": true,
+      "size": 340,
+      "permissions": {
+        "permissions": "-rw-r--r--",
+        "user": "user"
+      }
+    }
+  ]
+}
