@@ -1,3 +1,4 @@
+import importlib.metadata
 import json
 
 from textual import on, events, work
@@ -8,11 +9,13 @@ from textual.widget import Widget
 from textual.widgets import Pretty, Static
 
 from backend import MythicInstance, Operation
+from version import __version__
 
 
 class SessionInfo(Static):
 
     operation_name = reactive("", recompose=True)
+    server_version = reactive("", recompose=True)
 
     def __init__(self, instance: MythicInstance, operation: Operation, *children: Widget):
         super().__init__(*children)
@@ -22,16 +25,28 @@ class SessionInfo(Static):
             "username": self.instance.username,
             "server_url": self.instance.url,
             "current_operation": "",
-            "current_operation_id": self.instance.mythic.current_operation_id
+            "current_operation_id": self.instance.mythic.current_operation_id,
+            "console_version": __version__,
+            "mythic_library_version": self._mythic_library_version(),
+            "mythic_server_version": "",
         }
 
         self.border_title = "Session Info"
         self.double_click_timer: Timer | None = None
         self._query_operation()
+        self._query_server_version()
 
     def compose(self) -> ComposeResult:
         self.session_info["current_operation"] = self.operation.name or ""
+        self.session_info["mythic_server_version"] = self.server_version
         yield Pretty(self.session_info)
+
+    @staticmethod
+    def _mythic_library_version() -> str:
+        try:
+            return importlib.metadata.version("mythic")
+        except Exception:
+            return "unknown"
 
     @on(MouseUp)
     def _on_left_click(self, event: events.MouseUp):
@@ -60,3 +75,9 @@ class SessionInfo(Static):
             await self.operation.query()
         if self.operation.name:
             self.operation_name = self.operation.name
+
+    @work
+    async def _query_server_version(self) -> None:
+        version = await self.instance.get_server_version()
+        if version:
+            self.server_version = version
