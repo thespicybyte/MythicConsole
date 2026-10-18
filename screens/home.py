@@ -17,6 +17,7 @@ from textual.reactive import reactive, var
 from textual.screen import Screen
 from textual.widget import Widget
 from textual.widgets import Footer, Header, DataTable, TabbedContent, TabPane
+from textual.css.query import NoMatches
 from textual.widgets._data_table import DuplicateKey, CellDoesNotExist
 from textual.worker import WorkerFailed
 
@@ -245,17 +246,24 @@ class Home(Screen):
         if self.current_callback:
             # add task to task table if active
             if self.current_callback.uuid == tasked_callback.uuid:
-                task_table = self.query_one("#tasks_table", DataTable)
                 try:
-                    task_table.update_cell(row_key=task.uuid, column_key="status", value=task.status)
-                except CellDoesNotExist:
-                    # a fast task can be updated here before the new-task
-                    # row has been added; add it now instead of dropping it
+                    task_table = self.query_one("#tasks_table", DataTable)
+                except NoMatches:
+                    # current_callback stays set while viewing the Home tab (or
+                    # mid-recompose right after selecting a callback), so the
+                    # sidebar's tasks_table may not be mounted -- nothing to update
+                    task_table = None
+                if task_table is not None:
                     try:
-                        task_table.add_row(task.id, task.username, task.status, task.command_name, task.params,
-                                            key=task.uuid)
-                    except DuplicateKey:
-                        pass
+                        task_table.update_cell(row_key=task.uuid, column_key="status", value=task.status)
+                    except CellDoesNotExist:
+                        # a fast task can be updated here before the new-task
+                        # row has been added; add it now instead of dropping it
+                        try:
+                            task_table.add_row(task.id, task.username, task.status, task.command_name, task.params,
+                                                key=task.uuid)
+                        except DuplicateKey:
+                            pass
 
         if task not in tasked_callback.tasks:
             tasked_callback.tasks.append(task)
@@ -446,7 +454,12 @@ class Home(Screen):
             return
 
         if task.callback_uuid == self.current_callback.uuid:
-            task_table = self.query_one("#tasks_table", DataTable)
+            try:
+                task_table = self.query_one("#tasks_table", DataTable)
+            except NoMatches:
+                # same race as _update_task: current_callback outlives the
+                # sidebar's CALLBACK view, so tasks_table may not be mounted
+                return
             try:
                 task_table.add_row(task.id, task.username, task.status, task.command_name, task.params,
                                    key=task.uuid)
@@ -565,7 +578,12 @@ class Home(Screen):
 
     @work()
     async def _populate_sidebar_tasks(self):
-        task_table = self.query_one("#tasks_table", DataTable)
+        try:
+            task_table = self.query_one("#tasks_table", DataTable)
+        except NoMatches:
+            # view_mode's recompose (which mounts tasks_table) hasn't landed yet,
+            # or the user has already tabbed away again -- nothing to populate
+            return
         task_table.loading = True
         task_table.clear()
         for t in self.current_callback.tasks:
