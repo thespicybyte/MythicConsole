@@ -41,6 +41,10 @@ class MythicConsole(App, inherit_bindings=False):
         super().__init__()
         self.state = State.Login
 
+    def copy_to_clipboard(self, text: str) -> None:
+        super().copy_to_clipboard(text)
+        self.notify("Copied to clipboard", timeout=2)
+
     def watch_authenticated(self) -> None:
         if self.authenticated:
             self.push_screen(self.SCREENS["home"](self.instance))

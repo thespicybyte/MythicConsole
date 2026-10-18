@@ -10,7 +10,6 @@ from textual.widgets import DataTable
 from textual.widgets._data_table import DuplicateKey
 
 from backend import Task, MythicInstance
-from widgets import messages
 from widgets.sidebar_module import SidebarModule
 
 
@@ -61,8 +60,7 @@ class TasksTable(SidebarModule):
         del (info["verify_prompt"])
         info = dict(sorted(info.items()))
         content = json.dumps(info, indent=2)
-        message = f"Task {task.display_id} Information copied to clipboard"
-        self.post_message(messages.CopyToClipboard(content, message))
+        self.app.copy_to_clipboard(content)
 
     async def _get_selected_task(self) -> Task:
         row_index = self.datatable.cursor_row
