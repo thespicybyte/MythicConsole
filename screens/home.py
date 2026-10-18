@@ -212,9 +212,17 @@ class Home(Screen):
                 continue
 
             callback = self.active_callbacks[task.callback_uuid]
-            if task in callback.tasks:
-                continue
-            callback.tasks.append(task)
+            if task not in callback.tasks:
+                callback.tasks.append(task)
+            else:
+                # refresh the tracked instance so row/formatter see the latest state
+                for i, t in enumerate(callback.tasks):
+                    if t.uuid == task.uuid:
+                        callback.tasks[i] = task
+                        break
+            # always post; membership only dedups the list, never gates the row.
+            # _new_task guards add_row with DuplicateKey, so re-posting for a
+            # known task is a safe no-op on the row (OP#88).
             self.post_message(TasksTable.NewTask(task))
 
     @work()
@@ -578,15 +586,28 @@ class Home(Screen):
 
     @work()
     async def _populate_sidebar_tasks(self):
-        try:
-            task_table = self.query_one("#tasks_table", DataTable)
-        except NoMatches:
-            # view_mode's recompose (which mounts tasks_table) hasn't landed yet,
-            # or the user has already tabbed away again -- nothing to populate
+        callback = self.current_callback
+        if callback is None:
             return
+
+        # bounded wait for view_mode's recompose to mount tasks_table (OP#88);
+        # bail if the user tabs away mid-wait so a stale rebuild doesn't land
+        task_table = None
+        for _ in range(100):
+            if self.current_callback is not callback:
+                return
+            try:
+                task_table = self.query_one("#tasks_table", DataTable)
+                break
+            except NoMatches:
+                await asyncio.sleep(0.02)
+        if task_table is None:
+            return
+
         task_table.loading = True
+        # no await below -- atomic w.r.t. other coroutines until loading is cleared
         task_table.clear()
-        for t in self.current_callback.tasks:
+        for t in callback.tasks:
             try:
                 task_table.add_row(t.id, t.username, t.status, t.command_name, t.params, key=t.uuid)
             except DuplicateKey:
