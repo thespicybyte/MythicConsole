@@ -1,18 +1,19 @@
-import pytest
+def test_empty_string_lists_top_level_commands(poseidon_agent):
+    """OP#92: an empty/whitespace-only line now falls into the <=1-token branch and returns the
+    top-level command list, instead of crashing with IndexError on `tokens[0]`."""
+    items = poseidon_agent.get_completer_items("")
+
+    assert items
+    assert "help" in items
+    assert "process" in items
 
 
-def test_empty_string_raises_index_error(poseidon_agent):
-    """Known gap: widgets/console.py's _completer_items wrapper (OP#80) guards empty/whitespace
-    input before it ever reaches the backend. MythicAgent.get_completer_items itself has no such
-    guard and crashes on `tokens[0]` when shlex.split(line) yields no tokens. Documented here as
-    current behavior; not in scope to fix for OP#79."""
-    with pytest.raises(IndexError):
-        poseidon_agent.get_completer_items("")
+def test_whitespace_only_lists_top_level_commands(poseidon_agent):
+    items = poseidon_agent.get_completer_items("   ")
 
-
-def test_whitespace_only_raises_index_error(poseidon_agent):
-    with pytest.raises(IndexError):
-        poseidon_agent.get_completer_items("   ")
+    assert items
+    assert "help" in items
+    assert "process" in items
 
 
 def test_unbalanced_trailing_quote_returns_empty(poseidon_agent):
