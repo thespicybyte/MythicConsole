@@ -1,3 +1,4 @@
+import asyncio
 import io
 import sys
 from enum import Enum
@@ -123,6 +124,8 @@ class Home(Screen):
         self.current_operation = Operation(instance, operation_id=instance.mythic.current_operation_id)
         self.mythic: Mythic = self.instance.mythic
         self.cmd = MythicCmd(instance)
+        # commands run one at a time, in order, via _run_cmd_queue
+        self._cmd_queue: asyncio.Queue[str] = asyncio.Queue()
         super().__init__()
         self.displayed_tabs["Mythic"] = TabPane("Mythic", ConsolePanel(instance=instance), id="home")
 
@@ -144,6 +147,7 @@ class Home(Screen):
         await worker.wait()
         self._get_and_monitor_tasks()
         self._monitor_tasks()
+        self._run_cmd_queue()
 
     @on(TabClosed)
     def tab_closed(self, message: TabClosed):
@@ -169,9 +173,15 @@ class Home(Screen):
         yield Footer()
 
     @on(ConsolePanel.NewInput)
-    async def _new_input(self, event: ConsolePanel.NewInput):
-        cmd = event.data
-        self.execute_cmd(cmd)
+    def _new_input(self, event: ConsolePanel.NewInput):
+        self._cmd_queue.put_nowait(event.data)
+
+    @work(exclusive=True)
+    async def _run_cmd_queue(self) -> None:
+        """Run queued commands one at a time, in order."""
+        while True:
+            cmd = await self._cmd_queue.get()
+            await self.execute_cmd(cmd)
 
     def action_toggle_sidebar(self) -> None:
         self.query_one(Sidebar).toggle_class("-hidden")
@@ -239,8 +249,13 @@ class Home(Screen):
                 try:
                     task_table.update_cell(row_key=task.uuid, column_key="status", value=task.status)
                 except CellDoesNotExist:
-                    logger.warning("could not find row to update task status")
-                    pass
+                    # a fast task can be updated here before the new-task
+                    # row has been added; add it now instead of dropping it
+                    try:
+                        task_table.add_row(task.id, task.username, task.status, task.command_name, task.params,
+                                            key=task.uuid)
+                    except DuplicateKey:
+                        pass
 
         if task not in tasked_callback.tasks:
             tasked_callback.tasks.append(task)
@@ -251,8 +266,8 @@ class Home(Screen):
                 tasked_callback.tasks[index] = task
                 break
 
-    @work(exit_on_error=False)
     async def execute_cmd(self, cmd: str):
+        """Run one command to completion. Awaited by _run_cmd_queue only."""
         stderr_capture = io.StringIO()
         old_stderr = sys.stderr
         sys.stderr = stderr_capture
@@ -265,11 +280,8 @@ class Home(Screen):
         console_panel: Optional[ConsolePanel] = None
         prompt: Optional[ConsoleInput] = None
 
-        # Resolve the panel (and its prompt) unconditionally, ahead of and separate from
-        # the fallible command-execution try below, so a failure here can never leave
-        # `prompt` unassigned and strand focus on the (non-focusable) console output.
-        # OP#84: the no-current-callback / panel-resolution-failure path used to skip the
-        # `finally` refocus entirely.
+        # resolve the panel/prompt up front, separate from the try below, so a
+        # failure here can't leave `prompt` unassigned and skip the refocus
         try:
             if self.current_callback:
                 console_panel = self.current_callback.console_panel
@@ -356,12 +368,10 @@ class Home(Screen):
                 console_panel.write_string(output)
 
         except cmd2.Cmd2ArgparseError:
-            sys.stderr = old_stderr
             error_message = stderr_capture.getvalue().strip()
             if error_message and console_panel:
                 console_panel.write_string(error_message)
 
-            sys.stdout = old_stdout
             stdout = stdout_capture.getvalue().strip()
             if stdout and console_panel:
                 console_panel.write_string(stdout)
@@ -382,6 +392,9 @@ class Home(Screen):
                 console_panel.write_string(f"Unhandled exception: {e}")
             logger.exception(e)
         finally:
+            # always restore the real streams, not just on Cmd2ArgparseError
+            sys.stderr = old_stderr
+            sys.stdout = old_stdout
             if prompt:
                 prompt.read_only = False
                 prompt.focus()
