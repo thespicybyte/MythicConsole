@@ -10,7 +10,6 @@ from textual.events import Click, MouseUp, Timer, Key
 
 from backend import Callback, MythicInstance
 from utils.logger import logger
-from widgets.messages import CopyToClipboard
 from widgets.sidebar_module import SidebarModule
 
 
@@ -47,8 +46,7 @@ class CallbackTable(DataTable):
         del (info["console_panel"])
         info = dict(sorted(info.items()))
         content = json.dumps(info, indent=2)
-        message = f"Callback {callback.display_id} Information copied to clipboard"
-        self.post_message(CopyToClipboard(content, message))
+        self.app.copy_to_clipboard(content)
 
     def _clear_double_click(self) -> None:
         self.double_click_timer = None

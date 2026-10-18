@@ -8,7 +8,6 @@ from textual.widget import Widget
 from textual.widgets import Pretty, Static
 
 from backend import MythicInstance, Operation
-from widgets.messages import CopyToClipboard
 
 
 class SessionInfo(Static):
@@ -53,8 +52,7 @@ class SessionInfo(Static):
 
     def _copy_session_info(self) -> None:
         content = json.dumps(self.session_info, indent=2)
-        message = "Session Information copied to clipboard"
-        self.post_message(CopyToClipboard(content, message))
+        self.app.copy_to_clipboard(content)
 
     @work
     async def _query_operation(self) -> None:

@@ -1,5 +1,3 @@
-from typing import Optional, Callable, Any
-
 from textual.message import Message
 
 from backend import Callback
@@ -33,20 +31,4 @@ class PreviousTab(Message):
 class TabClosed(Message):
     def __init__(self, tab_id: str) -> None:
         self.tab_id = tab_id
-        super().__init__()
-
-
-class ClipboardReady(Message):
-    def __init__(
-            self, copy: Callable[[Any], None], paste: Callable[[], str]
-    ) -> None:
-        super().__init__()
-        self.copy = copy
-        self.paste = paste
-
-
-class CopyToClipboard(Message):
-    def __init__(self, content: str, success_message: Optional[str]):
-        self.content = content
-        self.success_message = success_message
         super().__init__()
