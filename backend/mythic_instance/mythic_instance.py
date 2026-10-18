@@ -34,22 +34,24 @@ class MythicInstance:
     async def login(self) -> bool:
         """ Login to Mythic """
 
-        url = urlparse(self.url)
-        address = url.netloc
-        if not address:
-            address = url.path
+        raw = self.url.strip()
+        parsed = urlparse(raw)
+        # urlparse only fills hostname/port when a scheme + // are present; a bare
+        # "host" or "host:port" lands in scheme/path. Re-parse with a default scheme.
+        if not parsed.scheme or not parsed.netloc:
+            parsed = urlparse(f"https://{raw}")
 
-        if url.scheme:
-            if url.scheme == "https":
-                self.server_port = 443
-            if url.scheme == "http":
-                self.protocol = "http"
-                self.server_port = 80
+        scheme = parsed.scheme or "https"
+        self.protocol = scheme
+        self.use_tls = scheme == "https"
 
-        if ":" in address:
-            self.server_address, self.server_port = address.split(":")
+        if parsed.hostname:
+            self.server_address = parsed.hostname
 
-        self.use_tls = True if self.protocol == "https" else "http"
+        if parsed.port:
+            self.server_port = parsed.port
+        else:
+            self.server_port = 443 if scheme == "https" else 80
 
         self.url = f"{self.protocol}://{self.server_address}:{self.server_port}"
         try:
