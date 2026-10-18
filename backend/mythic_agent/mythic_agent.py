@@ -249,7 +249,7 @@ class MythicAgent:
         except:
             return items
 
-        if len(tokens) == 1:
+        if len(tokens) <= 1:
             items.append("help")
             # return only commands and aliases
             for command in self._get_commands():
@@ -563,7 +563,7 @@ class MythicCommands(Cmd):
         except:
             return items
 
-        if len(tokens) == 1:
+        if len(tokens) <= 1:
             # items.append("help")
             for command in self.commands:
                 items.append(command.removeprefix("do_"))
