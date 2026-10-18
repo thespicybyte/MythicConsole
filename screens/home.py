@@ -176,7 +176,7 @@ class Home(Screen):
     def _new_input(self, event: ConsolePanel.NewInput):
         self._cmd_queue.put_nowait(event.data)
 
-    @work(exclusive=True)
+    @work(exclusive=True, group="cmd_queue")
     async def _run_cmd_queue(self) -> None:
         """Run queued commands one at a time, in order."""
         while True:
