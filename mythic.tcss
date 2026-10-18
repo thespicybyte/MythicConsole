@@ -103,8 +103,9 @@ SessionInfo {
 }
 
 ConsolePanel > Container > Vertical > ConsoleInput {
+    height: auto;
     min-height: 3;
-    max-height: 3;
+    max-height: 10;
     content-align: left middle;
     dock: bottom;
     border: solid $background-lighten-3 100%;
@@ -140,22 +141,16 @@ YesNoPrompt > Container > Horizontal > Button {
     margin: 1 0 0 0;
 }
 
-ConsoleAreaPlus {
+ConsoleOutput {
     width: 1fr;
     height: 1fr;
     layer: main;
 
     &:dark {
         border: solid $primary-background-lighten-1 100%;
-        &:focus {
-            border: solid $primary-background-lighten-3 100%;
-        }
     }
 
     &:light {
         border: solid $background-darken-1;
-        &:focus {
-            border: solid $background-darken-3;
-        }
     }
 }

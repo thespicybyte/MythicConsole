@@ -1,292 +1,18 @@
-import dataclasses
-import io
-import shlex
 from typing import List, Optional, TYPE_CHECKING
 
-from rich.console import Console as RichConsole, RenderableType
-from textual import on, events
-from textual._text_area_theme import TextAreaTheme
+from rich.console import RenderableType
+from textual import on
 from textual.app import ComposeResult
-from textual.binding import Binding
-from textual.color import Color
 from textual.containers import Container, Vertical
-from textual.document._document import Location, EditResult
-from textual.events import Paste, MouseUp
 from textual.message import Message
 from textual.widget import Widget
-from textual.widgets import TextArea, Input, Label
-from textual.widgets._text_area import ThemeDoesNotExist
 
-from textual_textarea import TextEditor
-from textual_autocomplete import AutoComplete, DropdownItem, TargetState
-from textual_textarea.autocomplete import CompletionList
-from textual_textarea.containers import TextContainer, FooterContainer
-from textual_textarea.text_editor import TextAreaPlus
+from textual_console import CommandAutoComplete, ConsoleInput, ConsoleOutput
 
 from backend import MythicInstance
-from utils.logger import logger
-from widgets.console_themes import MYTHIC_DARK, MYTHIC_LIGHT
 
 if TYPE_CHECKING:
     from backend import MythicAgent
-
-
-class ConsoleAreaPlus(TextAreaPlus):
-    BINDINGS = [
-        # Cursor movement
-        Binding("up", "cursor_up", "cursor up", show=False),
-        Binding("down", "cursor_down", "cursor down", show=False),
-        Binding("left", "cursor_left", "cursor left", show=False),
-        Binding("right", "cursor_right", "cursor right", show=False),
-        Binding("ctrl+left", "cursor_word_left", "cursor word left", show=False),
-        Binding("ctrl+right", "cursor_word_right", "cursor word right", show=False),
-        Binding("home", "cursor_line_start", "cursor line start", show=False),
-        Binding("end", "cursor_line_end", "cursor line end", show=False),
-        Binding("ctrl+home", "cursor_doc_start", "cursor doc start", show=False),
-        Binding("ctrl+end", "cursor_doc_end", "cursor doc end", show=False),
-        Binding("pageup", "cursor_page_up", "cursor page up", show=False),
-        Binding("pagedown", "cursor_page_down", "cursor page down", show=False),
-        # scrolling
-        Binding("ctrl+up", "scroll_one('up')", "scroll one up", show=False),
-        Binding("ctrl+down", "scroll_one('down')", "scroll one down", show=False),
-        # Making selections (generally holding the shift key and moving cursor)
-        Binding(
-            "ctrl+shift+left",
-            "cursor_word_left(True)",
-            "cursor left word select",
-            show=False,
-        ),
-        Binding(
-            "ctrl+shift+right",
-            "cursor_word_right(True)",
-            "cursor right word select",
-            show=False,
-        ),
-        Binding(
-            "shift+home",
-            "cursor_line_start(True)",
-            "cursor line start select",
-            show=False,
-        ),
-        Binding(
-            "shift+end", "cursor_line_end(True)", "cursor line end select", show=False
-        ),
-        Binding(
-            "ctrl+shift+home",
-            "cursor_doc_start(True)",
-            "select to cursor doc start",
-            show=False,
-        ),
-        Binding(
-            "ctrl+shift+end",
-            "cursor_doc_end(True)",
-            "select to cursor doc end",
-            show=False,
-        ),
-        Binding("shift+up", "cursor_up(True)", "cursor up select", show=False),
-        Binding("shift+down", "cursor_down(True)", "cursor down select", show=False),
-        Binding("shift+left", "cursor_left(True)", "cursor left select", show=False),
-        Binding("shift+right", "cursor_right(True)", "cursor right select", show=False),
-        Binding("ctrl+a", "select_all", "select all", show=False),
-        # Editing
-        Binding("ctrl+c", "copy", "copy", show=False),
-        Binding("cmd+c", "copy", "copy", show=False),
-    ]
-
-    def __init__(self, language: str = None, text: str = None):
-        super().__init__(text=text, language=language)
-        self.register_theme(MYTHIC_DARK)
-        self.register_theme(MYTHIC_LIGHT)
-        self._set_theme("mythic_dark" if self.app.current_theme.dark else "mythic_light")
-
-    def _handle_tab(self, _event: events.Key) -> None:
-        """Override editor behavior which would write a tab in the console"""
-        return
-
-    def _handle_enter(self, event: events.Key) -> None:
-        """Override editor behavior which would write a new line in the console"""
-        return
-
-    def _handle_backspace(self, _event: events.Key) -> None:
-        """Override editor behavior which would delete a character in the console"""
-        return
-
-    def _delete_via_keyboard(
-            self,
-            _start: Location,
-            _end: Location,
-    ) -> EditResult | None:
-        """Override editor behavior which would delete characters in the console"""
-        return
-
-    def on_mount(self) -> None:
-        """Override base class mount which was doing clipboard stuff we don't need"""
-        return
-
-    def on_key(self, _event: events.Key) -> None:
-        """Override base class key behavior"""
-        logger.info(_event.name)
-        return
-
-    def on_paste(self, _event: Paste) -> None:
-        """Override base class to prevent pasting in console"""
-        return
-
-    def _set_clipboard(self, _message) -> None:
-        """Override base class as clipboard is already set"""
-        return
-
-    def _set_theme(self, theme: str) -> None:
-        # somewhere monokai is being set as the theme at startup.
-        if theme == "monokai":
-            return
-
-        theme_object: TextAreaTheme | None
-
-        # If the user supplied a string theme name, find it and apply it.
-        try:
-            theme_object = self._themes[theme]
-        except KeyError:
-            theme_object = TextAreaTheme.get_builtin_theme(theme)
-            if theme_object is None:
-                raise ThemeDoesNotExist(
-                    f"{theme!r} is not a builtin theme, or it has not been registered. "
-                    f"To use a custom theme, register it first using `register_theme`, "
-                    f"then switch to that theme by setting the `TextArea.theme` attribute."
-                ) from None
-
-        self._theme = dataclasses.replace(theme_object)
-        if theme_object:
-            base_style = theme_object.base_style
-            if base_style:
-                color = base_style.color
-                background = base_style.bgcolor
-                if color:
-                    self.styles.color = Color.from_rich_color(color)
-                if background:
-                    self.styles.background = Color.from_rich_color(background)
-
-    def set_theme(self, theme_name: str) -> None:
-        self._set_theme(theme_name)
-
-
-class Console(TextEditor, inherit_bindings=False):
-    BINDINGS = [
-        Binding("ctrl+o", "load", "Open Query", show=False),
-        Binding("ctrl+f", "find", "Find", show=False),
-        Binding("f3", "find(True)", "Find Next", show=False),
-    ]
-
-    def __init__(self, *children: Widget):
-        super().__init__(*children)
-        self.text_container = TextContainer()
-        self.completion_list = CompletionList()
-        self.footer = FooterContainer(classes="hide")
-        self.footer_label = Label("", id="textarea__save_open_input_label")
-        self.watch(self.app, "theme", self._app_dark_toggled, init=False)
-        self.text_input = ConsoleAreaPlus(language=self._language, text=self._initial_text)
-
-    def _app_dark_toggled(self):
-        if self.app.current_theme.dark:
-            self.text_input.set_theme("mythic_dark")
-            return
-        self.text_input.set_theme("mythic_light")
-
-    def on_mount(self):
-        area = self.query_one(TextArea)
-        area.read_only = True
-        area.show_line_numbers = False
-        area.cursor_blink = False
-
-    def compose(self) -> ComposeResult:
-        with self.text_container:
-            yield self.text_input
-            yield self.completion_list
-        with self.footer:
-            yield self.footer_label
-
-    def write(self, value) -> None:
-        string_io = io.StringIO()
-        console = RichConsole(file=string_io, style=None, no_color=True)
-        console.print(value)
-
-        area = self.query_one(TextArea)
-        area.insert(string_io.getvalue(), area.document.end)
-        string_io.close()
-
-
-class ConsoleInput(Input):
-    class Paste(Message):
-        pass
-
-    @on(MouseUp)
-    async def _on_click(self, event: events.MouseUp) -> None:
-        if event.button == 2:
-            self.post_message(self.Paste())
-
-    def append(self, value: str) -> None:
-        """Append a string to the current value in the input"""
-        self.value += value
-
-
-class CommandAutoComplete(AutoComplete):
-    """Autocomplete which completes only the last word of the line in the target input"""
-
-    def __init__(self, target: Input, panel: "ConsolePanel"):
-        super().__init__(target)
-        self.panel = panel
-        # text recalled from history; no suggestions are offered until the text changes
-        self.suppressed_text: Optional[str] = None
-
-    def get_search_string(self, target_state: TargetState) -> str:
-        """Match against the last word of the line instead of the entire line"""
-        text = target_state.text
-        if not text or text.endswith(" ") or text.endswith("\""):
-            return ""
-
-        try:
-            tokens = shlex.split(text)
-        except ValueError:
-            return ""
-
-        return tokens[-1] if tokens else ""
-
-    def get_candidates(self, target_state: TargetState) -> List[DropdownItem]:
-        """
-        Generates a list of possible matches based on the current input state
-        :param target_state: Current text and cursor position of the input
-        :return: List of possible matches
-        """
-        if self.suppressed_text is not None:
-            if target_state.text == self.suppressed_text:
-                return []
-            self.suppressed_text = None
-
-        if not self.get_search_string(target_state):
-            return []
-
-        text = target_state.text
-        if self.panel.agent:
-            items = self.panel.agent.get_completer_items(text)
-        else:
-            items = self.panel.mythic_commands.get_completer_items(text)
-
-        return [DropdownItem(item) for item in items]
-
-    def apply_completion(self, value: str, state: TargetState) -> None:
-        """Replace the last word with the selected value without replacing the entire line"""
-        try:
-            tokens = shlex.split(state.text)
-        except ValueError:
-            return
-
-        if not tokens:
-            return
-
-        tokens[-1] = value
-        result = " ".join(tokens) + " "
-        self.target.value = result
-        self.target.cursor_position = len(result)
 
 
 class ConsolePanel(Container):
@@ -300,32 +26,31 @@ class ConsolePanel(Container):
 
         super().__init__(*children)
         self.instance = instance
-        self.agent: Optional[MythicAgent] = None
+        self.agent: Optional["MythicAgent"] = None
         self.mythic_commands = MythicCommands(instance)
-        self.console_input = ConsoleInput()
-        self.auto = CommandAutoComplete(self.console_input, self)
-        self._mythic_console = Console()
-        self._history: List[str] = []
-        self._history_index: int = -1
+        self.console_output = ConsoleOutput()
+        self.console_input = ConsoleInput(prompt="> ", id="prompt")
+        self.auto = CommandAutoComplete(self.console_input, candidates=self._completer_items)
 
     def compose(self) -> ComposeResult:
-        logger.info(self.auto)
         with Container():
             with Vertical():
-                logger.warning("yeidling consle")
-                yield self._mythic_console
+                yield self.console_output
                 yield self.console_input
-                logger.warning("yeidling auto")
                 yield self.auto
-                logger.warning("yeilded auto")
+
+    def _completer_items(self, text: str) -> List[str]:
+        """Candidate source for CommandAutoComplete: last-word matching is handled by the
+        package itself, so this just delegates to the active agent or global commands."""
+        source = self.agent or self.mythic_commands
+        return source.get_completer_items(text)
 
     def write_string(self, data: RenderableType) -> None:
         """
         Write a renderable value to the console
         :param data: any renderable value
         """
-        console = self.query_one(Console)
-        console.write(data)
+        self.console_output.write(data)
 
     def set_agent(self, payload_type: str):
         from agents import get_agent
@@ -340,64 +65,6 @@ class ConsolePanel(Container):
 
     @on(ConsoleInput.Submitted)
     def _input_submitted(self, event: ConsoleInput.Submitted) -> None:
-        prompt = self.query_one(ConsoleInput)
-        command = event.value
-        prompt.clear()
-        self.post_message(self.NewInput(command))
-        self._history_index = -1
-        if not self._history:
-            self._history.append(command)
-            return
-
-        # prevent the same command twice in a row
-        if self._history[-1] != command:
-            self._history.append(command)
-
-    def _recall(self, console_input: ConsoleInput, value: str) -> None:
-        """Put a history entry in the input without opening the autocomplete dropdown"""
-        self.auto.suppressed_text = value
-        console_input.value = value
-        console_input.cursor_position = len(value)
-        self.auto.action_hide()
-
-    @on(events.Key)
-    def key_press(self, event: events.Key) -> None:
-        """
-        Catch keystroke for history and tab complete. Tab will cancel default behavior to prevent switching context
-        :param event: key event
-        """
-        key = event.key
-        console_input = self.query_one(ConsoleInput)
-        match key:
-            case "up":
-                event.stop()
-                if not self._history:
-                    return
-                if self._history_index < 0:
-                    self._history_index = len(self._history) - 1
-                    self._recall(console_input, self._history[self._history_index])
-                    return
-
-                self._history_index -= 1
-                if self._history_index <= 0:
-                    self._history_index = 0
-
-                self._recall(console_input, self._history[self._history_index])
-            case "down":
-                event.stop()
-                if not self._history:
-                    return
-
-                if self._history_index < 0:
-                    return
-
-                self._history_index += 1
-                if self._history_index == len(self._history):
-                    self._history_index = -1
-                    console_input.value = ""
-                    return
-
-                self._recall(console_input, self._history[self._history_index])
-            case "tab":
-                event.stop()
-                event.prevent_default()
+        for line in event.value.splitlines():
+            if line.strip():
+                self.post_message(self.NewInput(line))
