@@ -588,8 +588,6 @@ class Home(Screen):
         if callback is None:
             return
 
-        # bounded wait for view_mode's recompose to mount tasks_table (OP#88);
-        # bail if the user tabs away mid-wait so a stale rebuild doesn't land
         task_table = None
         for _ in range(100):
             if self.current_callback is not callback:
