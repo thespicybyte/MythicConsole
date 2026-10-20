@@ -221,8 +221,6 @@ class Home(Screen):
                         callback.tasks[i] = task
                         break
             # always post; membership only dedups the list, never gates the row.
-            # _new_task guards add_row with DuplicateKey, so re-posting for a
-            # known task is a safe no-op on the row (OP#88).
             self.post_message(TasksTable.NewTask(task))
 
     @work()
