@@ -74,6 +74,22 @@ class MythicInstance:
         """Return the error message from an unsuccessful login"""
         return self._login_error
 
+    async def get_server_version(self) -> str:
+        """Return the connected Mythic server version, or "" if it cannot be read."""
+        query = """
+        query GetServerVersion {
+            getGlobalSettings {
+                settings
+            }
+        }
+        """
+        try:
+            resp = await mythic.execute_custom_query(self.mythic, query)
+            return resp["getGlobalSettings"]["settings"]["server_config"]["version"]
+        except Exception as e:
+            logger.error(f"failed to query server version: {e}")
+            return ""
+
     async def monitor_new_callbacks(self) -> AsyncGenerator[str, None]:
         """
         While running, monitor for new callbacks that connect to Mythic
