@@ -57,8 +57,7 @@ class MythicConsole(App, inherit_bindings=False):
         name = event.highlighted_event.option.hit.text
         if name in self.available_themes:
             self.theme = name
-            # the open palette isn't reached by App.refresh_css's own restyle pass
-            # (it only restyles screens below the top one), so force it here.
+            # App.refresh_css skips the topmost screen; restyle the open palette here.
             self.call_next(self._restyle_open_screen)
 
     def _restyle_open_screen(self) -> None:
