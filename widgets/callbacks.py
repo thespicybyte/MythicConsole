@@ -27,7 +27,6 @@ class CallbackTable(DataTable):
         super().__init__(cursor_type="row", id="callback_table", zebra_stripes=True, show_cursor=False)
         self.instance = instance
         self.double_click_timer: Timer | None = None
-        self.first_click = -1
         self.current_row_id: Optional[int] = None
         self.add_column("ID", key="id")
         self.add_column("Hostname", key="hostname")
@@ -50,7 +49,9 @@ class CallbackTable(DataTable):
 
     def _clear_double_click(self) -> None:
         self.double_click_timer = None
-        self.first_click = -1
+
+    def reset_selection(self) -> None:
+        self.current_row_id = None
 
     def _post_new_row_selected(self):
         """
@@ -139,19 +140,9 @@ class CallbackTable(DataTable):
         If user double-clicks a row in the callbacks table, post message that a callback was selected
         """
 
-        row_clicked = self.cursor_row
-
         if self.double_click_timer is not None:
             self.double_click_timer.reset()
-            if self.first_click < 0:
-                self.first_click = row_clicked
-                return
-
-            if self.first_click != row_clicked:
-                self._clear_double_click()
-                return
-
-            # row has not changed, don't post
+            row_clicked = self.cursor_row
             if self.current_row_id == row_clicked:
                 return
 
@@ -161,8 +152,6 @@ class CallbackTable(DataTable):
             self.double_click_timer = self.set_timer(delay=0.5,
                                                      callback=self._clear_double_click,
                                                      name="double_click_timer")
-            if not self.first_click:
-                self.first_click = row_clicked
 
 
 class Callbacks(SidebarModule):
