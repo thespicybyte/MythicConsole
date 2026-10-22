@@ -17,8 +17,19 @@ pip install -r requirements.txt
 python console.py            # run the app
 ```
 
-Requires Python 3.11+ (`cmd2` 4.x and the updated `mythic`/`textual` stack need it). There is no test
-suite, linter, or build step in this repo.
+Requires Python 3.11+ (`cmd2` 4.x and the updated `mythic`/`textual` stack need it). There is no
+linter or build step in this repo.
+
+```shell
+pip install -r requirements-dev.txt
+pytest                         # run the default (offline) test suite
+pytest tests/test_environment.py::test_log_level_mapping   # run a single test
+pytest -m live                 # live/Pilot tests — need .env + a reachable Mythic server
+```
+
+The default suite needs no Mythic server: the two objects that reach the network
+(`Task.get_responses`, `MythicInstance.login`) are mocked via fixtures in `tests/conftest.py`. Tests
+marked `@pytest.mark.live` (under `tests/live/`) are opt-in and deselected by default.
 
 `textual-dev` is a dependency, so the Textual tooling is available for debugging a running TUI:
 
