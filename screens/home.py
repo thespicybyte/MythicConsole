@@ -220,7 +220,6 @@ class Home(Screen):
                     if t.uuid == task.uuid:
                         callback.tasks[i] = task
                         break
-            # always post; membership only dedups the list, never gates the row.
             self.post_message(TasksTable.NewTask(task))
 
     @work()
