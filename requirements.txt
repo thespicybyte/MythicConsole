@@ -1,8 +1,7 @@
 mythic~=0.2.11
 textual~=8.2.8
 textual-dev~=1.8.0
-textual-console~=0.1
+textual-console~=0.2
 rich~=15.0.0
 typing_extensions~=4.16.0
 cmd2~=4.3.0
-textual-autocomplete~=4.0.6
