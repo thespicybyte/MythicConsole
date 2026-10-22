@@ -2,7 +2,9 @@ from enum import Enum
 from typing import List, Optional
 
 import asyncio
+from textual import on
 from textual.app import App, ComposeResult
+from textual.command import CommandPalette
 from textual.reactive import var
 from textual.widgets import Header, Footer
 
@@ -40,6 +42,35 @@ class MythicConsole(App, inherit_bindings=False):
     def __init__(self):
         super().__init__()
         self.state = State.Login
+        self._theme_preview_active = False
+        self._theme_before_preview: Optional[str] = None
+
+    def search_themes(self) -> None:
+        self._theme_before_preview = self.theme
+        self._theme_preview_active = True
+        super().search_themes()
+
+    @on(CommandPalette.OptionHighlighted)
+    def _preview_highlighted_theme(self, event: CommandPalette.OptionHighlighted) -> None:
+        if not self._theme_preview_active:
+            return
+        name = event.highlighted_event.option.hit.text
+        if name in self.available_themes:
+            self.theme = name
+            # App.refresh_css skips the topmost screen; restyle the open palette here.
+            self.call_next(self._restyle_open_screen)
+
+    def _restyle_open_screen(self) -> None:
+        if self._theme_preview_active and self.screen.is_mounted:
+            self.stylesheet.update(self.screen, animate=False)
+
+    @on(CommandPalette.Closed)
+    def _end_theme_preview(self, event: CommandPalette.Closed) -> None:
+        if not self._theme_preview_active:
+            return
+        self._theme_preview_active = False
+        if not event.option_selected and self._theme_before_preview is not None:
+            self.theme = self._theme_before_preview
 
     def copy_to_clipboard(self, text: str) -> None:
         super().copy_to_clipboard(text)
