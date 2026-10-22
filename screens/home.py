@@ -158,6 +158,7 @@ class Home(Screen):
 
         callback_uuid = tab_id.removeprefix("callback-")
         del self.displayed_tabs[callback_uuid]
+        self.query_one("#callback_table", CallbackTable).reset_selection()
 
     def watch_current_tab_id(self):
         logger.info(f"new tab id: {self.current_tab_id}")
