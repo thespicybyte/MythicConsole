@@ -71,7 +71,7 @@ class Environment(AgentCommand):
         command_args = f"{args.parameter} {args.value}"
 
         task = Task(self._agent.instance, command="setenv", args=command_args,
-                    callback_display_id=self._agent.tasker.callback.display_id)
+                    callback=self._agent.tasker.callback)
 
         task.console_args = args
         task.background = args.background
@@ -85,7 +85,7 @@ class Environment(AgentCommand):
             args = subcommand_parser.parse_args(args)
 
         task = Task(self._agent.instance, command="getenv",
-                    callback_display_id=self._agent.tasker.callback.display_id)
+                    callback=self._agent.tasker.callback)
 
         task.console_args = args
         task.background = args.background
@@ -100,7 +100,7 @@ class Environment(AgentCommand):
         command_args = args.parameter
 
         task = Task(self._agent.instance, command="unsetenv", args=command_args,
-                    callback_display_id=self._agent.tasker.callback.display_id)
+                    callback=self._agent.tasker.callback)
 
         task.console_args = args
         task.background = args.background

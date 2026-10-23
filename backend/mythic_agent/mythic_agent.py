@@ -16,6 +16,7 @@ from backend import MythicInstance, Task, User, Operation, Payload
 from utils.logger import logger
 from screens.prompts import TaskPrompt
 from . import mythic_command_parsers
+from ..callback.queries import CallbackQueries
 from ..operation.queries import OperationQueries
 from ..payload.queries import PayloadQueries
 from ..tasker.tasker import Tasker
@@ -252,7 +253,7 @@ class AgentCommand(cmd2.Cmd):
 
     def _build_task(self, ns) -> Task:
         task = Task(self._agent.instance, command=self._name, args=_serialize(ns),
-                    callback_display_id=self._agent.tasker.callback.display_id)
+                    callback=self._agent.tasker.callback)
         task.console_args = ns
         task.background = self.force_background or getattr(ns, "background", False)
         if self.verify_prompt:
@@ -542,6 +543,19 @@ class MythicAgent:
     async def load_commands(self):
         self.commands = await self.get_agent_commands()
         self.get_script_classes()
+        await self._cache_loaded_commands()
+
+    async def _cache_loaded_commands(self):
+        callback = self.tasker.callback
+        if not callback or not callback.display_id:
+            return
+        try:
+            loaded = await CallbackQueries.get_loaded_commands(self.mythic, callback.display_id)
+        except Exception as e:
+            logger.warning(f"could not cache loaded commands: {e}")
+            return
+        if loaded:
+            callback.loaded_commands = set(loaded)
 
     def get_script_classes(self) -> List[ScriptCommand]:
         script_files = self.get_script_files()

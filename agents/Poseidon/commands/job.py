@@ -63,7 +63,7 @@ class Job(AgentCommand):
             args = job_list_parser.parse_args(args)
 
         task = Task(self._agent.instance, command="jobs",
-                    callback_display_id=self._agent.tasker.callback.display_id)
+                    callback=self._agent.tasker.callback)
 
         task.console_args = args
         task.background = args.background
@@ -77,7 +77,7 @@ class Job(AgentCommand):
             args = subcommand_parser.parse_args(args)
 
         task = Task(self._agent.instance, command="jobkill", args=args.uuid,
-                    callback_display_id=self._agent.tasker.callback.display_id)
+                    callback=self._agent.tasker.callback)
 
         task.console_args = args
         task.background = args.background

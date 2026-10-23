@@ -25,8 +25,11 @@ def poseidon_commands_fixture():
 
 @pytest.fixture
 def make_task(fake_instance):
-    def _make_task(command="ls", args="", callback_display_id=1, completed=True, **extra):
-        task = Task(fake_instance, command=command, args=args, callback_display_id=callback_display_id)
+    def _make_task(command="ls", args="", callback_display_id=1, loaded_commands=None,
+                   completed=True, **extra):
+        callback = types.SimpleNamespace(display_id=callback_display_id,
+                                          loaded_commands=loaded_commands)
+        task = Task(fake_instance, command=command, args=args, callback=callback)
         task.completed = completed
         for key, value in extra.items():
             setattr(task, key, value)

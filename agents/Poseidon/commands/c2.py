@@ -72,7 +72,7 @@ class C2(AgentCommand):
         }
 
         task = Task(self._agent.instance, command="update_c2", args=command_args,
-                    callback_display_id=self._agent.tasker.callback.display_id)
+                    callback=self._agent.tasker.callback)
 
         task.console_args = args
         task.background = args.background
@@ -90,7 +90,7 @@ class C2(AgentCommand):
         }
 
         task = Task(self._agent.instance, command="update_c2", args=command_args,
-                    callback_display_id=self._agent.tasker.callback.display_id)
+                    callback=self._agent.tasker.callback)
 
         task.console_args = args
         task.background = args.background
@@ -108,7 +108,7 @@ class C2(AgentCommand):
             "config_value": args.value
         }
         task = Task(self._agent.instance, command="update_c2", args=command_args,
-                    callback_display_id=self._agent.tasker.callback.display_id)
+                    callback=self._agent.tasker.callback)
 
         task.console_args = args
         task.background = args.background
