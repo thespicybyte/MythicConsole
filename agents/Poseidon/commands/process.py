@@ -80,7 +80,7 @@ class Process(AgentCommand):
             command_args = {"regex_filter": args.regex}
 
         task = Task(self._agent.instance, command="ps", args=command_args,
-                    callback_display_id=self._agent.tasker.callback.display_id)
+                    callback=self._agent.tasker.callback)
 
         task.console_args = args
         task.background = args.background
@@ -93,7 +93,7 @@ class Process(AgentCommand):
             args = process_kill_parser.parse_args(args)
 
         task = Task(self._agent.instance, command="kill", args=str(args.pid),
-                    callback_display_id=self._agent.tasker.callback.display_id)
+                    callback=self._agent.tasker.callback)
 
         task.console_args = args
         task.background = args.background
@@ -129,7 +129,7 @@ class Process(AgentCommand):
             "env": env,
         }
         task = Task(self._agent.instance, command="run", args=command_args,
-                    callback_display_id=self._agent.tasker.callback.display_id)
+                    callback=self._agent.tasker.callback)
 
         task.console_args = args
         task.background = args.background

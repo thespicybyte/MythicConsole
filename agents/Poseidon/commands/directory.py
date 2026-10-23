@@ -75,7 +75,7 @@ class Directory(AgentCommand):
 
         command_args = " ".join(args.path)
         task = Task(self._agent.instance, command="ls", args=command_args,
-                    callback_display_id=self._agent.tasker.callback.display_id)
+                    callback=self._agent.tasker.callback)
 
         task.console_args = args
         task.background = args.background
@@ -90,7 +90,7 @@ class Directory(AgentCommand):
 
         command_args = " ".join(args.path)
         task = Task(self._agent.instance, command="cd", args=command_args,
-                    callback_display_id=self._agent.tasker.callback.display_id)
+                    callback=self._agent.tasker.callback)
 
         task.console_args = args
         task.background = args.background
@@ -105,7 +105,7 @@ class Directory(AgentCommand):
 
         command_args = " ".join(args.path)
         task = Task(self._agent.instance, command="mkdir", args=command_args,
-                    callback_display_id=self._agent.tasker.callback.display_id)
+                    callback=self._agent.tasker.callback)
 
         task.console_args = args
         task.background = args.background
@@ -118,7 +118,7 @@ class Directory(AgentCommand):
             args = directory_working_parser.parse_args(args)
 
         task = Task(self._agent.instance, command="pwd",
-                    callback_display_id=self._agent.tasker.callback.display_id)
+                    callback=self._agent.tasker.callback)
 
         task.console_args = args
         task.background = args.background

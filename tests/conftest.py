@@ -1,10 +1,14 @@
 import base64
+import json
 import types
+from pathlib import Path
 
 import pytest
 
 from agents.Poseidon.poseidon import Poseidon
 from backend.task.task import Task
+
+FIXTURES = Path(__file__).parent / "fixtures"
 
 
 @pytest.fixture
@@ -14,9 +18,18 @@ def fake_instance():
 
 
 @pytest.fixture
+def poseidon_commands_fixture():
+    """Trimmed, captured `get_all_commands_for_payloadtype("poseidon", ...)` response."""
+    return json.loads((FIXTURES / "poseidon_commands.json").read_text())
+
+
+@pytest.fixture
 def make_task(fake_instance):
-    def _make_task(command="ls", args="", callback_display_id=1, completed=True, **extra):
-        task = Task(fake_instance, command=command, args=args, callback_display_id=callback_display_id)
+    def _make_task(command="ls", args="", callback_display_id=1, loaded_commands=None,
+                   completed=True, **extra):
+        callback = types.SimpleNamespace(display_id=callback_display_id,
+                                          loaded_commands=loaded_commands)
+        task = Task(fake_instance, command=command, args=args, callback=callback)
         task.completed = completed
         for key, value in extra.items():
             setattr(task, key, value)
@@ -41,5 +54,13 @@ def fake_responses(monkeypatch):
 
 
 @pytest.fixture
-def poseidon_agent(fake_instance):
-    return Poseidon(fake_instance)
+async def poseidon_agent(fake_instance, poseidon_commands_fixture):
+    """A loaded Poseidon agent, fed the captured fixture instead of the network."""
+    agent = Poseidon(fake_instance)
+
+    async def _fetch_server_commands():
+        return poseidon_commands_fixture
+
+    agent._fetch_server_commands = _fetch_server_commands
+    await agent.load_commands()
+    return agent
