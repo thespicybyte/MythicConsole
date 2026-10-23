@@ -1,0 +1,267 @@
+[
+  {
+    "cmd": "upload",
+    "description": "Upload a file to the remote host.",
+    "help_cmd": "upload",
+    "attributes": {
+      "builtin": false,
+      "load_only": false,
+      "supported_os": [],
+      "suggested_command": false,
+      "filter_by_build_parameter": {}
+    },
+    "supported_ui_features": [],
+    "commandparameters": [
+      {
+        "name": "remote_path",
+        "cli_name": "remote_path",
+        "type": "String",
+        "required": true,
+        "default_value": "",
+        "description": "Path to write the file on the target. If empty, defaults to current working directory.",
+        "parameter_group_name": "Default",
+        "ui_position": 0,
+        "choices": [],
+        "choices_are_all_commands": false,
+        "choices_are_loaded_commands": false,
+        "dynamic_query_function": ""
+      },
+      {
+        "name": "file",
+        "cli_name": "file",
+        "type": "File",
+        "required": true,
+        "default_value": "",
+        "description": "",
+        "parameter_group_name": "Default",
+        "ui_position": 0,
+        "choices": [],
+        "choices_are_all_commands": false,
+        "choices_are_loaded_commands": false,
+        "dynamic_query_function": ""
+      }
+    ]
+  },
+  {
+    "cmd": "rm",
+    "description": "Remove specified file",
+    "help_cmd": "rm -path C:\\path\\to\\file",
+    "attributes": {
+      "builtin": false,
+      "load_only": false,
+      "supported_os": [],
+      "suggested_command": false,
+      "filter_by_build_parameter": {}
+    },
+    "supported_ui_features": [],
+    "commandparameters": [
+      {
+        "name": "path",
+        "cli_name": "path",
+        "type": "String",
+        "required": true,
+        "default_value": "",
+        "description": "path to file to remove",
+        "parameter_group_name": "Default",
+        "ui_position": 0,
+        "choices": [],
+        "choices_are_all_commands": false,
+        "choices_are_loaded_commands": false,
+        "dynamic_query_function": ""
+      }
+    ]
+  },
+  {
+    "cmd": "pwd",
+    "description": "Get process's current working directory",
+    "help_cmd": "pwd",
+    "attributes": {
+      "builtin": false,
+      "load_only": false,
+      "supported_os": [],
+      "suggested_command": false,
+      "filter_by_build_parameter": {}
+    },
+    "supported_ui_features": [],
+    "commandparameters": []
+  },
+  {
+    "cmd": "download",
+    "description": "Download a file from the victim machine (no need for quotes in the path)",
+    "help_cmd": "download [path to remote file]",
+    "attributes": {
+      "builtin": false,
+      "load_only": false,
+      "supported_os": [],
+      "suggested_command": false,
+      "filter_by_build_parameter": {}
+    },
+    "supported_ui_features": [
+      "file_browser:download"
+    ],
+    "commandparameters": [
+      {
+        "name": "file_path",
+        "cli_name": "file_path",
+        "type": "String",
+        "required": true,
+        "default_value": "",
+        "description": "Path to remote file to be downloaded",
+        "parameter_group_name": "Default",
+        "ui_position": 0,
+        "choices": [],
+        "choices_are_all_commands": false,
+        "choices_are_loaded_commands": false,
+        "dynamic_query_function": ""
+      }
+    ]
+  },
+  {
+    "cmd": "shell",
+    "description": "Execute commands through the use of cmd.exe",
+    "help_cmd": "shell [command] [arguments]",
+    "attributes": {
+      "builtin": false,
+      "load_only": false,
+      "supported_os": [],
+      "suggested_command": false,
+      "filter_by_build_parameter": {}
+    },
+    "supported_ui_features": [],
+    "commandparameters": [
+      {
+        "name": "command",
+        "cli_name": "command",
+        "type": "String",
+        "required": true,
+        "default_value": "",
+        "description": "command and arguments to be executed",
+        "parameter_group_name": "Default",
+        "ui_position": 0,
+        "choices": [],
+        "choices_are_all_commands": false,
+        "choices_are_loaded_commands": false,
+        "dynamic_query_function": ""
+      }
+    ]
+  },
+  {
+    "cmd": "ls",
+    "description": "Gather file information from a directory or single file",
+    "help_cmd": "ls [directory name]",
+    "attributes": {
+      "builtin": false,
+      "load_only": false,
+      "supported_os": [],
+      "suggested_command": false,
+      "filter_by_build_parameter": {}
+    },
+    "supported_ui_features": [],
+    "commandparameters": [
+      {
+        "name": "path",
+        "cli_name": "path",
+        "type": "String",
+        "required": false,
+        "default_value": ".",
+        "description": "file/directory to gather info from",
+        "parameter_group_name": "Default",
+        "ui_position": 0,
+        "choices": [],
+        "choices_are_all_commands": false,
+        "choices_are_loaded_commands": false,
+        "dynamic_query_function": ""
+      }
+    ]
+  },
+  {
+    "cmd": "execute_assembly",
+    "description": "Upload and execute a .NET assembly.",
+    "help_cmd": "execute_assembly",
+    "attributes": {
+      "builtin": false,
+      "load_only": false,
+      "supported_os": [
+        "Windows"
+      ],
+      "suggested_command": false,
+      "filter_by_build_parameter": {}
+    },
+    "supported_ui_features": [],
+    "commandparameters": [
+      {
+        "name": "arguments",
+        "cli_name": "arguments",
+        "type": "String",
+        "required": true,
+        "default_value": "",
+        "description": "Arguments for the assembly to execute",
+        "parameter_group_name": "Default",
+        "ui_position": 0,
+        "choices": [],
+        "choices_are_all_commands": false,
+        "choices_are_loaded_commands": false,
+        "dynamic_query_function": ""
+      },
+      {
+        "name": "file",
+        "cli_name": "file",
+        "type": "File",
+        "required": true,
+        "default_value": "",
+        "description": "",
+        "parameter_group_name": "Default",
+        "ui_position": 0,
+        "choices": [],
+        "choices_are_all_commands": false,
+        "choices_are_loaded_commands": false,
+        "dynamic_query_function": ""
+      }
+    ]
+  },
+  {
+    "cmd": "checkin",
+    "description": "Get system info from webshell",
+    "help_cmd": "checkin",
+    "attributes": {
+      "builtin": false,
+      "load_only": false,
+      "supported_os": [],
+      "suggested_command": false,
+      "filter_by_build_parameter": {}
+    },
+    "supported_ui_features": [],
+    "commandparameters": []
+  },
+  {
+    "cmd": "cd",
+    "description": "Change current working directory of agent process",
+    "help_cmd": "cd [directory name]",
+    "attributes": {
+      "builtin": false,
+      "load_only": false,
+      "supported_os": [
+        "Windows"
+      ],
+      "suggested_command": false,
+      "filter_by_build_parameter": {}
+    },
+    "supported_ui_features": [],
+    "commandparameters": [
+      {
+        "name": "path",
+        "cli_name": "path",
+        "type": "String",
+        "required": true,
+        "default_value": "",
+        "description": "directory to change too",
+        "parameter_group_name": "Default",
+        "ui_position": 0,
+        "choices": [],
+        "choices_are_all_commands": false,
+        "choices_are_loaded_commands": false,
+        "dynamic_query_function": ""
+      }
+    ]
+  }
+]
