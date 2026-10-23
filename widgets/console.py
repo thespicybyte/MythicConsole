@@ -42,9 +42,10 @@ class ConsolePanel(Container):
     def _completer_items(self, text: str) -> List[str]:
         """Candidate source for CommandAutoComplete: last-word matching is handled by the
         package itself, so this just delegates to the active agent or global commands.
-        Empty text is intentionally passed through so Tab on a blank line lists the
-        top-level commands."""
-        if text.endswith(" ") or text.endswith('"'):
+        A trailing space is passed through so Tab after a command (or subcommand) lists
+        its subcommands/options; empty text lists the top-level commands. An unclosed
+        quote yields nothing."""
+        if text.endswith('"'):
             return []
 
         source = self.agent or self.mythic_commands

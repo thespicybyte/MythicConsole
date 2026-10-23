@@ -44,3 +44,27 @@ async def test_generated_command_name_is_completer_visible(poseidon_agent):
 
     assert "sleep" in items
     assert "curl" in items
+
+
+async def test_trailing_space_after_command_lists_subcommands(poseidon_agent):
+    # "process " + Tab: the empty trailing word selects the command's subcommands,
+    # not the top-level command list.
+    items = poseidon_agent.get_completer_items("process ")
+
+    assert set(items) == {"list", "kill", "start", "-h", "--help"}
+    assert "directory" not in items
+
+
+async def test_trailing_space_after_subcommand_lists_its_options(poseidon_agent):
+    items = poseidon_agent.get_completer_items("process list ")
+
+    assert "--regex" in items
+    assert "-bg" in items
+    assert "list" not in items
+
+
+async def test_trailing_space_on_generated_command_lists_options(poseidon_agent):
+    items = poseidon_agent.get_completer_items("sleep ")
+
+    assert "--interval" in items
+    assert "-bg" in items

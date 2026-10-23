@@ -423,7 +423,11 @@ class MythicAgent:
         except:
             return items
 
-        if len(tokens) <= 1:
+        # A trailing space means the current word is empty: count it as one more
+        # (empty) token so "cmd " lists subcommands and "cmd sub " lists its options.
+        count = len(tokens) + (1 if tokens and line[-1:].isspace() else 0)
+
+        if count <= 1:
             items.append("help")
             # return only commands and aliases
             for command in self._get_commands():
@@ -433,7 +437,7 @@ class MythicAgent:
             for script_name in self._get_script_names():
                 items.append(script_name)
 
-        elif len(tokens) == 2:
+        elif count == 2:
             # check if command is in aliases, if so, get subcommand from alias_name, remove prefix options from subcommand options
             # if command is not in aliases, return command's subcommand
             command = tokens[0]
@@ -688,14 +692,18 @@ class MythicCommands(Cmd):
         except:
             return items
 
-        if len(tokens) <= 1:
+        # A trailing space means the current word is empty: count it as one more
+        # (empty) token so "cmd " lists subcommands and "cmd sub " lists its options.
+        count = len(tokens) + (1 if tokens and line[-1:].isspace() else 0)
+
+        if count <= 1:
             # items.append("help")
             for command in self.commands:
                 items.append(command.removeprefix("do_"))
             for alias_name in self._get_aliases_names():
                 items.append(alias_name)
 
-        elif len(tokens) == 2:
+        elif count == 2:
             # check if command is in aliases, if so, get subcommand from alias_name, remove prefix options from subcommand options
             # if command is not in aliases, return command's subcommand
             command = tokens[0]
