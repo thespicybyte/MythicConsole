@@ -57,7 +57,7 @@ class ConsolePanel(Container):
         """
         self.console_output.write(data)
 
-    def set_agent(self, payload_type: str):
+    async def set_agent(self, payload_type: str):
         from agents import get_agent
 
         if not payload_type:
@@ -67,6 +67,7 @@ class ConsolePanel(Container):
             return
 
         self.agent = get_agent(self.instance, payload_type)
+        await self.agent.load_commands()
 
     @on(ConsoleInput.Submitted)
     def _input_submitted(self, event: ConsoleInput.Submitted) -> None:

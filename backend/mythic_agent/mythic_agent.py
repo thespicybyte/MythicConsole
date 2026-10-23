@@ -1,18 +1,20 @@
 import os
 import importlib
 import shlex
-from abc import ABC, abstractmethod
+import types
 from pathlib import Path
-from typing import List, Dict, Optional
+from typing import List, Dict, Iterable, Optional
 
 from cmd2 import cmd2, with_argparser, Cmd, Cmd2ArgumentParser
 from glob import glob
+from mythic import mythic
 
 from rich.console import RenderableType
 from textual.worker import Worker
 
-from backend import MythicInstance, User, Operation, Payload
+from backend import MythicInstance, Task, User, Operation, Payload
 from utils.logger import logger
+from screens.prompts import TaskPrompt
 from . import mythic_command_parsers
 from ..operation.queries import OperationQueries
 from ..payload.queries import PayloadQueries
@@ -27,6 +29,18 @@ class MythicAgent:
 
 def add_default_options(parser: Cmd2ArgumentParser):
     parser.add_argument('-bg', '--background', action='store_true', help='run task in background')
+
+
+def remove_background_option(parser: Cmd2ArgumentParser):
+    """Strip the -bg/--background flag added by add_default_options (opt-out, e.g. exit)."""
+    for action in list(parser._actions):
+        if "--background" in action.option_strings:
+            parser._remove_action(action)
+            for group in parser._action_groups:
+                if action in group._group_actions:
+                    group._group_actions.remove(action)
+            for option_string in action.option_strings:
+                parser._option_string_actions.pop(option_string, None)
 
 
 class AgentCommandAlias:
@@ -53,10 +67,114 @@ class AgentCommandAlias:
         return {self.name: self.__str__()}
 
 
-class AgentCommand(ABC, cmd2.Cmd):
-    def __init__(self, agent: MythicAgent):
+_RICH_TYPE_HINTS = {
+    "File": "a file UUID",
+    "PayloadList": "a payload UUID",
+    "CredentialJson": "a JSON credential object",
+    "AgentConnect": "a JSON connection blob",
+    "LinkInfo": "a JSON connection blob",
+    "TypedArray": "a JSON array of [type, value] pairs",
+}
+
+_SKIP_SERIALIZE_KEYS = {"background", "func", "cmd2_statement", "cmd2_subcommand_func"}
+
+
+def _serialize(ns) -> dict:
+    """Namespace -> scripting dict, skipping cmd2/console bookkeeping keys and unset values."""
+    return {key: value for key, value in vars(ns).items()
+            if key not in _SKIP_SERIALIZE_KEYS and value is not None}
+
+
+def _group_params(params: List[dict]) -> Dict[str, List[dict]]:
+    """Split a command's server parameters into call styles, keyed by parameter_group_name."""
+    groups: Dict[str, List[dict]] = {}
+    for param in params:
+        group_name = param.get("parameter_group_name") or "Default"
+        groups.setdefault(group_name, []).append(param)
+
+    for group_params in groups.values():
+        group_params.sort(key=lambda p: p.get("ui_position") or 0)
+
+    return groups
+
+
+def _add_param_argument(parser: Cmd2ArgumentParser, param: dict) -> None:
+    flag = f"--{param.get('cli_name') or param['name']}"
+    param_type = param.get("type")
+    required = bool(param.get("required"))
+    default = param.get("default_value") or None
+    help_text = param.get("description") or ""
+    choices = param.get("choices") or None
+
+    if param_type == "Boolean":
+        # default=None (not the usual False) so an unset flag is omitted from the scripting dict
+        # rather than sent as an explicit false.
+        parser.add_argument(flag, action="store_true", default=None, help=help_text)
+    elif param_type == "Number":
+        parser.add_argument(flag, type=int, default=default, required=required, help=help_text)
+    elif param_type == "Array":
+        parser.add_argument(flag, nargs="+", required=required, help=help_text)
+    elif param_type == "ChooseOne":
+        parser.add_argument(flag, choices=choices, default=default, required=required, help=help_text)
+    elif param_type == "ChooseMultiple":
+        parser.add_argument(flag, nargs="+", choices=choices, required=required, help=help_text)
+    elif param_type in _RICH_TYPE_HINTS:
+        hint = _RICH_TYPE_HINTS[param_type]
+        parser.add_argument(flag, default=default, required=required, metavar=param_type.upper(),
+                            help=f"{help_text} (paste {hint})".strip())
+    else:
+        parser.add_argument(flag, default=default, required=required, help=help_text)
+
+
+def _dispatch_group(command: "AgentCommand", ns) -> Task:
+    """set_defaults(func=...) target for a parameter-group subparser."""
+    return command._build_task(ns)
+
+
+def _build_parsers(name: str, groups: Dict[str, List[dict]]):
+    if len(groups) <= 1:
+        parser = Cmd2ArgumentParser()
+        for group_params in groups.values():
+            for param in group_params:
+                _add_param_argument(parser, param)
+        add_default_options(parser)
+        return parser, {}
+
+    parser = Cmd2ArgumentParser()
+    subparsers = parser.add_subparsers(title='subcommands', help='subcommand help')
+    subcommand_parsers: Dict[str, Cmd2ArgumentParser] = {}
+    for group_name, group_params in groups.items():
+        sub = subparsers.add_parser(group_name, help=f"{name} ({group_name})")
+        for param in group_params:
+            _add_param_argument(sub, param)
+        add_default_options(sub)
+        sub.set_defaults(func=_dispatch_group)
+        subcommand_parsers[group_name] = sub
+
+    return parser, subcommand_parsers
+
+
+class AgentCommand(cmd2.Cmd):
+    """A command an operator can run against an agent: a hand-written subclass, or an instance
+    built by from_server() with a parser generated from the Mythic server's command metadata."""
+
+    def __init__(self, agent: MythicAgent, name: str = None, description: str = "",
+                 command_parser: Cmd2ArgumentParser = None,
+                 subcommand_parsers: Dict[str, Cmd2ArgumentParser] = None,
+                 aliases: List[AgentCommandAlias] = None):
         super().__init__()
         self._agent: MythicAgent = agent
+        self._name = name
+        self._description = description
+        self._command_parser = command_parser
+        self._subcommand_parsers: Dict[str, Cmd2ArgumentParser] = subcommand_parsers or {}
+        self._aliases: List[AgentCommandAlias] = aliases or []
+        self._params: List[dict] = []
+        self.verify_prompt: Optional[TaskPrompt] = None
+        self.force_background = False
+
+        if self._name and self._command_parser is not None:
+            self._bind_do()
 
     def __eq__(self, other) -> bool:
         if not isinstance(other, AgentCommand):
@@ -68,33 +186,24 @@ class AgentCommand(ABC, cmd2.Cmd):
         return self.name
 
     @property
-    @abstractmethod
     def name(self) -> str:
-        """name of the command"""
-        pass
+        return self._name
 
     @property
-    @abstractmethod
     def description(self) -> str:
-        """description of the command"""
-        pass
+        return self._description
 
     @property
-    @abstractmethod
     def subcommand_parsers(self) -> Dict[str, Cmd2ArgumentParser]:
-        """List of sub command parsers"""
-        pass
+        return self._subcommand_parsers
 
     @property
-    @abstractmethod
     def command_parser(self) -> Cmd2ArgumentParser:
-        """return the parser for the command"""
+        return self._command_parser
 
     @property
-    @abstractmethod
     def aliases(self) -> List[AgentCommandAlias]:
-        """Available aliases for an agent"""
-        pass
+        return self._aliases
 
     def get_subcommands(self) -> List[str]:
         """
@@ -129,8 +238,94 @@ class AgentCommand(ABC, cmd2.Cmd):
 
         return options
 
+    @classmethod
+    def from_server(cls, agent: MythicAgent, spec: dict) -> "AgentCommand":
+        """Build a generated command from one server `command` row (cmd/description/commandparameters)."""
+        params = spec.get("commandparameters") or []
+        groups = _group_params(params)
+        parser, subparsers = _build_parsers(spec["cmd"], groups)
+
+        command = cls(agent, name=spec["cmd"], description=spec.get("description") or "",
+                      command_parser=parser, subcommand_parsers=subparsers, aliases=[])
+        command._params = params
+        return command
+
+    def _build_task(self, ns) -> Task:
+        task = Task(self._agent.instance, command=self._name, args=_serialize(ns),
+                    callback_display_id=self._agent.tasker.callback.display_id)
+        task.console_args = ns
+        task.background = self.force_background or getattr(ns, "background", False)
+        if self.verify_prompt:
+            task.verify_prompt = self.verify_prompt
+
+        return task
+
+    def _bind_do(self):
+        has_groups = bool(self._subcommand_parsers)
+
+        def _do(_self, ns):
+            if has_groups:
+                func = getattr(ns, "func", None)
+                return func(self, ns) if func is not None else None
+
+            return self._build_task(ns)
+
+        _do.__name__ = f"do_{self._name}"
+        _do.__qualname__ = _do.__name__
+        bound = with_argparser(self._command_parser)(_do)
+        setattr(self, _do.__name__, types.MethodType(bound, self))
+
 
 ScriptCommand = AgentCommand
+
+
+class AgentCommands:
+    """One agent's command set (generated + curated): name-keyed mapping for dict-patch overrides
+    that iterates as command objects. Distinct from MythicCommands (the global cmd2.Cmd set)."""
+
+    def __init__(self, commands: Iterable[AgentCommand] = ()):
+        self._by_name: Dict[str, AgentCommand] = {c.name: c for c in commands}
+
+    def __getitem__(self, name: str) -> AgentCommand:
+        return self._by_name[name]
+
+    def __setitem__(self, name: str, command: AgentCommand):
+        self._by_name[name] = command
+
+    def __delitem__(self, name: str):
+        del self._by_name[name]
+
+    def __contains__(self, name: str) -> bool:
+        return name in self._by_name
+
+    def __iter__(self):
+        return iter(self._by_name.values())
+
+    def __len__(self) -> int:
+        return len(self._by_name)
+
+    def pop(self, name: str, *default):
+        return self._by_name.pop(name, *default)
+
+    def get(self, name: str, default=None):
+        return self._by_name.get(name, default)
+
+    def add(self, command: AgentCommand):
+        self._by_name[command.name] = command
+
+    @property
+    def aliases(self) -> List[AgentCommandAlias]:
+        return [alias for command in self for alias in command.aliases]
+
+
+_CMD_ATTRS = """
+cmd description help_cmd attributes supported_ui_features
+commandparameters {
+  name cli_name type required default_value description
+  parameter_group_name ui_position choices
+  choices_are_all_commands choices_are_loaded_commands dynamic_query_function
+}
+"""
 
 
 # noinspection PyRedeclaration
@@ -141,31 +336,24 @@ class MythicAgent:
         self.name = name
         self.formatter = formatter
         self.tasker = Tasker(instance)
-        self._commands: List[AgentCommand] = []
-        self._aliases: List[AgentCommandAlias] = []
+        self._commands: AgentCommands = AgentCommands()
         self._scripts: List[ScriptCommand] = []
         self._current_foreground_task: Optional[Worker] = None
 
         if tasker:
             self.tasker = tasker
 
-        self._set_commands()
-
     @property
-    def commands(self) -> List[AgentCommand]:
+    def commands(self) -> AgentCommands:
         return self._commands
 
     @commands.setter
-    def commands(self, commands: List[AgentCommand]):
+    def commands(self, commands: AgentCommands):
         self._commands = commands
 
     @property
     def aliases(self) -> List[AgentCommandAlias]:
-        return self._aliases
-
-    @aliases.setter
-    def aliases(self, aliases: List[AgentCommandAlias]):
-        self._aliases = aliases
+        return self._commands.aliases
 
     @property
     def scripts(self) -> List[ScriptCommand]:
@@ -184,14 +372,10 @@ class MythicAgent:
         self._current_foreground_task = worker
 
     def _get_commands(self) -> List[AgentCommand]:
-        return self._commands or []
+        return list(self._commands)
 
     def _get_aliases_names(self) -> List[str]:
-        items = []
-        for alias in self._aliases:
-            items.append(alias.name)
-
-        return items
+        return [alias.name for alias in self.aliases]
 
     def _get_script_names(self) -> List[str]:
         items = []
@@ -201,14 +385,10 @@ class MythicAgent:
         return items
 
     def get_command(self, command: str) -> AgentCommand | None:
-        for cmd in self._commands:
-            if cmd.name == command:
-                return cmd
-
-        return None
+        return self._commands.get(command)
 
     def get_alias(self, command: str) -> AgentCommandAlias | None:
-        for alias in self._aliases:
+        for alias in self.aliases:
             if alias.name == command:
                 return alias
 
@@ -222,16 +402,10 @@ class MythicAgent:
         return None
 
     def is_command(self, value: str) -> bool:
-        for command in self._commands:
-            if command.name == value:
-                return True
-        return False
+        return value in self._commands
 
     def is_alias(self, value: str) -> bool:
-        for alias in self._aliases:
-            if alias.name == value:
-                return True
-        return False
+        return any(alias.name == value for alias in self.aliases)
 
     def is_script(self, value: str) -> bool:
         for script in self._scripts:
@@ -324,37 +498,25 @@ class MythicAgent:
         return items
 
     def get_subcommands(self, command_name: str) -> List[str]:
-        for command in self._commands:
-            if command.name == command_name:
-                return command.get_subcommands()
-
-        return []
+        command = self._commands.get(command_name)
+        return command.get_subcommands() if command else []
 
     def get_subcommand_options(self, command_name: str, subcommand_name: str = None):
         if not subcommand_name:
             parser = self.get_command_parser(command_name)
-            return self.get_parser_options(parser)
+            return self.get_parser_options(parser) if parser else []
 
-        for command in self._commands:
-            if command.name == command_name:
-                return command.get_subcommand_options(subcommand_name)
-
-        return []
+        command = self._commands.get(command_name)
+        return command.get_subcommand_options(subcommand_name) if command else []
 
     def get_subcommand_parser(self, command_name: str,
                               subcommand_name: str) -> Cmd2ArgumentParser | None:
-        for command in self._commands:
-            if command.name == command_name:
-                return command.get_subcommand_parser(subcommand_name)
-
-        return None
+        command = self._commands.get(command_name)
+        return command.get_subcommand_parser(subcommand_name) if command else None
 
     def get_command_parser(self, command_name: str) -> Cmd2ArgumentParser | None:
-        for command in self._commands:
-            if command.name == command_name:
-                return command.command_parser
-
-        return None
+        command = self._commands.get(command_name)
+        return command.command_parser if command else None
 
     @classmethod
     def get_parser_options(cls, parser: Cmd2ArgumentParser) -> List[str]:
@@ -365,46 +527,17 @@ class MythicAgent:
 
         return options
 
-    def get_command_classes(self) -> List[AgentCommand]:
-        command_files = self.get_command_files()
-        self.commands = []
-        self.aliases = []
+    async def _fetch_server_commands(self) -> List[dict]:
+        return await mythic.get_all_commands_for_payloadtype(
+            self.mythic, self.name, custom_return_attributes=_CMD_ATTRS)
 
-        for path in command_files:
-            module_name = path.stem
-            if "_" in module_name:
-                tokens = module_name.split("_")
-                class_name = ""
-                for token in tokens:
-                    class_name += token.capitalize()
-            else:
-                class_name = module_name.capitalize()
+    async def get_agent_commands(self) -> AgentCommands:
+        specs = await self._fetch_server_commands()
+        return AgentCommands(AgentCommand.from_server(self, spec) for spec in specs)
 
-            try:
-                # Dynamically load the module
-                module_path = f"agents.{self.name.capitalize()}.commands.{module_name}"
-                module = importlib.import_module(module_path)
-
-                # Get the class from the module
-                command_class = getattr(module, class_name, None)
-
-                if command_class is None:
-                    logger.debug(f"Class {class_name} not found in {module_name}.py")
-                    continue
-
-                # verify class is an AgentCommand
-                if not issubclass(command_class, AgentCommand):
-                    logger.debug(f"{command_class.__name__} is not an AgentCommand")
-                    continue
-
-                agent_command = command_class(self)
-                self.commands.append(agent_command)
-                self.aliases += agent_command.aliases
-
-            except (ImportError, AttributeError) as e:
-                logger.warning(f"Failed to load class {class_name} from {module_name}.py: {e}")
-
-        return self.commands
+    async def load_commands(self):
+        self.commands = await self.get_agent_commands()
+        self.get_script_classes()
 
     def get_script_classes(self) -> List[ScriptCommand]:
         script_files = self.get_script_files()
@@ -436,14 +569,7 @@ class MythicAgent:
             except (ImportError, AttributeError) as e:
                 logger.warning(f"Failed to load class {class_name} from {module_name}.py: {e}")
 
-        return self.commands
-
-    def get_command_files(self) -> List[Path]:
-        """
-        Enumerate the agents `commands` directory for a list of files that should contain
-        :return: List of paths
-        """
-        return self.get_files("commands")
+        return self.scripts
 
     def get_script_files(self) -> List[Path]:
         return self.get_files("scripts")
@@ -468,12 +594,11 @@ class MythicAgent:
 
         return target_files
 
-    def _set_commands(self):
-        self.get_command_classes()
-        self.get_script_classes()
-
 
 class MythicCommands(Cmd):
+    """Global, agent-independent console commands (operation/payload/user), a cmd2.Cmd.
+    Unrelated to AgentCommands (a per-agent command collection)."""
+
     def __init__(self, instance: MythicInstance):
         super().__init__()
         self.instance = instance

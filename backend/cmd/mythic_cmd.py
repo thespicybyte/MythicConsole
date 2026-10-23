@@ -3,7 +3,6 @@ from typing import Optional, List, Union, Coroutine
 
 from cmd2 import Cmd, Statement
 
-import utils
 from backend import MythicAgent, MythicInstance
 from backend.mythic_agent.mythic_agent import MythicCommands
 from utils.logger import logger
@@ -71,11 +70,8 @@ class MythicCmd(Cmd):
         if not self.current_agent:
             return
 
-        command_classes = self.current_agent.get_command_classes()
-
-        for command in command_classes:
-            command_class = command.__class__
-            command_name = utils.camel_to_snake(command_class.__name__).lower()
+        for command in self.current_agent.commands:
+            command_name = command.name
 
             method_name = f"do_{command_name}"
 

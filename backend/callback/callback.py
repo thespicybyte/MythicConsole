@@ -143,7 +143,7 @@ class Callback:
                 resp = await CallbackQueries.query_by_uuid(self.mythic, self.uuid)
 
             self._update(resp)
-            self.console_panel.set_agent(self.payload_type_name)
+            await self.console_panel.set_agent(self.payload_type_name)
         except Exception as e:
             logger.exception(e)
             raise

@@ -1,16 +1,26 @@
 import base64
+import json
 import types
+from pathlib import Path
 
 import pytest
 
 from agents.Poseidon.poseidon import Poseidon
 from backend.task.task import Task
 
+FIXTURES = Path(__file__).parent / "fixtures"
+
 
 @pytest.fixture
 def fake_instance():
     """Stub MythicInstance: satisfies `.mythic` reads without a network connection."""
     return types.SimpleNamespace(mythic=None)
+
+
+@pytest.fixture
+def poseidon_commands_fixture():
+    """Trimmed, captured `get_all_commands_for_payloadtype("poseidon", ...)` response."""
+    return json.loads((FIXTURES / "poseidon_commands.json").read_text())
 
 
 @pytest.fixture
@@ -41,5 +51,13 @@ def fake_responses(monkeypatch):
 
 
 @pytest.fixture
-def poseidon_agent(fake_instance):
-    return Poseidon(fake_instance)
+async def poseidon_agent(fake_instance, poseidon_commands_fixture):
+    """A loaded Poseidon agent, fed the captured fixture instead of the network."""
+    agent = Poseidon(fake_instance)
+
+    async def _fetch_server_commands():
+        return poseidon_commands_fixture
+
+    agent._fetch_server_commands = _fetch_server_commands
+    await agent.load_commands()
+    return agent

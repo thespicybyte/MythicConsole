@@ -532,6 +532,7 @@ class Home(Screen):
         agent = get_agent(self.instance, callback.payload_type_name)
         self.current_agent = agent
         self.current_agent.tasker.set_callback(self.current_callback)
+        await self.current_agent.load_commands()
         self.cmd.current_agent = self.current_agent
         self.cmd.load_and_register_agent_commands()
 
