@@ -6,6 +6,8 @@ from pathlib import Path
 import pytest
 
 from agents.Poseidon.poseidon import Poseidon
+from backend.formatter.formatter import DefaultFormatter
+from backend.mythic_agent.mythic_agent import MythicAgent
 from backend.task.task import Task
 
 FIXTURES = Path(__file__).parent / "fixtures"
@@ -21,6 +23,18 @@ def fake_instance():
 def poseidon_commands_fixture():
     """Trimmed, captured `get_all_commands_for_payloadtype("poseidon", ...)` response."""
     return json.loads((FIXTURES / "poseidon_commands.json").read_text())
+
+
+@pytest.fixture
+def generic_commands_fixture():
+    """Synthetic `get_all_commands_for_payloadtype("testagent", ...)` response."""
+    return json.loads((FIXTURES / "generic_commands.json").read_text())
+
+
+@pytest.fixture
+def arachne_commands_fixture():
+    """Captured `get_all_commands_for_payloadtype("arachne", ...)` response (a real, non-Poseidon agent)."""
+    return json.loads((FIXTURES / "arachne_commands.json").read_text())
 
 
 @pytest.fixture
@@ -60,6 +74,32 @@ async def poseidon_agent(fake_instance, poseidon_commands_fixture):
 
     async def _fetch_server_commands():
         return poseidon_commands_fixture
+
+    agent._fetch_server_commands = _fetch_server_commands
+    await agent.load_commands()
+    return agent
+
+
+@pytest.fixture
+async def generic_agent(fake_instance, generic_commands_fixture):
+    """A loaded base MythicAgent (no curated overrides), fed the synthetic fixture."""
+    agent = MythicAgent("testagent", fake_instance, DefaultFormatter())
+
+    async def _fetch_server_commands():
+        return generic_commands_fixture
+
+    agent._fetch_server_commands = _fetch_server_commands
+    await agent.load_commands()
+    return agent
+
+
+@pytest.fixture
+async def arachne_agent(fake_instance, arachne_commands_fixture):
+    """A loaded base MythicAgent, fed the captured arachne dump (a real, non-Poseidon agent)."""
+    agent = MythicAgent("arachne", fake_instance, DefaultFormatter())
+
+    async def _fetch_server_commands():
+        return arachne_commands_fixture
 
     agent._fetch_server_commands = _fetch_server_commands
     await agent.load_commands()
