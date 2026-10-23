@@ -1,3 +1,5 @@
+from typing import List
+
 from mythic import mythic
 from mythic.mythic_classes import Mythic
 
@@ -110,6 +112,41 @@ class CallbackQueries:
             raise Exception(f"failed to query callback: {resp}")
 
         return callbacks[0].get("tasks")
+
+    @staticmethod
+    async def get_loaded_commands(session: Mythic, display_id: int) -> List[str]:
+        """
+        Get the names of commands currently loaded on a callback
+        :param session: authenticated Mythic object
+        :param display_id: display id for callback
+        :return: list of loaded command names
+        """
+        resp = await mythic.execute_custom_query(
+            mythic=session,
+            query=f"""
+                query Query($display_id: Int!) {{
+                  callback(where: {{display_id: {{_eq: $display_id}}}}) {{
+                    loadedcommands {{
+                      command {{
+                        cmd
+                      }}
+                    }}
+                  }}
+                }}
+                """,
+            variables={"display_id": display_id}
+        )
+
+        callbacks = resp.get("callback")
+
+        if not callbacks:
+            raise Exception(f"failed to query callback: {resp}")
+
+        if len(callbacks) != 1:
+            raise Exception(f"failed to query callback: {resp}")
+
+        loaded = callbacks[0].get("loadedcommands") or []
+        return [entry["command"]["cmd"] for entry in loaded if entry.get("command")]
 
     @staticmethod
     async def export(session: Mythic, callback_uuid: str) -> str:

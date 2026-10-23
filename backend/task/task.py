@@ -10,6 +10,7 @@ from utils.logger import logger
 from screens.prompts import TaskPrompt
 
 from .queries import TaskQueries
+from ..callback.queries import CallbackQueries
 from ..response.response import Response
 from ..response.queries import ResponseQueries
 
@@ -227,6 +228,10 @@ class Task:
             raise ValueError("callback display id not set")
 
         try:
+            loaded_commands = await CallbackQueries.get_loaded_commands(self.mythic, self.callback_display_id)
+            if self.command_name not in loaded_commands:
+                raise TaskError(f"command '{self.command_name}' is not loaded on this callback")
+
             task_id = await TaskQueries.execute(self.mythic, self.command_name, self.args, self.callback_display_id)
             if not task_id:
                 return
@@ -234,6 +239,8 @@ class Task:
             self.id = task_id
             await self.query()
 
+        except TaskError:
+            raise
         except Exception as e:
             raise TaskError(e)
 
