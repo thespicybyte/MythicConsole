@@ -1,0 +1,131 @@
+[
+  {
+    "cmd": "echo",
+    "description": "Echo a string back, optionally shouting it",
+    "help_cmd": "echo -text text -shout",
+    "attributes": {
+      "builtin": false,
+      "load_only": false,
+      "supported_os": [],
+      "suggested_command": true,
+      "filter_by_build_parameter": {}
+    },
+    "supported_ui_features": [],
+    "commandparameters": [
+      {
+        "name": "text",
+        "cli_name": "text",
+        "type": "String",
+        "required": true,
+        "default_value": "",
+        "description": "Text to echo",
+        "parameter_group_name": "Default",
+        "ui_position": 0,
+        "choices": [],
+        "choices_are_all_commands": false,
+        "choices_are_loaded_commands": false,
+        "dynamic_query_function": ""
+      },
+      {
+        "name": "shout",
+        "cli_name": "shout",
+        "type": "Boolean",
+        "required": false,
+        "default_value": "false",
+        "description": "Uppercase the output",
+        "parameter_group_name": "Default",
+        "ui_position": 1,
+        "choices": [],
+        "choices_are_all_commands": false,
+        "choices_are_loaded_commands": false,
+        "dynamic_query_function": ""
+      }
+    ]
+  },
+  {
+    "cmd": "connect",
+    "description": "Connect to a peer over a chosen protocol",
+    "help_cmd": "connect -port port -protocol protocol",
+    "attributes": {
+      "builtin": false,
+      "load_only": false,
+      "supported_os": [],
+      "suggested_command": true,
+      "filter_by_build_parameter": {}
+    },
+    "supported_ui_features": [],
+    "commandparameters": [
+      {
+        "name": "port",
+        "cli_name": "port",
+        "type": "Number",
+        "required": true,
+        "default_value": "",
+        "description": "Port to connect to",
+        "parameter_group_name": "Default",
+        "ui_position": 0,
+        "choices": [],
+        "choices_are_all_commands": false,
+        "choices_are_loaded_commands": false,
+        "dynamic_query_function": ""
+      },
+      {
+        "name": "protocol",
+        "cli_name": "protocol",
+        "type": "ChooseOne",
+        "required": true,
+        "default_value": "tcp",
+        "description": "Transport protocol",
+        "parameter_group_name": "Default",
+        "ui_position": 1,
+        "choices": ["tcp", "udp", "smb"],
+        "choices_are_all_commands": false,
+        "choices_are_loaded_commands": false,
+        "dynamic_query_function": ""
+      }
+    ]
+  },
+  {
+    "cmd": "transfer",
+    "description": "Transfer a file to or from the target, by direction",
+    "help_cmd": "transfer [push|pull] -path path",
+    "attributes": {
+      "builtin": false,
+      "load_only": false,
+      "supported_os": [],
+      "suggested_command": true,
+      "filter_by_build_parameter": {}
+    },
+    "supported_ui_features": [],
+    "commandparameters": [
+      {
+        "name": "path",
+        "cli_name": "path",
+        "type": "String",
+        "required": true,
+        "default_value": "",
+        "description": "Local path to push",
+        "parameter_group_name": "Push",
+        "ui_position": 0,
+        "choices": [],
+        "choices_are_all_commands": false,
+        "choices_are_loaded_commands": false,
+        "dynamic_query_function": ""
+      },
+      {
+        "name": "remote_path",
+        "cli_name": "remote_path",
+        "type": "String",
+        "required": true,
+        "default_value": "",
+        "description": "Remote path to pull",
+        "parameter_group_name": "Pull",
+        "ui_position": 0,
+        "choices": [],
+        "choices_are_all_commands": false,
+        "choices_are_loaded_commands": false,
+        "dynamic_query_function": ""
+      }
+    ]
+  }
+]

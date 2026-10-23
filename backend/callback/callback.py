@@ -46,6 +46,7 @@ class Callback:
         self.payload_type_uuid: Optional[str] = None
         self.operation_name: Optional[str] = None
         self.tasks: List[Task] = []
+        self.loaded_commands: Optional[set[str]] = None
         self.config_path = config
         self.console_panel: ConsolePanel = ConsolePanel(instance=self.instance)
 
@@ -143,7 +144,7 @@ class Callback:
                 resp = await CallbackQueries.query_by_uuid(self.mythic, self.uuid)
 
             self._update(resp)
-            self.console_panel.set_agent(self.payload_type_name)
+            await self.console_panel.set_agent(self.payload_type_name)
         except Exception as e:
             logger.exception(e)
             raise
@@ -172,7 +173,7 @@ class Callback:
             if not task_id:
                 continue
 
-            task = Task(self.instance, task_id=task_id)
+            task = Task(self.instance, task_id=task_id, callback=self)
             await task.query()
             self.tasks.append(task)
 

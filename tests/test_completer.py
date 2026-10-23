@@ -1,6 +1,4 @@
-def test_empty_string_lists_top_level_commands(poseidon_agent):
-    """OP#92: an empty/whitespace-only line now falls into the <=1-token branch and returns the
-    top-level command list, instead of crashing with IndexError on `tokens[0]`."""
+async def test_empty_string_lists_top_level_commands(poseidon_agent):
     items = poseidon_agent.get_completer_items("")
 
     assert items
@@ -8,7 +6,7 @@ def test_empty_string_lists_top_level_commands(poseidon_agent):
     assert "process" in items
 
 
-def test_whitespace_only_lists_top_level_commands(poseidon_agent):
+async def test_whitespace_only_lists_top_level_commands(poseidon_agent):
     items = poseidon_agent.get_completer_items("   ")
 
     assert items
@@ -16,11 +14,11 @@ def test_whitespace_only_lists_top_level_commands(poseidon_agent):
     assert "process" in items
 
 
-def test_unbalanced_trailing_quote_returns_empty(poseidon_agent):
+async def test_unbalanced_trailing_quote_returns_empty(poseidon_agent):
     assert poseidon_agent.get_completer_items('shell "a') == []
 
 
-def test_single_partial_token_lists_help_and_commands(poseidon_agent):
+async def test_single_partial_token_lists_help_and_commands(poseidon_agent):
     items = poseidon_agent.get_completer_items("pw")
 
     assert "help" in items
@@ -28,14 +26,45 @@ def test_single_partial_token_lists_help_and_commands(poseidon_agent):
     assert "pwd" in items  # alias for `directory working`
 
 
-def test_two_token_line_returns_subcommands_and_options(poseidon_agent):
+async def test_two_token_line_returns_subcommands_and_options(poseidon_agent):
     items = poseidon_agent.get_completer_items("process list")
 
     assert set(items) == {"list", "kill", "start", "-h", "--help"}
 
 
-def test_multi_token_line_excludes_tokens_already_on_the_line(poseidon_agent):
+async def test_multi_token_line_excludes_tokens_already_on_the_line(poseidon_agent):
     items = poseidon_agent.get_completer_items("process list --regex foo extra")
 
     assert set(items) == {"-h", "--help", "-bg", "--background"}
     assert "--regex" not in items
+
+
+async def test_generated_command_name_is_completer_visible(poseidon_agent):
+    items = poseidon_agent.get_completer_items("")
+
+    assert "sleep" in items
+    assert "curl" in items
+
+
+async def test_trailing_space_after_command_lists_subcommands(poseidon_agent):
+    # "process " + Tab: the empty trailing word selects the command's subcommands,
+    # not the top-level command list.
+    items = poseidon_agent.get_completer_items("process ")
+
+    assert set(items) == {"list", "kill", "start", "-h", "--help"}
+    assert "directory" not in items
+
+
+async def test_trailing_space_after_subcommand_lists_its_options(poseidon_agent):
+    items = poseidon_agent.get_completer_items("process list ")
+
+    assert "--regex" in items
+    assert "-bg" in items
+    assert "list" not in items
+
+
+async def test_trailing_space_on_generated_command_lists_options(poseidon_agent):
+    items = poseidon_agent.get_completer_items("sleep ")
+
+    assert "--interval" in items
+    assert "-bg" in items

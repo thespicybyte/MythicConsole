@@ -1,47 +1,25 @@
 import json
 import os.path
-from typing import Optional
 
-from rich.console import RenderableType
 from rich.table import Table
 from rich.text import Text
 
 import utils
-from backend import Formatter, Task
+from backend import Formatter, Task, renders
 from utils.environment import Environment
 from utils.logger import logger
 
 
 class PoseidonFormatter(Formatter):
-    async def format_output(self, task: Task) -> Optional["RenderableType"]:
-        command = task.command_name
+    @renders("config")
+    async def config(self, task: Task):
+        return await self.format_pretty(task)
 
-        match command:
-            case "config":
-                return await self.format_pretty(task)
-            case "download":
-                return await self.download(task)
-            case "drives":
-                return await self.drives(task)
-            case "execute_library":
-                return await self.get_env(task)
-            case "getuser":
-                return await self.format_pretty(task, expand_all=True)
-            case "jobs":
-                return await self.jobs(task)
-            case "keys":
-                return await self.format_pretty(task, expand_all=True)
-            case "ls":
-                return await self.ls(task)
-            case "portscan":
-                return await self.portscan(task)
-            case "ps":
-                return await self.ps(task)
-            case "sshauth":
-                return await self.ssh_auth(task)
-            case _:
-                return await self.format_plaintext(task)
+    @renders("getuser", "keys")
+    async def user_info(self, task: Task):
+        return await self.format_pretty(task, expand_all=True)
 
+    @renders("ls")
     async def ls(self, task: Task, encoding: str = "utf8") -> Table | Text:
         raw = await self.get_raw_output(task, encoding)
 
@@ -73,8 +51,8 @@ class PoseidonFormatter(Formatter):
         table = self.build_table(*rows, headers=headers, title=title)
         return table
 
-    @classmethod
-    async def download(cls, task: Task) -> Text:
+    @renders("download")
+    async def download(self, task: Task) -> Text:
         success = False
         local_path = ""
         try:
@@ -95,6 +73,7 @@ class PoseidonFormatter(Formatter):
 
             return Text("failed to download file")
 
+    @renders("drives")
     async def drives(self, task: Task, encoding: str = "utf8") -> Table:
         raw = await self.get_raw_output(task, encoding)
 
@@ -113,6 +92,7 @@ class PoseidonFormatter(Formatter):
         table = self.build_table(*rows, headers=headers, title=title)
         return table
 
+    @renders("getenv")
     async def get_env(self, task: Task) -> Table:
         raw = await self.get_raw_output(task)
 
@@ -137,6 +117,7 @@ class PoseidonFormatter(Formatter):
         table = self.build_table(*rows, headers=headers, title=title)
         return table
 
+    @renders("jobs")
     async def jobs(self, task: Task, encoding: str = "utf8") -> Table:
         raw = await self.get_raw_output(task, encoding)
 
@@ -154,6 +135,7 @@ class PoseidonFormatter(Formatter):
         table = self.build_table(*rows, headers=headers, title=title)
         return table
 
+    @renders("portscan")
     async def portscan(self, task: Task, encoding: str = "utf8") -> Table:
         raw = await self.get_raw_output(task, encoding)
 
@@ -174,6 +156,7 @@ class PoseidonFormatter(Formatter):
         table = self.build_table(*rows, headers=headers, title=title)
         return table
 
+    @renders("ps")
     async def ps(self, task: Task, encoding: str = "utf8") -> Table:
         raw = await self.get_raw_output(task, encoding)
 
@@ -193,6 +176,7 @@ class PoseidonFormatter(Formatter):
         table = self.build_table(*rows, headers=headers, title=title)
         return table
 
+    @renders("sshauth")
     async def ssh_auth(self, task: Task, encoding: str = "utf8") -> Table:
         raw = await self.get_raw_output(task, encoding)
 

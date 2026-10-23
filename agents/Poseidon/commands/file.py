@@ -115,7 +115,7 @@ class File(AgentCommand):
         }
 
         task = Task(self._agent.instance, command="cp", args=command_args,
-                    callback_display_id=self._agent.tasker.callback.display_id)
+                    callback=self._agent.tasker.callback)
 
         task.console_args = args
         task.background = args.background
@@ -129,7 +129,7 @@ class File(AgentCommand):
 
         path = " ".join(args.path)
         task = Task(self._agent.instance, command="cat", args=path,
-                    callback_display_id=self._agent.tasker.callback.display_id)
+                    callback=self._agent.tasker.callback)
 
         task.console_args = args
         task.background = args.background
@@ -146,7 +146,7 @@ class File(AgentCommand):
             "lines": args.lines,
         }
         task = Task(self._agent.instance, command="head", args=command_args,
-                    callback_display_id=self._agent.tasker.callback.display_id)
+                    callback=self._agent.tasker.callback)
 
         task.console_args = args
         task.background = args.background
@@ -164,7 +164,7 @@ class File(AgentCommand):
         }
 
         task = Task(self._agent.instance, command="tail", args=command_args,
-                    callback_display_id=self._agent.tasker.callback.display_id)
+                    callback=self._agent.tasker.callback)
 
         task.console_args = args
         task.background = args.background
@@ -182,7 +182,7 @@ class File(AgentCommand):
         }
 
         task = Task(self._agent.instance, command="mv", args=command_args,
-                    callback_display_id=self._agent.tasker.callback.display_id)
+                    callback=self._agent.tasker.callback)
 
         task.console_args = args
         task.background = args.background
@@ -196,7 +196,7 @@ class File(AgentCommand):
 
         path = " ".join(args.path)
         task = Task(self._agent.instance, command="download", args=path,
-                    callback_display_id=self._agent.tasker.callback.display_id)
+                    callback=self._agent.tasker.callback)
 
         task.console_args = args
         task.background = args.background
@@ -210,7 +210,7 @@ class File(AgentCommand):
 
         path = " ".join(args.path)
         task = Task(self._agent.instance, command="rm", args=path,
-                    callback_display_id=self._agent.tasker.callback.display_id)
+                    callback=self._agent.tasker.callback)
 
         task.console_args = args
         task.background = args.background
@@ -236,7 +236,7 @@ class File(AgentCommand):
             }
 
             task = Task(self._agent.instance, command="upload", args=command_args,
-                        callback_display_id=self._agent.tasker.callback.display_id)
+                        callback=self._agent.tasker.callback)
 
             task.console_args = args
             task.background = args.background

@@ -67,7 +67,7 @@ class Command(AgentCommand):
             command_args = " ".join(args.command)
 
         task = Task(self._agent.instance, command="shell", args=command_args,
-                    callback_display_id=self._agent.tasker.callback.display_id)
+                    callback=self._agent.tasker.callback)
 
         task.console_args = args
         task.background = args.background
@@ -83,7 +83,7 @@ class Command(AgentCommand):
             "shell": args.shell,
         }
         task = Task(self._agent.instance, command="shell_config", args=command_args,
-                    callback_display_id=self._agent.tasker.callback.display_id)
+                    callback=self._agent.tasker.callback)
 
         task.console_args = args
         task.background = args.background

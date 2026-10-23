@@ -393,7 +393,7 @@ class Home(Screen):
         except WorkerFailed as worker_error:
             if isinstance(worker_error.error, TaskError):
                 if console_panel:
-                    console_panel.write_string(f"Task Failed: {worker_error.error}")
+                    console_panel.write_string(Text(f"Task Failed: {worker_error.error}", style="red"))
             logger.exception(worker_error.error)
         except FormatterNotAvailable as e:
             if console_panel:
@@ -532,6 +532,7 @@ class Home(Screen):
         agent = get_agent(self.instance, callback.payload_type_name)
         self.current_agent = agent
         self.current_agent.tasker.set_callback(self.current_callback)
+        await self.current_agent.load_commands()
         self.cmd.current_agent = self.current_agent
         self.cmd.load_and_register_agent_commands()
 
