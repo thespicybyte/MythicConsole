@@ -95,6 +95,12 @@ SidebarModule {
     min-height: 12;
 }
 
+TasksTable {
+    height: 1fr;
+    min-height: 12;
+    max-height: 100%;
+}
+
 SessionInfo {
     border: $accent;
     margin: 1;
