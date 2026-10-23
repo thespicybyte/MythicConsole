@@ -144,7 +144,6 @@ YesNoPrompt > Container > Horizontal > Button {
 ConsoleOutput {
     width: 1fr;
     height: 1fr;
-    layer: main;
 
     &:dark {
         border: solid $primary-background-lighten-1 100%;
