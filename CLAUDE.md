@@ -76,11 +76,13 @@ This is where per-agent command sets are defined and dynamically loaded:
   type's full command catalog from the Mythic server and builds one `AgentCommand` per command via
   `AgentCommand.from_server`, which also auto-binds `do_<name>`. A plugin curates on top of this by
   overriding `get_agent_commands`, calling `super()`, and patching the returned `AgentCommands`
-  mapping (pop/add by name). Scripts are the one piece still loaded by naming convention:
-  `get_script_classes` globs `agents/<Name>/scripts/*.py` (or a plugin's own `scripts/*.py`) and
-  imports each by a strict **filename → class name** convention — the class is named by
-  capitalizing the filename (`ping.py` → `Ping`). A mismatched name silently fails to load (logged
-  as a warning), so keep script file and class names in sync.
+  mapping (pop/add by name). Scripts are the one piece still loaded by convention rather than
+  explicit wiring: `get_script_classes` globs `scripts/*.py` and imports each module, but for a
+  plugin (`PluginAgent.get_script_classes`, `plugins/base.py`) it discovers by **type**, not name —
+  every `ScriptCommand` subclass defined in the file is loaded, so the class can be named whatever
+  reads well. The in-repo `agents/<Name>/` base loader (`MythicAgent.get_script_classes`,
+  `mythic_agent.py:744`) still uses the older convention — capitalizing the filename (`ping.py` →
+  `Ping`) — but there are no curated in-repo agents left to hit it; out of scope for plugin authors.
 
 **Formatters** (`backend/formatter/`). A `Formatter` turns a completed `Task` into a Rich
 `RenderableType` for the console. A subclass tags render methods with `@renders("<command>")`
@@ -107,6 +109,7 @@ before a dangerous command (e.g. `exit`) runs.
 - A `do_<command>` method returns an unexecuted `Task`; the screen layer executes it. Stash any data the
   formatter will need on the `Task` (`console_args`, `args`) at build time.
 - Call `add_default_options(parser)` on every command parser to get the shared `-bg/--background` flag.
-- Scripts are loaded by naming convention, not registration — a script file is picked up
-  automatically only if its class name matches the file name. Commands are generated from the
-  server catalog, not file-loaded; a plugin curates them by patching `get_agent_commands`'s result.
+- A plugin's scripts are loaded by type, not registration or naming — any `ScriptCommand` subclass
+  defined under `scripts/` is picked up automatically, independent of filename. Commands are
+  generated from the server catalog, not file-loaded; a plugin curates them by patching
+  `get_agent_commands`'s result.

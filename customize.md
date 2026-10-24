@@ -203,7 +203,9 @@ A script is an `AgentCommand` whose `do_<name>` can return a renderable directly
 `AgentCommand` itself (`ScriptCommand = AgentCommand`); what makes a command a script is where the
 file lives.
 
-Place it at `scripts/<name>.py`; the class name is the capitalized filename (`ping.py` → `Ping`):
+Place it at `scripts/<name>.py`. Any `ScriptCommand` subclass defined in that file is discovered
+and loaded automatically — name the class whatever reads well; it does not need to match the
+filename:
 
 ```python
 from typing import Dict, List
@@ -280,6 +282,48 @@ scripts, all on top of the same generated baseline.
 
 ## Package it as a plugin
 
+### Scaffold a new plugin
+
+```shell
+python console.py plugin new <name> <payload-type> [--author A] [--description D] [--dir PARENT]
+```
+
+This generates `<PARENT>/<name>/` — a package that installs and loads with no edits and exposes the
+payload type's full generated command catalog right away:
+
+```
+myagent/
+├── manifest.json
+├── __init__.py
+├── myagent.py          # entrypoint module: the Myagent(PluginAgent) class
+├── formatter.py        # empty Formatter subclass + a commented @renders example
+├── README.md
+├── commands/
+│   ├── __init__.py
+│   └── example.py      # commented AgentCommand example
+└── scripts/
+    ├── __init__.py
+    └── example.py      # commented ScriptCommand example
+```
+
+Install it, then build on it incrementally with the sections above — curate a command, customize a
+formatter, add a script, confirm a dangerous one, or hand-write the whole agent.
+
+Before shipping a plugin, check it:
+
+```shell
+python console.py plugin validate <path>
+```
+
+This loads the manifest, resolves the entrypoint, and import-walks `commands/`/`scripts/`,
+reporting a non-zero exit for a bad manifest, an unresolvable or non-`MythicAgent` entrypoint, an
+import error in a `commands/` or `scripts/` module, or a plugin directory name that doesn't match
+the manifest's `name`. A `commands/`/`scripts/` module that imports cleanly but defines no command
+class is only an advisory — it loads nothing, but that's not an error (the scaffold's own commented
+examples are like this).
+
+### Reference: manifest fields and layout
+
 A plugin is a Python package with a `manifest.json` at its root. All fields except `author` and
 `description` are required (`plugins/manifest.py`):
 
@@ -296,14 +340,15 @@ A plugin is a Python package with a `manifest.json` at its root. All fields exce
 ```
 
 - `schema_version` must be `1`.
-- `name` must be a valid Python identifier.
+- `name` must be a valid Python identifier, and must match the plugin's directory name.
 - `payload_type` is the Mythic payload type name this plugin handles.
 - `entrypoint` is `"<module>:<Class>"`; the class must subclass `MythicAgent` — use `PluginAgent`
   (`plugins/base.py`) as that base, since it resolves the plugin's own `commands/`/`scripts/`
   directories instead of the in-repo `agents/<Name>/` layout `MythicAgent` assumes.
 - `version` is the plugin's version string.
 
-Lay the package out like this:
+`plugin new` writes this layout for you; hand-author it only if you're not starting from the
+scaffold:
 
 ```
 myagent/
@@ -315,6 +360,8 @@ myagent/
 └── scripts/
     └── ping.py
 ```
+
+### Install, list, remove
 
 Install it from the shell:
 

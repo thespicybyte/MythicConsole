@@ -36,24 +36,15 @@ class PluginAgent(MythicAgent):
 
         for path in script_files:
             module_name = path.stem
-            class_name = module_name.capitalize()
+            module_path = f"{package_root}.scripts.{module_name}"
             try:
-                module_path = f"{package_root}.scripts.{module_name}"
                 module = importlib.import_module(module_path)
+            except ImportError as e:
+                logger.warning(f"failed to import script module {module_name}: {e}")
+                continue
 
-                script_class = getattr(module, class_name, None)
-                if script_class is None:
-                    logger.debug(f"Class {class_name} not found in {module_name}.py")
-                    continue
-
-                if not issubclass(script_class, ScriptCommand):
-                    logger.debug(f"{script_class.__name__} is not an ScriptCommand")
-                    continue
-
-                script = script_class(self)
-                self.scripts.append(script)
-
-            except (ImportError, AttributeError) as e:
-                logger.warning(f"Failed to load class {class_name} from {module_name}.py: {e}")
+            for _, member in inspect.getmembers(module, inspect.isclass):
+                if issubclass(member, ScriptCommand) and member.__module__ == module.__name__:
+                    self.scripts.append(member(self))
 
         return self.scripts
