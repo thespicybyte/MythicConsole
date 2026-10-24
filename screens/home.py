@@ -250,6 +250,9 @@ class Home(Screen):
             logger.warning(f"could not add task to task table: callback {task.callback_display_id} not found")
             return
 
+        if task.command_name == "load" and task.status == "success" and tasked_callback:
+            await tasked_callback.refresh_loaded_commands()
+
         if self.current_callback:
             # add task to task table if active
             if self.current_callback.uuid == tasked_callback.uuid:
@@ -435,13 +438,13 @@ class Home(Screen):
 
         if current_agent:
             command_table.title = f"{current_agent.name.capitalize()} Commands"
-            for command in current_agent.commands:
+            for command in current_agent.surfaced_commands():
                 command_table.add_row(command.name, command.description)
 
             console_panel.write_string(command_table)
 
             alias_table.title = f"{current_agent.name.capitalize()} Aliases"
-            for alias in sorted(current_agent.aliases, key=lambda a: a.name):
+            for alias in sorted(current_agent.surfaced_aliases(), key=lambda a: a.name):
                 target = f"{alias.command} {alias.subcommand}"
                 if alias.options_prefix:
                     target += f" {alias.options_prefix}"
@@ -541,6 +544,8 @@ class Home(Screen):
         agent = get_agent(self.instance, callback.payload_type_name)
         self.current_agent = agent
         self.current_agent.tasker.set_callback(self.current_callback)
+        if self.current_callback.console_panel.agent:
+            self.current_callback.console_panel.agent.tasker.set_callback(self.current_callback)
         await self.current_agent.load_commands()
         self.cmd.current_agent = self.current_agent
         self.cmd.load_and_register_agent_commands()

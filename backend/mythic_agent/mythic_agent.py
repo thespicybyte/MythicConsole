@@ -533,8 +533,28 @@ class MythicAgent:
         value completion then degrades cleanly to free-form, matching an offline/unresolved state."""
         return list(self._dynamic_query_cache.get((command_name, param_name), []))
 
-    def _get_aliases_names(self) -> List[str]:
-        return [alias.name for alias in self.aliases]
+    def _loaded_names(self) -> Optional[set[str]]:
+        callback = getattr(self.tasker, "callback", None)
+        return getattr(callback, "loaded_commands", None) if callback else None
+
+    def surfaced_commands(self) -> List[AgentCommand]:
+        """Catalog commands the operator can actually run on this callback. Fail-open: the full
+        catalog when the loaded set is unknown, the loaded subset when it is known."""
+        loaded = self._loaded_names()
+        commands = self._get_commands()
+        if loaded is None:
+            return commands
+        return [command for command in commands if command.name in loaded]
+
+    def surfaced_aliases(self) -> List[AgentCommandAlias]:
+        """Aliases whose target command is surfaced; fail-open when the loaded set is unknown."""
+        loaded = self._loaded_names()
+        if loaded is None:
+            return list(self.aliases)
+        return [alias for alias in self.aliases if alias.command in loaded]
+
+    def _get_surfaced_alias_names(self) -> List[str]:
+        return [alias.name for alias in self.surfaced_aliases()]
 
     def _get_script_names(self) -> List[str]:
         items = []
@@ -589,9 +609,9 @@ class MythicAgent:
         if count <= 1:
             items.append("help")
             # return only commands and aliases
-            for command in self._get_commands():
+            for command in self.surfaced_commands():
                 items.append(command.name)
-            for alias_name in self._get_aliases_names():
+            for alias_name in self._get_surfaced_alias_names():
                 items.append(alias_name)
             for script_name in self._get_script_names():
                 items.append(script_name)
