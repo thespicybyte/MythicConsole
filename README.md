@@ -10,7 +10,10 @@ users to interact with callbacks and operations. This application was made with 
 
 # Supported Agents
 
-- Poseidon
+Any Mythic payload type works out of the box: Mythic Console generates its commands from the
+server's own command catalog, no agent-specific code required. An agent can be enhanced further
+with an installable plugin (custom commands, output rendering, scripts) — see
+[customize.md](customize.md). Poseidon ships as such a plugin, in its own repo.
 
 # Demo
 
@@ -54,6 +57,7 @@ Other variables may be passed to further configure your environment.
 | LOG_DIRECTORY           | Set the  directory logs are stored in. Default is cwd                                               |
 | LOG_FILE                | Set the log  file. Default is .console.log                                                          |
 | LOG_LEVEL               | Set the log level. Available options are `debug`, `info`, `warning`, and `error`. Default is `info` |
+| PLUGIN_DIRECTORY        | Set the directory plugins install into. Default is `${XDG_CONFIG_HOME:-~/.config}/mythicconsole/plugins` |
 
 ## Execution
 
@@ -63,10 +67,11 @@ python console.py
 
 # Extend Mythic Console
 
-Check out [customization page](customize.md) to learn how to extend Mythic Console.
+Supporting a new agent needs zero code. Check out the [customization page](customize.md) to learn
+how to add polish as an installable plugin — a curated command, a custom renderer, a confirmation
+prompt, a client-side script, or a full hand-written agent.
 
 # Road Map
 
-- [ ] Add more Agents
-    - [ ] Apollo
+- [ ] More curated agent plugins
 

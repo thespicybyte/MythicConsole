@@ -72,21 +72,29 @@ This is where per-agent command sets are defined and dynamically loaded:
   `do_<name>` method builds and returns a `Task` (it does **not** execute it — the UI calls `.execute()`).
 - `ScriptCommand` is the variant for multi-step client-side scripts.
 - `MythicCommands` holds global, agent-independent commands (e.g. `payload list/download`).
-- **Dynamic discovery**: `get_command_classes`/`get_script_classes` glob `agents/<Name>/commands/*.py`
-  and `agents/<Name>/scripts/*.py` and import each by a strict **filename → class name** convention —
-  snake_case file maps to CamelCase class (`file.py` → `File`, `execute_library.py` → `ExecuteLibrary`).
-  A mismatched name silently fails to load (logged as a warning), so keep file and class names in sync.
+- **Commands are generated, not globbed**: `MythicAgent.get_agent_commands` fetches the payload
+  type's full command catalog from the Mythic server and builds one `AgentCommand` per command via
+  `AgentCommand.from_server`, which also auto-binds `do_<name>`. A plugin curates on top of this by
+  overriding `get_agent_commands`, calling `super()`, and patching the returned `AgentCommands`
+  mapping (pop/add by name). Scripts are the one piece still loaded by naming convention:
+  `get_script_classes` globs `agents/<Name>/scripts/*.py` (or a plugin's own `scripts/*.py`) and
+  imports each by a strict **filename → class name** convention — snake_case file maps to
+  CamelCase class (`ping.py` → `Ping`). A mismatched name silently fails to load (logged as a
+  warning), so keep script file and class names in sync.
 
 **Formatters** (`backend/formatter/`). A `Formatter` turns a completed `Task` into a Rich
-`RenderableType` for the console. Each agent subclasses it and implements `format_output`, which
-`match`es on `task.command_name` and dispatches to a render method; `DefaultFormatter`/base helpers
-(`format_plaintext`, `format_pretty`, `format_ls`, `build_table`, `get_raw_output`) cover common cases.
+`RenderableType` for the console. A subclass tags render methods with `@renders("<command>")`
+instead of overriding `format_output`; the base `format_output` dispatches to the tagged method by
+command name and falls back to `format_plaintext` for anything untagged. Base helpers:
+`format_plaintext`, `format_pretty`, `build_table`, `get_raw_output`.
 
-**Agent registration** (`agents/`). `agents/__init__.py` `get_agent(instance, payload_type_name)` maps a
-Mythic payload type name (lowercase, as Mythic reports it) to an agent class via a `match`. Poseidon
-(`agents/Poseidon/`) is the only implemented agent and the reference example. Adding an agent means:
-create `agents/<Name>/` with `commands/`, `scripts/`, `__init__.py`, `<name>.py` (the `MythicAgent`
-subclass) and `formatter.py`, then add a `case` to `get_agent`. Full walkthrough is in `customize.md`.
+**Agent registration** (`agents/`). `agents/__init__.py` `get_agent(instance, payload_type_name)`
+looks up an installed plugin for that payload type; if none is installed, it returns a generated
+`MythicAgent(payload_type_name, instance, DefaultFormatter())`. There are no hard-coded agent names.
+Supporting a new payload type needs zero code — the generated baseline just works. Poseidon is no
+longer in this repo; it ships as its own plugin, installed like any other. Optional curation (a
+custom command, formatter, or script) ships as a plugin too: a `PluginAgent` subclass plus a
+`manifest.json`. Full walkthrough is in `customize.md`.
 
 **UI layer**. `screens/` (`home.py` is the main operator screen; `login.py`; `prompts.py` holds
 `TaskPrompt`/`YesNoPrompt` modal confirmations) and `widgets/` (console panel, callback tabs, tables,
@@ -99,5 +107,6 @@ before a dangerous command (e.g. `exit`) runs.
 - A `do_<command>` method returns an unexecuted `Task`; the screen layer executes it. Stash any data the
   formatter will need on the `Task` (`console_args`, `args`) at build time.
 - Call `add_default_options(parser)` on every command parser to get the shared `-bg/--background` flag.
-- Commands and scripts are loaded by naming convention, not registration — new files are picked up
-  automatically only if the class name matches the file name.
+- Scripts are loaded by naming convention, not registration — a script file is picked up
+  automatically only if its class name matches the file name. Commands are generated from the
+  server catalog, not file-loaded; a plugin curates them by patching `get_agent_commands`'s result.
