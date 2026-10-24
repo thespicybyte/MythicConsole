@@ -2,6 +2,8 @@ import argparse
 
 from utils.environment import Environment
 from .installer import PluginInstallError, install, list_installed, remove
+from .scaffold import ScaffoldError, scaffold
+from .validate import validate_plugin
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -19,6 +21,16 @@ def build_parser() -> argparse.ArgumentParser:
     plugin_subparsers.add_parser("list", help="list installed plugins")
     remove_parser = plugin_subparsers.add_parser("remove", help="remove an installed plugin")
     remove_parser.add_argument("name", help="plugin name to remove")
+
+    new_parser = plugin_subparsers.add_parser("new", help="scaffold a new plugin")
+    new_parser.add_argument("name", help="plugin/package name")
+    new_parser.add_argument("payload_type", help="Mythic payload type this plugin handles")
+    new_parser.add_argument("--author", default="", help="plugin author")
+    new_parser.add_argument("--description", default="", help="plugin description")
+    new_parser.add_argument("--dir", default=".", help="parent directory to create the plugin in")
+
+    validate_parser = plugin_subparsers.add_parser("validate", help="validate a plugin before shipping it")
+    validate_parser.add_argument("path", help="path to the plugin directory")
 
     return parser
 
@@ -60,7 +72,29 @@ def run(argv) -> int:
             print(f"[+] removed '{args.name}'")
             return 0
 
-        print("plugin: expected 'list' or 'remove'")
+        if args.plugin_action == "new":
+            try:
+                path = scaffold(args.name, args.payload_type, author=args.author,
+                                description=args.description, parent=args.dir)
+            except ScaffoldError as e:
+                print(f"[-] scaffold failed: {e}")
+                return 1
+            print(f"[+] created plugin '{args.name}' at {path}")
+            print(f"    next: python console.py install {path}")
+            return 0
+
+        if args.plugin_action == "validate":
+            errors, advisories = validate_plugin(args.path)
+            for advisory in advisories:
+                print(f"[!] {advisory}")
+            for error in errors:
+                print(f"[-] {error}")
+            if errors:
+                return 1
+            print(f"[+] '{args.path}' looks valid")
+            return 0
+
+        print("plugin: expected 'list', 'remove', 'new', or 'validate'")
         return 2
 
     print("expected 'install' or 'plugin'")
