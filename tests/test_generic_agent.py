@@ -1,23 +1,34 @@
 import pytest
 
 from agents import UnknownAgent, get_agent
-from agents.Poseidon.poseidon import Poseidon
 from backend.formatter.formatter import DefaultFormatter
 from backend.mythic_agent.mythic_agent import MythicAgent
 from backend.task.task import Task, TaskError
+from plugins.base import PluginAgent
 
 
-def test_get_agent_returns_poseidon_for_poseidon(fake_instance):
+def test_get_agent_returns_plugin_agent_when_one_is_installed(fake_instance, installed_testplugin):
+    agent = get_agent(fake_instance, "testplugin")
+
+    assert isinstance(agent, PluginAgent)
+    assert agent.name == "testplugin"
+
+
+def test_get_agent_returns_generic_for_payload_type_with_no_plugin(fake_instance, installed_testplugin):
+    """A plugin being installed for one payload type must not make any other name special."""
     agent = get_agent(fake_instance, "poseidon")
 
-    assert isinstance(agent, Poseidon)
+    assert isinstance(agent, MythicAgent)
+    assert not isinstance(agent, PluginAgent)
+    assert agent.name == "poseidon"
+    assert isinstance(agent.formatter, DefaultFormatter)
 
 
 def test_get_agent_returns_generic_for_unknown(fake_instance):
     agent = get_agent(fake_instance, "testagent")
 
     assert isinstance(agent, MythicAgent)
-    assert not isinstance(agent, Poseidon)
+    assert not isinstance(agent, PluginAgent)
     assert agent.name == "testagent"
     assert isinstance(agent.formatter, DefaultFormatter)
 
@@ -36,19 +47,6 @@ async def test_generic_agent_loads_generated_commands(arachne_agent, arachne_com
 
     assert "directory" not in arachne_agent.commands
     assert "process" not in arachne_agent.commands
-
-
-async def test_generic_agent_real_dump_is_ungrouped(fake_instance, poseidon_commands_fixture):
-    agent = MythicAgent("poseidon", fake_instance, DefaultFormatter())
-
-    async def _fetch_server_commands():
-        return poseidon_commands_fixture
-
-    agent._fetch_server_commands = _fetch_server_commands
-    await agent.load_commands()
-
-    assert "ls" in agent.commands
-    assert "directory" not in agent.commands
 
 
 async def test_generic_agent_missing_dir_yields_no_scripts(generic_agent):

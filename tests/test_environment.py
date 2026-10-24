@@ -11,7 +11,8 @@ def isolated_cwd(tmp_path, monkeypatch):
     """Every test runs in an empty tmp dir so `.env` / env vars from the real repo never leak in."""
     monkeypatch.chdir(tmp_path)
     for key in ("MYTHIC_CONSOLE_USER", "MYTHIC_CONSOLE_PASSWORD", "MYTHIC_SERVER_URL",
-                "DOWNLOAD_DIRECTORY", "LOG_DIRECTORY", "LOG_FILE", "LOG_LEVEL"):
+                "DOWNLOAD_DIRECTORY", "LOG_DIRECTORY", "LOG_FILE", "LOG_LEVEL",
+                "PLUGIN_DIRECTORY", "XDG_CONFIG_HOME"):
         monkeypatch.delenv(key, raising=False)
 
 
@@ -116,5 +117,28 @@ def test_log_directory_env_creates_dir(tmp_path, monkeypatch):
     target = tmp_path / "logs"
     monkeypatch.setenv("LOG_DIRECTORY", str(target))
     result = Environment().log_directory()
+    assert result == str(target)
+    assert os.path.isdir(target)
+
+
+def test_plugins_directory_default_is_xdg_config_based(tmp_path, monkeypatch):
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path / "config"))
+    result = Environment().plugins_directory()
+    assert result == str(tmp_path / "config" / "mythicconsole" / "plugins")
+    assert os.path.isdir(result)
+
+
+def test_plugins_directory_env_override_creates_dir(tmp_path, monkeypatch):
+    target = tmp_path / "plugins"
+    monkeypatch.setenv("PLUGIN_DIRECTORY", str(target))
+    result = Environment().plugins_directory()
+    assert result == str(target)
+    assert os.path.isdir(target)
+
+
+def test_plugins_directory_dotenv_override(tmp_path):
+    target = tmp_path / "from_dotenv_plugins"
+    (tmp_path / ".env").write_text(f"PLUGIN_DIRECTORY={target}\n")
+    result = Environment().plugins_directory()
     assert result == str(target)
     assert os.path.isdir(target)
