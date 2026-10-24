@@ -485,3 +485,29 @@ class NewAgentFormatter(Formatter):
 
             return Text("failed to download file")
 ```
+
+## Installing an agent as a plugin
+
+Agents no longer have to live inside this repo. An agent can instead ship as a standalone
+**plugin**: a Python package with a `manifest.json` at its root (`payload_type`, `entrypoint`, a
+Python-identifier `name`, and a `version`), installed into the console's plugins directory
+(`${XDG_CONFIG_HOME:-~/.config}/mythicconsole/plugins`, overridable with `PLUGIN_DIRECTORY`).
+
+Install from a local folder or a GitHub URL, from the shell:
+
+```shell
+python console.py install https://github.com/<you>/<your-agent-plugin> [--branch BRANCH] [--subdir DIR]
+python console.py install /path/to/local/clone
+python console.py plugin list
+python console.py plugin remove <name>
+```
+
+or from inside the console: `plugin install <url|path>`, `plugin list`, `plugin remove <name>`.
+Installing takes effect immediately -- no restart needed -- for callbacks selected afterward.
+
+`agents/Poseidon` has moved out of this repo into its own separate repository, and is installed
+like any other third-party agent plugin via `python console.py install <github-url-or-local-clone-path>`.
+A full walkthrough for authoring a plugin from scratch is still forthcoming; for now, follow the
+"Registering additional agents" and "Define your commands"/"Define how the output should be
+formatted" sections above, but have your agent class subclass `plugins.base.PluginAgent` instead
+of `MythicAgent`, and add the `manifest.json` described here at your plugin's root.

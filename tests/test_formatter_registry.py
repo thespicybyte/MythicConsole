@@ -1,31 +1,12 @@
 from rich.text import Text
 
 from backend.formatter.formatter import DefaultFormatter, Formatter, renders
-from agents.Poseidon.formatter import PoseidonFormatter
 
 
-def test_poseidon_registry_contents():
-    assert PoseidonFormatter._renderers == {
-        "ls": "ls",
-        "download": "download",
-        "drives": "drives",
-        "getenv": "get_env",
-        "jobs": "jobs",
-        "portscan": "portscan",
-        "ps": "ps",
-        "sshauth": "ssh_auth",
-        "config": "config",
-        "getuser": "user_info",
-        "keys": "user_info",
-    }
-
-
-def test_execute_library_is_not_registered():
-    assert "execute_library" not in PoseidonFormatter._renderers
-
-
-def test_multi_name_renderer_shares_one_method():
-    assert PoseidonFormatter._renderers["getuser"] == PoseidonFormatter._renderers["keys"]
+def test_plugin_formatter_is_registered_via_import(test_plugin_agent):
+    """A plugin's formatter registers itself with the formatter registry simply by being
+    imported when its agent module is loaded -- no extra wiring needed."""
+    assert type(test_plugin_agent.formatter)._renderers == {"echo": "echo"}
 
 
 def test_base_formatter_registry_is_empty():
