@@ -1,5 +1,6 @@
 from backend.mythic_instance.mythic_instance import MythicInstance
-from backend.mythic_agent.mythic_agent import MythicAgent, AgentCommands, remove_background_option
+from backend.mythic_agent.mythic_agent import AgentCommands, remove_background_option
+from plugins.base import PluginAgent
 from screens.prompts import YesNoPrompt
 
 from .formatter import PoseidonFormatter
@@ -12,7 +13,7 @@ from .commands.command import Command
 from .commands.c2 import C2
 
 
-class Poseidon(MythicAgent):
+class Poseidon(PluginAgent):
     def __init__(self, instance: MythicInstance):
         name = "poseidon"
         formatter = PoseidonFormatter()

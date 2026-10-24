@@ -4,7 +4,7 @@ from cmd2 import cmd2, Cmd2ArgumentParser
 from rich.console import RenderableType
 
 from backend.mythic_agent.mythic_agent import AgentCommandAlias, MythicAgent, ScriptCommand
-from agents.Poseidon.commands.command import Command
+from ..commands.command import Command
 
 netstat_parser = Cmd2ArgumentParser(description="get a netstat by calling sockstat")
 netstat_parser.add_argument('--test')
