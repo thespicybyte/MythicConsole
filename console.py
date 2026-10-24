@@ -1,3 +1,4 @@
+import sys
 from enum import Enum
 from typing import List, Optional
 
@@ -9,6 +10,8 @@ from textual.reactive import var
 from textual.widgets import Header, Footer
 
 from backend import MythicInstance
+from backend.payload_type.queries import PayloadTypeQueries
+from plugins import get_plugin_registry, load_installed_plugins
 from screens.home import Home
 from screens.login import LoginScreen
 from utils.logger import logger
@@ -82,6 +85,7 @@ class MythicConsole(App, inherit_bindings=False):
 
     def on_mount(self):
         logger.debug("starting console")
+        load_installed_plugins()
         self.push_screen(LoginScreen(), callback=self.handle_login_response)
 
     def compose(self) -> ComposeResult:
@@ -103,6 +107,24 @@ class MythicConsole(App, inherit_bindings=False):
         if loop:
             self.instance.loop = loop
         self.authenticated = True
+        self.run_worker(self._log_plugin_vs_generated_payload_types(), exit_on_error=False)
+
+    async def _log_plugin_vs_generated_payload_types(self):
+        try:
+            payload_types = await PayloadTypeQueries.query_all_payload_types(self.instance.mythic)
+        except Exception as e:
+            logger.warning(f"could not query payload types for plugin reconciliation: {e}")
+            return
+
+        registry = get_plugin_registry()
+        for payload_type in payload_types or []:
+            name = payload_type.get("name")
+            if not name:
+                continue
+            if registry.agent_class_for(name) is not None:
+                logger.info(f"payload type '{name}': plugin-backed")
+            else:
+                logger.info(f"payload type '{name}': generated (no plugin installed)")
 
     def action_logout(self):
         self.authenticated = False
@@ -119,6 +141,15 @@ class MythicConsole(App, inherit_bindings=False):
         self.push_screen(LoginScreen(), callback=self.handle_login_response)
 
 
-if __name__ == '__main__':
+def main():
+    argv = sys.argv[1:]
+    if argv and argv[0] in ("install", "plugin"):
+        from plugins.cli import run as run_plugin_cli
+        sys.exit(run_plugin_cli(argv))
+
     app = MythicConsole()
     app.run()
+
+
+if __name__ == '__main__':
+    main()
