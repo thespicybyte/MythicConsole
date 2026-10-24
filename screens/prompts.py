@@ -1,8 +1,12 @@
+import os
+from typing import Optional
+
 from textual import on
 from textual.app import ComposeResult
+from textual.binding import Binding
 from textual.containers import Container, Horizontal
 from textual.screen import ModalScreen
-from textual.widgets import Button, Label
+from textual.widgets import Button, DirectoryTree, Label
 
 from utils.logger import logger
 
@@ -29,3 +33,44 @@ class YesNoPrompt(TaskPrompt):
     @on(Button.Pressed)
     def _return(self, event: Button.Pressed):
         self.dismiss(event.button.id == "yes")
+
+
+class FilePrompt(TaskPrompt):
+    BINDINGS = [
+        Binding(key="escape", action="cancel", description="cancel", show=False),
+    ]
+
+    def __init__(self, label: str, start_path: Optional[str] = None):
+        super().__init__()
+        self.label = label
+        self.start_path = start_path or os.path.expanduser("~")
+        self._selected: Optional[str] = None
+
+    def compose(self) -> ComposeResult:
+        logger.debug("file prompt")
+        yield Container(
+            Label(f"Select a file for '{self.label}'"),
+            DirectoryTree(self.start_path),
+            Label("", id="selection"),
+            Horizontal(
+                Button(label="Select", variant="success", id="select"),
+                Button(label="Cancel", variant="error", id="cancel"),
+            ),
+        )
+
+    @on(DirectoryTree.FileSelected)
+    def _file_selected(self, event: DirectoryTree.FileSelected):
+        self._selected = str(event.path)
+        self.query_one("#selection", Label).update(self._selected)
+
+    @on(Button.Pressed)
+    def _button_pressed(self, event: Button.Pressed):
+        if event.button.id == "select":
+            if self._selected:
+                self.dismiss(self._selected)
+            return
+
+        self.dismiss(None)
+
+    def action_cancel(self):
+        self.dismiss(None)

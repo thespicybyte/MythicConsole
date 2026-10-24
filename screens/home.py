@@ -27,6 +27,7 @@ from agents import get_agent
 from backend import Callback, MythicInstance, User, Operation, Task, MythicAgent, FormatterNotAvailable
 from backend.cmd.mythic_cmd import MythicCmd
 from backend.task.task import TaskError
+from screens.prompts import FilePrompt
 from utils.logger import logger
 from widgets.calback_tabs import CallbackTabs
 from widgets.callbacks import Callbacks, CallbackTable
@@ -335,6 +336,14 @@ class Home(Screen):
 
             worker = None
             if isinstance(resp, Task):
+                if resp.pending_file_params:
+                    for dest, label in resp.pending_file_params.items():
+                        path = await self.app.push_screen_wait(FilePrompt(label))
+                        if not path:
+                            logger.debug("operator cancelled file selection")
+                            return
+                        resp.file_params[dest] = path
+
                 if resp.verify_prompt:
                     if not await self.app.push_screen_wait(resp.verify_prompt):
                         logger.debug("user bailed on task")

@@ -63,6 +63,7 @@ class Task:
         self.verify_prompt: Optional[TaskPrompt] = None
         self.console_args: Optional[argparse.Namespace] = None
         self.file_params: Dict[str, str] = {}
+        self.pending_file_params: Dict[str, str] = {}
 
     def __eq__(self, other):
         if isinstance(other, Task):

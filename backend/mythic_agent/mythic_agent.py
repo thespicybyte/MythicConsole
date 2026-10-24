@@ -211,7 +211,7 @@ def _add_param_argument(parser: Cmd2ArgumentParser, param: dict, agent: Optional
                             required=required, metavar="JSON",
                             help=f"{help_text} JSON array of [type, value] pairs{choices_note}".strip())
     elif param_type == "File":
-        parser.add_argument(flag, default=default, required=required, metavar="PATH|UUID",
+        parser.add_argument(flag, default=default, required=False, metavar="PATH|UUID",
                             help=f"{help_text} (local file to upload, or an existing file UUID)".strip())
     elif param_type == "PayloadList":
         parser.add_argument(flag, default=default, required=required, metavar="PAYLOAD_UUID",
@@ -266,6 +266,7 @@ class AgentCommand(cmd2.Cmd):
         self._aliases: List[AgentCommandAlias] = aliases or []
         self._params: List[dict] = []
         self._file_param_keys: set = set()
+        self._required_file_param_keys: Dict[str, str] = {}
         self._flag_param_map: Dict[Optional[str], Dict[str, dict]] = {}
         self.verify_prompt: Optional[TaskPrompt] = None
         self.force_background = False
@@ -350,6 +351,10 @@ class AgentCommand(cmd2.Cmd):
             (p.get("cli_name") or p["name"]).replace("-", "_")
             for p in params if p.get("type") == "File"
         }
+        command._required_file_param_keys = {
+            (p.get("cli_name") or p["name"]).replace("-", "_"): (p.get("cli_name") or p["name"])
+            for p in params if p.get("type") == "File" and bool(p.get("required"))
+        }
         # Keyed per parameter group so a flag that repeats across groups (grouped commands)
         # resolves against the right group's param when completing its value.
         command._flag_param_map = {
@@ -397,6 +402,10 @@ class AgentCommand(cmd2.Cmd):
             value = args.get(key)
             if isinstance(value, str) and os.path.isfile(value):
                 task.file_params[key] = value
+
+        for key, label in self._required_file_param_keys.items():
+            if args.get(key) is None:
+                task.pending_file_params[key] = label
 
         return task
 
