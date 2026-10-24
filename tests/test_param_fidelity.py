@@ -101,6 +101,58 @@ def test_file_param_metavar_and_help(richtype_agent):
     assert "UUID" in action.help
 
 
+def test_file_param_omitted_is_pending_not_a_parse_error(richtype_agent):
+    command = richtype_agent.get_command("stash")
+    ns = command.command_parser.parse_args([])
+    task = command._build_task(ns)
+
+    assert task.file_params == {}
+    assert task.pending_file_params == {"file": "file"}
+    assert "file" not in task.args
+
+
+def test_file_param_provided_path_is_not_pending(richtype_agent, tmp_path):
+    local_file = tmp_path / "payload.bin"
+    local_file.write_bytes(b"data")
+
+    command = richtype_agent.get_command("stash")
+    ns = command.command_parser.parse_args(["--file", str(local_file)])
+    task = command._build_task(ns)
+
+    assert task.file_params == {"file": str(local_file)}
+    assert task.pending_file_params == {}
+
+
+def test_file_param_provided_uuid_is_not_pending(richtype_agent):
+    command = richtype_agent.get_command("stash")
+    ns = command.command_parser.parse_args(["--file", "11111111-2222-3333-4444-555555555555"])
+    task = command._build_task(ns)
+
+    assert task.file_params == {}
+    assert task.pending_file_params == {}
+
+
+def test_optional_file_param_omitted_is_not_pending():
+    from backend.mythic_agent.mythic_agent import AgentCommand
+
+    spec = {"cmd": "fetch_optional", "description": "", "commandparameters": [
+        {"name": "file", "cli_name": "file", "type": "File", "required": False,
+         "default_value": "", "description": "", "parameter_group_name": "Default",
+         "ui_position": 0, "choices": [], "choices_are_all_commands": False,
+         "choices_are_loaded_commands": False, "dynamic_query_function": ""},
+    ]}
+
+    import types
+    agent = types.SimpleNamespace(instance=types.SimpleNamespace(mythic=None),
+                                  tasker=types.SimpleNamespace(callback=None))
+    command = AgentCommand.from_server(agent, spec)
+    ns = command.command_parser.parse_args([])
+    task = command._build_task(ns)
+
+    assert task.file_params == {}
+    assert task.pending_file_params == {}
+
+
 async def test_task_execute_registers_a_pending_file_before_issuing(richtype_agent, tmp_path, monkeypatch):
     from backend.task.queries import TaskQueries
     from backend.task.task import Task
