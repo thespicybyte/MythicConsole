@@ -40,3 +40,21 @@ async def test_update_locked_still_issues_locked_update(fake_instance, monkeypat
     await callback.update_locked(True)
 
     assert calls == [("locked", 7, True)]
+
+
+def test_apply_stream_update_sets_active_false(fake_instance):
+    callback = Callback(fake_instance, callback_id=1)
+    callback.active = True
+
+    callback.apply_stream_update({"active": False})
+
+    assert callback.active is False
+
+
+def test_apply_stream_update_sets_active_true(fake_instance):
+    callback = Callback(fake_instance, callback_id=1)
+    callback.active = False
+
+    callback.apply_stream_update({"active": True})
+
+    assert callback.active is True
