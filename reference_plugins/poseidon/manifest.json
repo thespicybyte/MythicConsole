@@ -1,9 +1,0 @@
-{
-  "schema_version": 1,
-  "name": "poseidon",
-  "payload_type": "poseidon",
-  "entrypoint": "poseidon:Poseidon",
-  "version": "1.0.0",
-  "author": "spicybyte",
-  "description": "Reference plugin for the Poseidon Mythic agent"
-}

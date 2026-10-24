@@ -496,8 +496,8 @@ Python-identifier `name`, and a `version`), installed into the console's plugins
 Install from a local folder or a GitHub URL, from the shell:
 
 ```shell
-python console.py install reference_plugins/poseidon
 python console.py install https://github.com/<you>/<your-agent-plugin> [--branch BRANCH] [--subdir DIR]
+python console.py install /path/to/local/clone
 python console.py plugin list
 python console.py plugin remove <name>
 ```
@@ -505,9 +505,9 @@ python console.py plugin remove <name>
 or from inside the console: `plugin install <url|path>`, `plugin list`, `plugin remove <name>`.
 Installing takes effect immediately -- no restart needed -- for callbacks selected afterward.
 
-`agents/Poseidon` has moved out of this repo; `reference_plugins/poseidon/` is the reference
-example, kept here only as a locally installable plugin folder. A full walkthrough for authoring
-a plugin from scratch is still forthcoming; for now, follow the "Registering additional agents"
-and "Define your commands"/"Define how the output should be formatted" sections above, but have
-your agent class subclass `plugins.base.PluginAgent` instead of `MythicAgent`, and add the
-`manifest.json` described here at your plugin's root.
+`agents/Poseidon` has moved out of this repo into its own separate repository, and is installed
+like any other third-party agent plugin via `python console.py install <github-url-or-local-clone-path>`.
+A full walkthrough for authoring a plugin from scratch is still forthcoming; for now, follow the
+"Registering additional agents" and "Define your commands"/"Define how the output should be
+formatted" sections above, but have your agent class subclass `plugins.base.PluginAgent` instead
+of `MythicAgent`, and add the `manifest.json` described here at your plugin's root.
