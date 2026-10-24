@@ -1,6 +1,6 @@
-"""Opt-in live test for rich-param fidelity (OP#104). Needs a reachable Mythic server + .env, with
-an active callback for a non-Poseidon agent (arachne on the lab test server) that has a `File`
-parameter (e.g. `upload`).
+"""Opt-in live test for rich-param fidelity. Needs a reachable Mythic server + .env, with an active
+callback for a non-Poseidon agent (arachne on the lab test server) that has a `File` parameter
+(e.g. `upload`).
 
 Run with `pytest -m live`; deselected by default (pytest.ini's `addopts -m "not live"`).
 
@@ -58,10 +58,10 @@ async def test_file_param_registers_and_tasks_through_the_generated_path(tmp_pat
     await agent.load_commands()
 
     local_file = tmp_path / "live_upload.bin"
-    local_file.write_bytes(b"mythicconsole-104 live test payload")
+    local_file.write_bytes(b"param fidelity live test payload")
 
     command = agent.get_command("upload")
-    ns = command.command_parser.parse_args(["--remote_path", "/tmp/mythicconsole-104.bin",
+    ns = command.command_parser.parse_args(["--remote_path", "/tmp/param_fidelity_live.bin",
                                             "--file", str(local_file)])
     task = command._build_task(ns)
 
