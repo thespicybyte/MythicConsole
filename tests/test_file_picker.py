@@ -183,9 +183,9 @@ async def test_file_prompt_cancel_does_not_persist_a_directory(tmp_path):
         assert state.get_last_file_dir() is None
 
 
-# --- FilePrompt "Up" affordance: re-root toward the filesystem root ---
+# --- FilePrompt left/right keys: re-root toward the filesystem root / open a directory ---
 
-async def test_file_prompt_up_button_rerootes_to_the_parent_directory(tmp_path):
+async def test_file_prompt_left_key_rerootes_to_the_parent_directory(tmp_path):
     nested = tmp_path / "a" / "b"
     nested.mkdir(parents=True)
 
@@ -198,20 +198,20 @@ async def test_file_prompt_up_button_rerootes_to_the_parent_directory(tmp_path):
         tree = prompt.query_one(DirectoryTree)
         assert tree.path == nested
 
-        await pilot.click("#up")
+        await pilot.press("left")
         await asyncio.sleep(0.2)
         await pilot.pause()
 
         assert tree.path == nested.parent
 
-        await pilot.click("#up")
+        await pilot.press("left")
         await asyncio.sleep(0.2)
         await pilot.pause()
 
         assert tree.path == nested.parent.parent
 
 
-async def test_file_prompt_up_at_filesystem_root_is_a_noop():
+async def test_file_prompt_left_key_at_filesystem_root_is_a_noop():
     app = _PromptHarness()
     async with app.run_test() as pilot:
         prompt = FilePrompt("file", start_path="/")
@@ -219,10 +219,34 @@ async def test_file_prompt_up_at_filesystem_root_is_a_noop():
         await pilot.pause()
 
         tree = prompt.query_one(DirectoryTree)
-        await pilot.click("#up")
+        await pilot.press("left")
         await pilot.pause()
 
         assert str(tree.path) == "/"
+
+
+async def test_file_prompt_right_key_expands_the_cursor_directory(tmp_path):
+    nested = tmp_path / "a"
+    nested.mkdir()
+    (nested / "child.txt").write_text("hi")
+
+    app = _PromptHarness()
+    async with app.run_test() as pilot:
+        prompt = FilePrompt("file", start_path=str(tmp_path))
+        app.push_screen(prompt)
+        await asyncio.sleep(0.2)
+        await pilot.pause()
+
+        tree = prompt.query_one(DirectoryTree)
+        root_node = tree.root
+        assert not root_node.children[0].is_expanded
+
+        tree.cursor_line = 1
+        await pilot.press("right")
+        await asyncio.sleep(0.2)
+        await pilot.pause()
+
+        assert root_node.children[0].is_expanded
 
 
 # --- screens/home.py wiring: pre-execute file-picker loop ---

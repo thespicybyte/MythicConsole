@@ -39,6 +39,8 @@ class YesNoPrompt(TaskPrompt):
 class FilePrompt(TaskPrompt):
     BINDINGS = [
         Binding(key="escape", action="cancel", description="cancel", show=False),
+        Binding(key="left", action="go_up", description="up", show=False),
+        Binding(key="right", action="enter_dir", description="open", show=False),
     ]
 
     def __init__(self, label: str, start_path: Optional[str] = None):
@@ -54,7 +56,6 @@ class FilePrompt(TaskPrompt):
             DirectoryTree(self.start_path, id="tree"),
             Label("", id="selection"),
             Horizontal(
-                Button(label="Up", variant="default", id="up"),
                 Button(label="Select", variant="success", id="select"),
                 Button(label="Cancel", variant="error", id="cancel"),
             ),
@@ -67,10 +68,6 @@ class FilePrompt(TaskPrompt):
 
     @on(Button.Pressed)
     def _button_pressed(self, event: Button.Pressed):
-        if event.button.id == "up":
-            self._go_up()
-            return
-
         if event.button.id == "select":
             if self._selected:
                 set_last_file_dir(os.path.dirname(self._selected))
@@ -79,11 +76,14 @@ class FilePrompt(TaskPrompt):
 
         self.dismiss(None)
 
-    def _go_up(self):
+    def action_go_up(self):
         tree = self.query_one("#tree", DirectoryTree)
         parent = tree.path.parent
         if parent != tree.path:
             tree.path = parent
+
+    def action_enter_dir(self):
+        self.query_one("#tree", DirectoryTree).action_select_cursor()
 
     def action_cancel(self):
         self.dismiss(None)
