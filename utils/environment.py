@@ -39,6 +39,21 @@ class Environment:
             return log_dir
         return os.getcwd()
 
+    def plugins_directory(self) -> str:
+        """
+        check environment variables for `PLUGIN_DIRECTORY`.
+        Returns `${XDG_CONFIG_HOME:-~/.config}/mythicconsole/plugins` if not set
+        """
+        plugins_dir = os.getenv("PLUGIN_DIRECTORY") or self.get_value_from_config("PLUGIN_DIRECTORY")
+        if not plugins_dir:
+            config_home = os.getenv("XDG_CONFIG_HOME") or os.path.join(os.path.expanduser("~"), ".config")
+            plugins_dir = os.path.join(config_home, "mythicconsole", "plugins")
+
+        plugins_dir = os.path.expanduser(plugins_dir)
+        if not os.path.isdir(plugins_dir):
+            os.makedirs(plugins_dir, exist_ok=True)
+        return plugins_dir
+
     def log_file(self) -> str:
         """
         check environment variables for `LOG_FILE`.
