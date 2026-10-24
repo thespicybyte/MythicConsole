@@ -124,3 +124,30 @@ class PayloadQueries:
             payload_ids.append(payload_id)
 
         return payload_ids
+
+    @staticmethod
+    async def get_all_payload_uuids(session: Mythic, operation_id: int) -> List[str]:
+        resp = await mythic.execute_custom_query(
+            mythic=session,
+            query=f"""
+                query Query($operation_id: Int!) {{
+                    payload(where: {{operation_id: {{_eq: $operation_id}}}}) {{
+                        uuid
+                    }}
+                }}
+                """,
+            variables={"operation_id": operation_id}
+        )
+
+        payload_uuids = []
+        payloads = resp.get("payload")
+        if not payloads:
+            return payload_uuids
+
+        for payload in payloads:
+            payload_uuid = payload.get("uuid")
+            if not payload_uuid:
+                continue
+            payload_uuids.append(payload_uuid)
+
+        return payload_uuids
