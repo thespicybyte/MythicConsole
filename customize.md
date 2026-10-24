@@ -511,4 +511,3 @@ a plugin from scratch is still forthcoming; for now, follow the "Registering add
 and "Define your commands"/"Define how the output should be formatted" sections above, but have
 your agent class subclass `plugins.base.PluginAgent` instead of `MythicAgent`, and add the
 `manifest.json` described here at your plugin's root.
-```

@@ -4,8 +4,8 @@ from backend.formatter.formatter import DefaultFormatter, Formatter, renders
 
 
 def test_plugin_formatter_is_registered_via_import(test_plugin_agent):
-    """A plugin's formatter registers itself with the #103 registry simply by being imported
-    when its agent module is loaded -- no extra wiring needed."""
+    """A plugin's formatter registers itself with the formatter registry simply by being
+    imported when its agent module is loaded -- no extra wiring needed."""
     assert type(test_plugin_agent.formatter)._renderers == {"echo": "echo"}
 
 
