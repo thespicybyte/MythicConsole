@@ -134,6 +134,18 @@ class Net(AgentCommand):
         return task
 
     net_echo_parser.set_defaults(func=net_echo)
+
+    def net_connect(self, args) -> Task:
+        if isinstance(args, str):
+            args = net_connect_parser.parse_args(args)
+
+        task = Task(self._agent.instance, command="connect", args=str(args.port),
+                    callback=self._agent.tasker.callback)
+        task.console_args = args
+        task.background = args.background
+        return task
+
+    net_connect_parser.set_defaults(func=net_connect)
 ```
 
 Note the `Task(..., callback=self._agent.tasker.callback)` constructor — build a `Task` this way,

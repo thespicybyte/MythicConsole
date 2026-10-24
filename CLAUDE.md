@@ -78,9 +78,9 @@ This is where per-agent command sets are defined and dynamically loaded:
   overriding `get_agent_commands`, calling `super()`, and patching the returned `AgentCommands`
   mapping (pop/add by name). Scripts are the one piece still loaded by naming convention:
   `get_script_classes` globs `agents/<Name>/scripts/*.py` (or a plugin's own `scripts/*.py`) and
-  imports each by a strict **filename → class name** convention — snake_case file maps to
-  CamelCase class (`ping.py` → `Ping`). A mismatched name silently fails to load (logged as a
-  warning), so keep script file and class names in sync.
+  imports each by a strict **filename → class name** convention — the class is named by
+  capitalizing the filename (`ping.py` → `Ping`). A mismatched name silently fails to load (logged
+  as a warning), so keep script file and class names in sync.
 
 **Formatters** (`backend/formatter/`). A `Formatter` turns a completed `Task` into a Rich
 `RenderableType` for the console. A subclass tags render methods with `@renders("<command>")`
