@@ -1,499 +1,322 @@
 # Extending Mythic Console
 
-Extending Mythic Console to support your own agent is easy to do.
-There are three steps to take:
+Mythic Console generates commands for any connected callback from the Mythic server's own command
+catalog, so a new agent works with zero code. Curation is optional: add polish one piece at a time,
+only where the generated behavior is not good enough. The curation you write ships as a **plugin**,
+a standalone package installed into the console, not a file you add to this repo. Poseidon is the
+fully-curated end of that spectrum — it ships as its own plugin.
 
-1. Register your agent by creating the required file structure
-    1. Create your agent class
-    2. Add your agent to the agent initializer
-2. Define your commands
-3. Define how the output should be formatted
+## Zero-code: connect a callback, get commands
 
-## Registering additional agents
-
-Simply create the file structure depicted below:
-
- ```markdown
- mythic_console
-├── agents
-│ ├── __init__.py
-│ ├── NewAgent
-│ │ ├── commands
-│ │ ├── scripts
-│ │ ├── __init__.py
-│ │ ├── formatter.py
-│ │ ├── new_agent.py
- ```
-
-Once the file structure is set up, create your agent class.
-A Mythic Agent class requires just two things, it's name defined and an optional `Formatter` (described later).
-If you do not have a custom formatter, the default one can be used.
+When you select a callback, the console calls `get_agent(instance, callback.payload_type_name)`
+(`agents/__init__.py`). If no plugin is installed for that payload type, you get a generated
+`MythicAgent` with a `DefaultFormatter`:
 
 ```python
-from backend import Formatter
-from backend.mythic_agent.mythic_agent import MythicAgent
-from backend.mythic_instance.mythic_instance import MythicInstance
-
-
-class NewAgent(MythicAgent):
-    def __init__(self, instance: MythicInstance):
-        name = "new_agent"
-        formatter = Formatter()
-        super().__init__(name, instance, formatter)
+return MythicAgent(payload_type_name, instance, DefaultFormatter())
 ```
 
-After defining your agent, you can add it to the agents `__init__` file so the Console will recognize it.
-Note that whatever goes into the `case` field is the name of your agent as Mythic refers to.
+`MythicAgent.load_commands` then calls `get_agent_commands`, which queries
+`mythic.get_all_commands_for_payloadtype` for every command the payload type defines and builds an
+`AgentCommand` for each one with `AgentCommand.from_server`. `from_server` reads each command's
+`commandparameters` and builds a `Cmd2ArgumentParser` from them — booleans, numbers, arrays,
+choice lists, files, and so on all map to the right argparse flag automatically. A `do_<name>`
+method is bound for you, so the command is immediately usable.
+
+`DefaultFormatter` defines no renderers, so `format_output` falls back to `format_plaintext` for
+every command. Output is plaintext until you add a renderer (see "Customize how output renders"
+below).
+
+Connect a callback of any Mythic-supported payload type and you get a full set of commands and
+readable output. Nothing to create, nothing to register.
+
+### Catalog vs. loaded commands
+
+The commands generated this way are the full **catalog**: everything the payload type defines on
+the Mythic server, whether or not the specific callback currently has it loaded. The console
+separately caches which commands are actually loaded on the callback
+(`MythicAgent._cache_loaded_commands`, via `CallbackQueries.get_loaded_commands`), and a parameter
+flagged `choices_are_loaded_commands` is checked against that set. That check is fail-open: if the
+loaded set isn't known, the value is allowed through. In short, a generated command may appear that
+isn't currently loaded on the callback — there's no load-gating UI in the console yet.
+
+## Add polish incrementally
+
+Everything below is independent and opt-in. Add only what a given agent needs. All of it is
+delivered as a **plugin** (see "Package it as a plugin"): the console loads the generated commands
+first, then your plugin's overrides patch on top of them.
+
+### 1. Curate a command group
+
+Replace generated flags with friendlier names, subcommands, or aliases. Override
+`get_agent_commands`, start from the generated set, then drop and add commands:
 
 ```python
-from backend.mythic_instance.mythic_instance import MythicInstance
-from agents.Poseidon.poseidon import Poseidon
-from agents.NewAgent.new_agent import NewAgent
-
-
-class UnknownAgent(Exception):
-    def __init__(self, payload_type_name: str):
-        super().__init__(payload_type_name)
-
-
-def get_agent(instance: MythicInstance, payload_type_name: str) -> Poseidon:
-    match payload_type_name:
-        case "poseidon":
-            return Poseidon(instance)
-        case "new_agent":
-            return NewAgent(instance)
-        case _:
-            raise UnknownAgent(payload_type_name)
+async def get_agent_commands(self) -> AgentCommands:
+    cmds = await super().get_agent_commands()
+    for name in ("echo", "connect"):
+        cmds.pop(name, None)
+    cmds["net"] = Net(self)
+    return cmds
 ```
 
-## Adding Commands
-
-Agent commands are simple to write and allow the author a lot of flexibility.
-All commands must inherit the `AgentCommand` class which in
-an [Abstract Base Class](https://docs.python.org/3/library/abc.html), or interface, the provides all the plumbing
-necessary to subcommands, aliases, and tab completion. There are three ways to define an Agent Command: basic command,
-command with sub-commands, and a script.
-
-### Single Command
-
-A basic command means that the command that is entered in the command will translate to what gets executed.
-In this example we will demonstrate writing the `config` command for `Poseidon` which simply returns the host
-information of the target.
-
-1. The first step is to create the file. The file must be placed under the `commands` folder and be named after the
-   command.
-
-    ```markdown
-    mythic_console
-    ├── agents
-    │ ├── Poseidon
-    │ │ ├── commands
-    │ │ │ ├── __init__.py
-    │ │ │ ├── config.py
-    ```
-
-2. In `config.py`, add the template to get started. Commands are dynamically imported so it is important that the class
-   name is the name of the file and starts with a capital letter.
-
-    ```python
-    import argparse
-    from typing import List, Dict
-    
-    from cmd2 import cmd2, Cmd2ArgumentParser
-    
-    from backend import Task
-    from backend.mythic_agent.mythic_agent import AgentCommand, MythicAgent, AgentCommandAlias, add_default_options
-    
-    config_parser = Cmd2ArgumentParser(description="View current config and host information")
-    add_default_options(config_parser) # Adds `-bg`/`--background` as options
-    
-    
-    class Config(AgentCommand):
-        def __init__(self, agent: MythicAgent):
-            super().__init__(agent)
-            self._name = "config"
-            self._description = "View current config and host information"
-            self._subcommand_parsers: Dict[str, cmd2.argparse_custom.Cmd2ArgumentParser] = {}
-            self._aliases = []
-    
-        @property
-        def name(self) -> str:
-            return self._name
-    
-        @property
-        def description(self) -> str:
-            return self._description
-      
-        @property
-        def subcommand_parsers(self) -> Dict[str, cmd2.argparse_custom.Cmd2ArgumentParser]:
-            return self._subcommand_parsers
-    
-        @property
-        def command_parser(self) -> cmd2.argparse_custom.Cmd2ArgumentParser:
-            return config_parser
-    
-        @property
-        def aliases(self) -> List[AgentCommandAlias]:
-            return self._aliases
-   
-       @cmd2.with_argparser(config_parser)
-       def do_config(self, args: argparse.Namespace | str) -> Task:
-           pass
-    ```
-
-3. Add command logic. Commands are defined leveraging [cmd2](https://cmd2.readthedocs.io/en/stable/) meaning the command
-   to be executed must be prefaced with `do_`. The function will return a `Task` object the application will call the
-   `execute` method on. The reason why the `args` parameter is either a `argparse.Namespace` object or a `str` is if the
-   function is called natively (through the prompt), args will be passed as an `argparse.Namespace` object. If you want
-   the command to be available to scripting, it's easier to call the function and pass the args as a string.
-
-   ```python
-   def do_config(self, args: argparse.Namespace | str) -> Task:
-       # parse the args if they are passed as a string
-       if isinstance(args, str):
-           args = config_parser.parse_args(args)
-  
-       # instantiate the Task object
-       task = Task(self._agent.instance, command="config",
-                   callback_display_id=self._agent.tasker.callback.display_id)
-  
-       # Arguments that are passed to the command are stored in the task so they may be accessed when formatting.
-       # This allows a lot of flexibility to be able to manipulate the data that is returned from Mythic when displaying it.
-       # For example, you may choose to sort a column of data based on a field or filter the data that is displayed.
-       task.console_args = args
-   
-       # set background to true if passed. This will release the prompt immediately and continue to run the task
-       # output will not be displayed automatically but can be shown by double-clicking the task in the task table
-       # when it is competed
-       task.background = args.background
-       
-       return task
-   ```
-
-4. Update formatter class. Because `config` just returns a string of a json object, we can leverage the inherited
-   `format_pretty`
-   method to render our output.
-
-   ```python
-   class PoseidonFormatter(Formatter):
-       async def format_output(self, task: Task) -> Optional["RenderableType"]:
-           command = task.command_name
-   
-           match command:
-               case "pwd":
-                   return await self.format_plaintext(task)
-               case "shell":
-                   return await self.format_plaintext(task)
-               case "cat":
-                   return await self.format_plaintext(task)
-               case "cd":
-                   return await self.format_plaintext(task)
-               case "config":
-                   return await self.format_pretty(task)
-   ```
-
-### Grouped Commands
-
-When commands can be grouped together, we can have a parent command and sub-commands to define each command. This will
-reduce the number of files you need to create and the amount of boilerplate code you will need to write. Because the
-idea of having users type a <command> + <subcommand> can be tedious/you may want command names to match what the agent
-command actually is, aliases can be leveraged. In this example, we will implement the copy (cp) command from Poseidon.
-Because there are other commands that revolve around a file such as move, delete, etc, this is a perfect use-case for
-sub-commands.
-
-1. The first step is to create the file. The file must be placed under the `commands` folder and be named after the
-   command. Our parent command will be `file` so our filename will be `file.py`
-
-    ```markdown
-    mythic_console
-    ├── agents
-    │ ├── Poseidon
-    │ │ ├── commands
-    │ │ │ ├── __init__.py
-    │ │ │ ├── file.py
-    ```
-
-2. Add boilerplate code to start a new `AgentCommand` and define the argument parsers and commands.
-
-   ```python
-   import argparse
-   from typing import List, Dict
-   
-   from cmd2 import cmd2, Cmd2ArgumentParser, argparse_custom, as_subcommand_to
-   
-   from backend import Task
-   from backend.mythic_agent.mythic_agent import AgentCommand, AgentCommandAlias, MythicAgent, add_default_options
-   
-   # main parser for the file command
-   file_parser = Cmd2ArgumentParser()
-   file_subparsers = file_parser.add_subparsers(title='subcommands', help='subcommand help')   
-   
-   # subcommand parser for copy
-   file_copy_parser = file_subparsers.add_parser('copy', help='Copy a file')
-   file_copy_parser.add_argument('source', help='source path')
-   file_copy_parser.add_argument('destination', help='destination path')
-   add_default_options(file_copy_parser)
-   
-   class File(AgentCommand):
-       def __init__(self, agent: MythicAgent):
-           super().__init__(agent=agent)
-           self._name = "file"
-   
-           # set the subcommand parser, this is used for tab completion
-           self._subcommand_parsers: Dict[str, argparse_custom.Cmd2ArgumentParser] = {
-               "copy": file_copy_parser,
-           }
-   
-           # create an alias so users can use the same command as defined in the agent
-           self._aliases = [
-               AgentCommandAlias("cp", self._name, "copy")
-           ]
-   
-       @property
-       def name(self) -> str:
-           return self._name
-   
-       @property
-       def aliases(self) -> List[AgentCommandAlias]:
-           return self._aliases
-   
-       @property
-       def subcommand_parsers(self) -> Dict[str, cmd2.argparse_custom.Cmd2ArgumentParser]:
-           return self._subcommand_parsers
-   
-       @property
-       def command_parser(self) -> cmd2.argparse_custom.Cmd2ArgumentParser:
-           return file_parser
-   
-       # define main command function which will call the subcommand function 
-       @cmd2.with_argparser(file_parser)
-       def do_file(self, args):
-           func = getattr(args, 'func', None)
-           if func is not None:
-               return func(self, args)
-   
-         # define the task for copy
-        def file_copy(self, args: argparse.Namespace | str) -> Task:
-           if isinstance(args, str):
-               args = file_copy_parser.parse_args(args)
-   
-           command_args = {
-               "source": args.source,
-               "destination": args.destination
-           }
-   
-           task = Task(self._agent.instance, command="cp", args=command_args,
-                       callback_display_id=self._agent.tasker.callback.display_id)
-   
-           task.console_args = args
-           task.background = args.background
-           return task
-   
-       # set the function to call for copy
-       file_copy_parser.set_defaults(func=file_copy)
-   ```
-
-### Verify Prompts
-
-The `Task` class has an attribute called `verify_prompt` that can be set when defining a command. 
-A verify prompt is a [Modal Screen](https://textual.textualize.io/guide/screens/#modal-screens) the is displayed before the command executes.
-They give the user one last chance to verify they want to run particularly dangerous commands, such as exit. 
-The verify prompt must have a base class of `TaskPrompt` and currently there is one built in, the `YesNoPrompt` class 
-which simply takes in a question which should be answered with a yes or no. 
-
-Example:
+`Net` here is a hand-written `AgentCommand` with its own subcommands and aliases (grouping the
+`echo`/`connect` generated commands under one `net` command):
 
 ```python
-import argparse
-from typing import List, Dict
+from typing import Dict, List
 
 from cmd2 import cmd2, Cmd2ArgumentParser
 
 from backend import Task
-from backend.mythic_agent.mythic_agent import AgentCommand, MythicAgent
+from backend.mythic_agent.mythic_agent import AgentCommand, AgentCommandAlias, MythicAgent, add_default_options
+
+net_parser = Cmd2ArgumentParser()
+net_subparsers = net_parser.add_subparsers(title='subcommands', help='subcommand help')
+
+net_echo_parser = net_subparsers.add_parser('echo', help='echo text')
+add_default_options(net_echo_parser)
+net_echo_parser.add_argument('--text', required=True, help='text to echo')
+
+net_connect_parser = net_subparsers.add_parser('connect', help='connect to a peer')
+add_default_options(net_connect_parser)
+net_connect_parser.add_argument('--port', type=int, required=True, help='port')
+
+
+class Net(AgentCommand):
+    def __init__(self, agent: MythicAgent):
+        super().__init__(agent=agent)
+        self._name = "net"
+        self._description = "grouped command covering echo/connect"
+        self._subcommand_parsers: Dict[str, Cmd2ArgumentParser] = {
+            "echo": net_echo_parser,
+            "connect": net_connect_parser,
+        }
+        self._aliases = [
+            AgentCommandAlias("echo", self._name, "echo", description="echo text"),
+            AgentCommandAlias("connect", self._name, "connect", description="connect to a peer"),
+        ]
+
+    @property
+    def name(self) -> str:
+        return self._name
+
+    @property
+    def description(self) -> str:
+        return self._description
+
+    @property
+    def aliases(self) -> List[AgentCommandAlias]:
+        return self._aliases
+
+    @property
+    def subcommand_parsers(self) -> Dict[str, Cmd2ArgumentParser]:
+        return self._subcommand_parsers
+
+    @property
+    def command_parser(self) -> Cmd2ArgumentParser:
+        return net_parser
+
+    @cmd2.with_argparser(net_parser)
+    def do_net(self, args):
+        func = getattr(args, 'func', None)
+        if func is not None:
+            return func(self, args)
+
+    def net_echo(self, args) -> Task:
+        if isinstance(args, str):
+            args = net_echo_parser.parse_args(args)
+
+        task = Task(self._agent.instance, command="echo", args=args.text,
+                    callback=self._agent.tasker.callback)
+        task.console_args = args
+        task.background = args.background
+        return task
+
+    net_echo_parser.set_defaults(func=net_echo)
+
+    def net_connect(self, args) -> Task:
+        if isinstance(args, str):
+            args = net_connect_parser.parse_args(args)
+
+        task = Task(self._agent.instance, command="connect", args=str(args.port),
+                    callback=self._agent.tasker.callback)
+        task.console_args = args
+        task.background = args.background
+        return task
+
+    net_connect_parser.set_defaults(func=net_connect)
+```
+
+Note the `Task(..., callback=self._agent.tasker.callback)` constructor — build a `Task` this way,
+not with `callback_display_id=...`.
+
+### 2. Customize how output renders
+
+Subclass `Formatter` and tag a method with `@renders("<command>")`. `format_output` dispatches to
+the tagged method by command name; any command without a tagged method still falls back to
+`format_plaintext` automatically, so you only write renderers for the commands you want to improve:
+
+```python
+from rich.text import Text
+
+from backend import Formatter, Task, renders
+
+
+class MyAgentFormatter(Formatter):
+    @renders("echo")
+    async def echo(self, task: Task) -> Text:
+        raw = await self.get_raw_output(task)
+        return Text(raw.upper())
+```
+
+`Formatter` also provides `format_pretty` (pretty-print JSON output), `build_table` (render rows as
+a Rich table), and `get_raw_output` (the decoded response text, for writing your own renderer) as
+helpers.
+
+### 3. Confirm dangerous commands (verify_prompt)
+
+Every `AgentCommand` has a `verify_prompt` attribute (`None` by default). Set it on the command
+instance and the console shows that modal and waits for confirmation before the task executes:
+
+```python
 from screens.prompts import YesNoPrompt
 
-exit_parser = Cmd2ArgumentParser(description="Exit the current session and kill the agent")
+net = Net(self)
+net.verify_prompt = YesNoPrompt(question="Run this command?")
+```
 
+On a hand-written command, set it in `__init__` instead:
 
+```python
 class Exit(AgentCommand):
     def __init__(self, agent: MythicAgent):
         super().__init__(agent)
         self._name = "exit"
-        self._description = "Exit the current session and kill the agent"
-        self._subcommand_parsers: Dict[str, cmd2.argparse_custom.Cmd2ArgumentParser] = {}
-        self._aliases = []
-
-    # snip....
-    
-    @cmd2.with_argparser(exit_parser)
-    def do_exit(self, _args: argparse.Namespace | str) -> Task:
-        task = Task(self._agent.instance, command="exit",
-                    callback_display_id=self._agent.tasker.callback.display_id)
-
-        task.verify_prompt = YesNoPrompt(question="Exit/kill the current session?")
-        task.background = True
-        return task
+        self.verify_prompt = YesNoPrompt(question="Exit/kill the current session?")
 ```
 
-3. Last part is to define the formatter. Because copy just returns a plaintext string, we can use the inherited
-   `format_plaintext` method.
+### 4. Add a client-side script (ScriptCommand)
 
-   ```python
-   class PoseidonFormatter(Formatter):
-       async def format_output(self, task: Task) -> Optional["RenderableType"]:
-           command = task.command_name
-   
-           match command:
-               case "pwd":
-                   return await self.format_plaintext(task)
-               case "shell":
-                   return await self.format_plaintext(task)
-               case "cat":
-                   return await self.format_plaintext(task)
-               case "cd":
-                   return await self.format_plaintext(task)
-               case "config":
-                   return await self.format_pretty(task)
-               case "cp":
-                   return await self.format_plaintext(task)
-               case "ls":
-                   return await self.format_ls(task)
-               case _:
-                   raise FormatterNotAvailable(command)
-   ```
+A script is an `AgentCommand` whose `do_<name>` can return a renderable directly instead of a
+`Task` — useful for a client-side action that doesn't need a server round trip. `ScriptCommand` is
+`AgentCommand` itself (`ScriptCommand = AgentCommand`); what makes a command a script is where the
+file lives.
 
-4. Just to emphasize, let's add another subcommand. In this step we will implement the `cat` command.
-
-    1. Add new subcommand parser for `cat`
-       ```python
-       file_cat_parser = file_subparsers.add_parser('cat', help='Cat a file')
-       file_cat_parser.add_argument('path', nargs='+', help='Path to file to cat')
-       add_default_options(file_cat_parser)
-       ```
-    2. Create method for creating the task
-        ```python
-            def file_cat(self, args: str | argparse.Namespace) -> Task:
-                if isinstance(args, str):
-                    subcommand_parser = file_cat_parser
-                    args = subcommand_parser.parse_args(args)
-        
-                path = " ".join(args.path)
-                task = Task(self._agent.instance, command="cat", args=path,
-                            callback_display_id=self._agent.tasker.callback.display_id)
-        
-                task.console_args = args
-                task.background = args.background
-                return task
-        
-            file_cat_parser.set_defaults(func=file_cat)
-        ```
-    3. Update alias/subcommand parsers
-         ```python
-             def __init__(self, agent: MythicAgent):
-                 super().__init__(agent=agent)
-                 self._name = "file"
-                 self._subcommand_parsers: Dict[str, argparse_custom.Cmd2ArgumentParser] = {
-                     "copy": file_copy_parser,
-                     "cat": file_cat_parser,
-                 }
-                 self._aliases = [
-                     AgentCommandAlias("cp", self._name, "copy"),
-                     AgentCommandAlias("cat", self._name, "cat")
-                 ]
-         ```
-
-## Create a `Formatter` for your Agent.
-
-The `Formatter` class is an Abstract Base Class that can be used to customize how you want your commands results to
-appear in the console.
-Each method can do whatever you want but should return
-a [Rich RenderableType](https://rich.readthedocs.io/en/stable/reference/console.html?highlight=renderabletype#rich.console.RenderableType).
-The base `Formatter` class comes with a few methods for free to including a method to print a plaintext response among
-others.
-
-If creating your own formatter, you only are required to define one method: `format_output`.
-This method takes in one parameter of type `Task` which is the task executed.
-If you defined your task to have arguments to customize how the results should look, these values will be available in
-the task under `task.console_args`.
-
-Here is an example of a sample formatter.
+Place it at `scripts/<name>.py`; the class name is the capitalized filename (`ping.py` → `Ping`):
 
 ```python
-from backend import Formatter, Task
-from utils.environment import Environment
+from typing import Dict, List
 
-import os
-import json
-from rich.text import Text
-from rich.table import Table
-from typing import Optional
+from cmd2 import cmd2, Cmd2ArgumentParser
+from rich.console import RenderableType
+
+from backend.mythic_agent.mythic_agent import AgentCommandAlias, MythicAgent, ScriptCommand
+
+ping_parser = Cmd2ArgumentParser(description="client-side ping script")
 
 
-class NewAgentFormatter(Formatter):
-    async def format_output(self, task: Task) -> Optional["RenderableType"]:
-        command = task.command_name
+class Ping(ScriptCommand):
+    def __init__(self, agent: MythicAgent):
+        super().__init__(agent=agent)
+        self._name = "ping"
+        self._description = "client-side ping script"
+        self._subcommand_parsers: Dict[str, Cmd2ArgumentParser] = {}
+        self._aliases: List[AgentCommandAlias] = []
 
-        match command:
-            case "command1":
-                return await self.format_pretty(task)
-            case "command2":
-                return await self.format_plaintext(task)
-            case "command3":
-                return await self.command3(task)
-            case "download":
-                return await self.download(task)
+    @property
+    def name(self) -> str:
+        return self._name
 
-    async def command3(self, task: Task, encoding: str = "utf8") -> Table | Text:
-        raw = await self.get_raw_output(task, encoding)
+    @property
+    def description(self) -> str:
+        return self._description
 
-        try:
-            results = json.loads(raw)
-        except json.JSONDecodeError:
-            return Text(raw)
+    @property
+    def aliases(self) -> List[AgentCommandAlias]:
+        return self._aliases
 
-        rows = []
-        headers = ["col1", "col2", "col3"]
+    @property
+    def subcommand_parsers(self) -> Dict[str, Cmd2ArgumentParser]:
+        return self._subcommand_parsers
 
-        title = "Command 3 Output"
-        for result in results:
-            foo = result.get("foo")
-            bar = result.get("bar")
-            rows.append([foo, bar])
+    @property
+    def command_parser(self) -> Cmd2ArgumentParser:
+        return ping_parser
 
-        table = self.build_table(*rows, headers=headers, title=title)
-        return table
-
-    @classmethod
-    async def download(cls, task: Task) -> Text:
-        success = False
-        local_path = ""
-        try:
-            filename = task.params.replace(" ", "_")
-            download_dir = os.path.join(Environment().download_directory(),
-                                        f"{task.hostname}_{task.callback_display_id}")
-            if not os.path.isdir(download_dir):
-                os.makedirs(download_dir, exist_ok=True)
-
-            local_path = os.path.join(download_dir, filename)
-            success = await task.download_file(local_path)
-        except Exception as e:
-            return Text(f"failed to download file: {e}")
-        finally:
-            if success and local_path:
-                return Text(f"[+] file successfully saved to {local_path}")
-
-            return Text("failed to download file")
+    @cmd2.with_argparser(ping_parser)
+    async def do_ping(self, _args) -> RenderableType:
+        return "pong"
 ```
 
-## Installing an agent as a plugin
+`do_ping` returns the string `"pong"` directly, with no `Task` involved. A script can return a
+`Task` instead when it does need to round-trip to the server.
 
-Agents no longer have to live inside this repo. An agent can instead ship as a standalone
-**plugin**: a Python package with a `manifest.json` at its root (`payload_type`, `entrypoint`, a
-Python-identifier `name`, and a `version`), installed into the console's plugins directory
-(`${XDG_CONFIG_HOME:-~/.config}/mythicconsole/plugins`, overridable with `PLUGIN_DIRECTORY`).
+### 5. Hand-write a full agent class (override everything)
 
-Install from a local folder or a GitHub URL, from the shell:
+For full control, subclass `PluginAgent` (not `MythicAgent` directly — see below) and override
+whatever you need:
+
+```python
+from backend.mythic_agent.mythic_agent import AgentCommands
+from plugins.base import PluginAgent
+
+from .commands.net import Net
+from .formatter import MyAgentFormatter
+
+
+class MyAgent(PluginAgent):
+    def __init__(self, instance):
+        super().__init__("myagent", instance, MyAgentFormatter())
+
+    async def get_agent_commands(self) -> AgentCommands:
+        cmds = await super().get_agent_commands()
+        cmds["net"] = Net(self)
+        return cmds
+```
+
+This is the shape Poseidon uses: a curated command set, a full formatter, verify prompts, and
+scripts, all on top of the same generated baseline.
+
+## Package it as a plugin
+
+A plugin is a Python package with a `manifest.json` at its root. All fields except `author` and
+`description` are required (`plugins/manifest.py`):
+
+```json
+{
+  "schema_version": 1,
+  "name": "myagent",
+  "payload_type": "myagent",
+  "entrypoint": "myagent:MyAgent",
+  "version": "0.1.0",
+  "author": "you",
+  "description": "optional"
+}
+```
+
+- `schema_version` must be `1`.
+- `name` must be a valid Python identifier.
+- `payload_type` is the Mythic payload type name this plugin handles.
+- `entrypoint` is `"<module>:<Class>"`; the class must subclass `MythicAgent` — use `PluginAgent`
+  (`plugins/base.py`) as that base, since it resolves the plugin's own `commands/`/`scripts/`
+  directories instead of the in-repo `agents/<Name>/` layout `MythicAgent` assumes.
+- `version` is the plugin's version string.
+
+Lay the package out like this:
+
+```
+myagent/
+├── manifest.json
+├── myagent.py        # entrypoint module: the MyAgent(PluginAgent) class
+├── formatter.py
+├── commands/
+│   └── net.py
+└── scripts/
+    └── ping.py
+```
+
+Install it from the shell:
 
 ```shell
 python console.py install https://github.com/<you>/<your-agent-plugin> [--branch BRANCH] [--subdir DIR]
@@ -503,11 +326,38 @@ python console.py plugin remove <name>
 ```
 
 or from inside the console: `plugin install <url|path>`, `plugin list`, `plugin remove <name>`.
-Installing takes effect immediately -- no restart needed -- for callbacks selected afterward.
 
-`agents/Poseidon` has moved out of this repo into its own separate repository, and is installed
-like any other third-party agent plugin via `python console.py install <github-url-or-local-clone-path>`.
-A full walkthrough for authoring a plugin from scratch is still forthcoming; for now, follow the
-"Registering additional agents" and "Define your commands"/"Define how the output should be
-formatted" sections above, but have your agent class subclass `plugins.base.PluginAgent` instead
-of `MythicAgent`, and add the `manifest.json` described here at your plugin's root.
+Installing or removing a plugin reloads the plugin registry immediately, but a callback you already
+selected keeps the agent it was given at selection time — reselect the callback (or select a new one
+of that payload type) to pick up the change. Plugins are discovered at startup from the plugins
+directory (`${XDG_CONFIG_HOME:-~/.config}/mythicconsole/plugins`, overridable with
+`PLUGIN_DIRECTORY`); `install`/`plugin install` write there too.
+
+## Poseidon: the fully-curated reference
+
+Poseidon no longer lives in this repo — it ships as its own plugin, installed the same way as any
+other plugin described above. It curates its command groups, supplies a full formatter, sets
+`verify_prompt` on dangerous commands, and adds client-side scripts. If you want to see every
+technique above used together in a real agent, read its source.
+
+## Reference: generated parameter mapping
+
+`_add_param_argument` (`backend/mythic_agent/mythic_agent.py`) maps each Mythic command parameter
+type to an argparse treatment when building a generated command's parser:
+
+| Mythic parameter type                     | argparse treatment                                        |
+|--------------------------------------------|------------------------------------------------------------|
+| `Boolean`                                  | `store_true` flag                                           |
+| `Number`                                   | `int`-typed flag                                             |
+| `Array`                                    | flag with `nargs="+"`                                       |
+| `ChooseOne`                                | flag with `choices=[...]`                                   |
+| `ChooseMultiple`                           | flag with `nargs="+"`, `choices=[...]`                       |
+| `File`                                     | flag taking a local path or an existing file UUID            |
+| `PayloadList`                              | flag taking a payload UUID                                   |
+| `TypedArray`                                | flag taking a JSON array of `[type, value]` pairs            |
+| JSON-object types (e.g. `CredentialJson`)   | flag taking a JSON object, validated against a template      |
+| `choices_are_all_commands`                 | flag whose choices are every command name on the agent       |
+| `choices_are_loaded_commands`               | flag validated against the callback's currently loaded commands (fail-open) |
+| dynamic (`dynamic_query_function`)          | flag whose choices are supplied by the agent at runtime       |
+
+Anything not listed above falls back to a plain string flag.
