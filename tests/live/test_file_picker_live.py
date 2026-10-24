@@ -1,15 +1,11 @@
-"""Opt-in live test for the file-picker flow (mythicconsole-107). Needs a reachable Mythic server +
-.env, with an active callback for a non-Poseidon agent (arachne on the lab test server) that has a
-required `File` parameter (e.g. `upload`).
+"""Opt-in live test for the file-picker flow. Needs a reachable Mythic server + .env, with an active
+callback for a non-Poseidon agent (arachne on the lab test server) that has a required `File`
+parameter (e.g. `upload`).
 
 Run with `pytest -m live`; deselected by default (pytest.ini's `addopts -m "not live"`).
 
 Drives the backend contract the picker feeds (`task.pending_file_params` -> operator picks a path ->
-`task.file_params[dest] = path` -> `task.execute()`), rather than the TUI picker itself: driving
-`Home.execute_cmd` end-to-end here risks clobbering pytest's capture process-wide (see
-tests/live/test_pilot_smoke.py), so the modal's own behavior is covered offline in
-tests/test_file_picker.py and this test covers only what a live server can confirm — that a path
-assigned the way the picker assigns it registers and tasks correctly.
+`task.file_params[dest] = path` -> `task.execute()`), rather than the TUI picker itself.
 """
 import pytest
 
