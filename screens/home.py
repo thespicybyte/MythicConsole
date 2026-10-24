@@ -1,6 +1,7 @@
 import asyncio
 import io
 import sys
+from datetime import datetime, timezone
 from enum import Enum
 from typing import Optional, Coroutine
 
@@ -27,10 +28,12 @@ from agents import get_agent
 from backend import Callback, MythicInstance, User, Operation, Task, MythicAgent, FormatterNotAvailable
 from backend.cmd.mythic_cmd import MythicCmd
 from backend.task.task import TaskError
+from screens.manage_callbacks import ManageCallbacks
 from screens.prompts import FilePrompt
+from utils.callback_status import count_active
 from utils.logger import logger
 from widgets.calback_tabs import CallbackTabs
-from widgets.callbacks import Callbacks, CallbackTable
+from widgets.callbacks import Callbacks, CallbackTable, build_callback_row
 from widgets.console import ConsolePanel
 from widgets.messages import TabClosed, UpdateCurrentCallback
 from widgets.session_info import SessionInfo
@@ -128,6 +131,7 @@ class Home(Screen):
         self.cmd = MythicCmd(instance)
         # commands run one at a time, in order, via _run_cmd_queue
         self._cmd_queue: asyncio.Queue[str] = asyncio.Queue()
+        self.known_callbacks: dict[str, bool] = {}
         super().__init__()
         self.displayed_tabs["Mythic"] = TabPane("Mythic", ConsolePanel(instance=instance), id="home")
 
@@ -141,15 +145,82 @@ class Home(Screen):
         Binding(key="alt+right", action="grow_sidebar", description="grow sidebar", show=False),
         Binding(key="ctrl+q", action="close_tab", description="close tab", key_display="^q"),
         Binding(key="ctrl+z", action="background_current_task", description="background", key_display="^z"),
+        Binding(key="m", action="manage_callbacks", description="manage callbacks", key_display="m"),
     ]
 
     async def _on_mount(self, _event: events.Mount) -> None:
         self.monitor_callbacks()
         worker = self._get_active_callbacks()
         await worker.wait()
+        worker = self._seed_known_callbacks()
+        await worker.wait()
+        self._monitor_callback_updates()
+        self.set_interval(1.0, self._refresh_live_cells)
         self._get_and_monitor_tasks()
         self._monitor_tasks()
         self._run_cmd_queue()
+
+    def _refresh_live_cells(self) -> None:
+        try:
+            table = self.query_one("#callback_table", CallbackTable)
+        except NoMatches:
+            return
+        table.refresh_live_cells(self.active_callbacks)
+
+    def _refresh_callbacks_title(self) -> None:
+        active, total = count_active(self.known_callbacks)
+        try:
+            self.query_one(Callbacks).border_title = f"Callbacks ({active}/{total})"
+        except NoMatches:
+            pass
+
+    @work()
+    async def _seed_known_callbacks(self) -> None:
+        detail = await self.instance.get_all_callbacks_detail()
+        for row in detail:
+            uuid = row.get("agent_callback_id")
+            if not uuid:
+                continue
+            self.known_callbacks[uuid] = bool(row.get("active"))
+        self._refresh_callbacks_title()
+
+    @work()
+    async def _monitor_callback_updates(self) -> None:
+        """Reconcile the table and known_callbacks on every callback_stream update."""
+        try:
+            table = self.query_one("#callback_table", CallbackTable)
+        except NoMatches:
+            return
+
+        async for row in self.instance.monitor_callback_updates():
+            uuid = row.get("agent_callback_id")
+            if not uuid:
+                continue
+
+            cb = self.active_callbacks.get(uuid)
+            if not cb:
+                cb = Callback(self.instance, callback_uuid=uuid)
+                await cb.query()
+                self.active_callbacks[uuid] = cb
+
+            cb.apply_stream_update(row)
+            self.known_callbacks[uuid] = cb.active
+            table.reconcile_callback(cb, self.current_tab_id)
+            self._refresh_callbacks_title()
+
+    async def action_manage_callbacks(self) -> None:
+        changes = await self.app.push_screen_wait(ManageCallbacks(self.instance))
+        if not changes:
+            return
+
+        await asyncio.gather(*(
+            Callback(self.instance, callback_uuid=uuid).update_active(is_active)
+            for uuid, is_active in changes.items()
+        ))
+
+    @on(CallbackTable.ManageCallbacksRequested)
+    def _manage_callbacks_requested(self, _message: CallbackTable.ManageCallbacksRequested) -> None:
+        self.run_worker(self.action_manage_callbacks())
 
     @on(TabClosed)
     def tab_closed(self, message: TabClosed):
@@ -191,12 +262,12 @@ class Home(Screen):
 
     @work()
     async def _get_active_callbacks(self):
-        callback_table = self.query_one("#callback_table", DataTable)
+        callback_table = self.query_one("#callback_table", CallbackTable)
         callback_uuids = await self.instance.get_active_callbacks()
         for callback_uuid in callback_uuids:
             cb = Callback(self.instance, callback_uuid=callback_uuid)
             await cb.query()
-            callback_table.add_row(cb.display_id, cb.hostname, cb.payload_type_name, cb.uuid, key=cb.uuid)
+            callback_table.add_row(*build_callback_row(cb, datetime.now(timezone.utc)), key=cb.uuid)
             if cb.uuid not in self.active_callbacks.keys():
                 self.active_callbacks[cb.uuid] = cb
 
@@ -234,14 +305,16 @@ class Home(Screen):
 
     @work()
     async def monitor_callbacks(self):
-        callback_table = self.query_one("#callback_table", DataTable)
+        callback_table = self.query_one("#callback_table", CallbackTable)
         async for uuid in self.instance.monitor_new_callbacks():
             if uuid in self.active_callbacks.keys():
                 continue
             cb = Callback(self.instance, callback_uuid=uuid)
             await cb.query()
-            callback_table.add_row(cb.display_id, cb.hostname, cb.payload_type_name, cb.uuid, key=cb.uuid)
+            callback_table.add_row(*build_callback_row(cb, datetime.now(timezone.utc)), key=cb.uuid)
             self.active_callbacks[cb.uuid] = cb
+            self.known_callbacks[cb.uuid] = cb.active
+            self._refresh_callbacks_title()
 
     async def _update_task(self, task: Task):
         tasked_callback = self.active_callbacks.get(task.callback_uuid)

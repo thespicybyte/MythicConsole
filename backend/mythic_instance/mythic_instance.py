@@ -1,4 +1,5 @@
 from asyncio import AbstractEventLoop
+from datetime import datetime
 from typing import Optional, AsyncGenerator, List
 from urllib.parse import urlparse
 
@@ -123,6 +124,34 @@ class MythicInstance:
                 callback_uuids.append(callback_uuid)
 
         return callback_uuids
+
+    async def monitor_callback_updates(self) -> AsyncGenerator[dict, None]:
+        """
+        Monitor the unfiltered callback_stream for any update to any callback (active flips,
+        dead flips, check-ins, streaming) regardless of which operator made the change
+        :return: yields raw callback_stream rows
+        """
+        attrs = "agent_callback_id active dead last_checkin sleep_info ip external_ip current_time timestamp"
+        sub = """
+            subscription CallbackUpdates($now: timestamp!, $batch: Int!) {
+              callback_stream(batch_size: $batch, cursor: {initial_value: {timestamp: $now}}) { %s }
+            }""" % attrs
+        variables = {"now": str(datetime.utcnow()), "batch": 100}
+        try:
+            async for result in mythic.subscribe_custom_query(self.mythic, sub, variables):
+                for row in result.get("callback_stream", []):
+                    yield row
+        except asyncio.CancelledError:
+            pass
+
+    async def get_all_callbacks_detail(self) -> list[dict]:
+        """
+        Get all callbacks, including ones that are no longer active, for the manage-callbacks
+        modal and the showing X/Y count
+        :return: list of callback detail dicts
+        """
+        attrs = "agent_callback_id display_id host active payload { payloadtype { name } }"
+        return await mythic.get_all_callbacks(self.mythic, custom_return_attributes=attrs)
 
     async def monitor_tasks_updates(self) -> AsyncGenerator[int, None]:
         """

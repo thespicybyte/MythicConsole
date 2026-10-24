@@ -180,6 +180,59 @@ FilePrompt > Container > Horizontal > Button {
     margin: 1 0 0 0;
 }
 
+ManageCallbacks {
+    align: center middle;
+}
+
+ManageCallbacks > Container {
+    width: 90%;
+    height: 80%;
+    padding: 1 2;
+    background: $panel;
+}
+
+ManageCallbacks > Container > #title {
+    width: 100%;
+    content-align-horizontal: center;
+}
+
+ManageCallbacks #panes {
+    height: 1fr;
+}
+
+ManageCallbacks #shown_pane,
+ManageCallbacks #hidden_pane {
+    width: 1fr;
+    height: 100%;
+}
+
+ManageCallbacks #shown_list,
+ManageCallbacks #hidden_list {
+    height: 1fr;
+    border: solid $primary-background-lighten-1 100%;
+}
+
+ManageCallbacks #move_buttons {
+    width: auto;
+    height: 100%;
+    align: center middle;
+}
+
+ManageCallbacks #move_buttons > Button {
+    width: 6;
+    margin: 1 0;
+}
+
+ManageCallbacks #actions {
+    width: auto;
+    height: auto;
+    align: center middle;
+}
+
+ManageCallbacks #actions > Button {
+    margin: 1 1 0 1;
+}
+
 ConsoleOutput {
     width: 1fr;
     height: 1fr;
