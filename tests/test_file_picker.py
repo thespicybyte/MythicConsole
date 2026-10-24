@@ -249,6 +249,34 @@ async def test_file_prompt_right_key_expands_the_cursor_directory(tmp_path):
         assert root_node.children[0].is_expanded
 
 
+async def test_file_prompt_left_key_goes_up_from_the_cursor_not_the_tree_root(tmp_path):
+    nested = tmp_path / "a" / "b"
+    nested.mkdir(parents=True)
+
+    app = _PromptHarness()
+    async with app.run_test() as pilot:
+        prompt = FilePrompt("file", start_path=str(tmp_path))
+        app.push_screen(prompt)
+        await asyncio.sleep(0.2)
+        await pilot.pause()
+
+        tree = prompt.query_one(DirectoryTree)
+
+        tree.cursor_line = 1
+        await pilot.press("right")
+        await asyncio.sleep(0.2)
+        await pilot.pause()
+
+        tree.cursor_line = 2
+        assert tree.cursor_node.data.path == tmp_path / "a" / "b"
+
+        await pilot.press("left")
+        await asyncio.sleep(0.2)
+        await pilot.pause()
+
+        assert tree.path == tmp_path / "a"
+
+
 # --- screens/home.py wiring: pre-execute file-picker loop ---
 # Exercises Home.execute_cmd's new picker loop against a minimal screen carrying
 # only what that method touches (prompt/current_callback/displayed_tabs/cmd), rather

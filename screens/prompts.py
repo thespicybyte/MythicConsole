@@ -78,8 +78,12 @@ class FilePrompt(TaskPrompt):
 
     def action_go_up(self):
         tree = self.query_one("#tree", DirectoryTree)
-        parent = tree.path.parent
-        if parent != tree.path:
+        node = tree.cursor_node
+        current = node.data.path if node and node.data else tree.path
+        if current.is_file():
+            current = current.parent
+        parent = current.parent
+        if parent != current:
             tree.path = parent
 
     def action_enter_dir(self):
