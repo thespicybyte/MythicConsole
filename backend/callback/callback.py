@@ -121,6 +121,13 @@ class Callback:
                 if payload_type.get("name"):
                     self.payload_type_name = payload_type.get("name")
 
+    async def refresh_loaded_commands(self) -> None:
+        display_id = await self.get_display_id()
+        if not display_id:
+            return
+        loaded = await CallbackQueries.get_loaded_commands(self.mythic, display_id)
+        self.loaded_commands = set(loaded)
+
     async def get_display_id(self) -> int:
         if self.display_id:
             return self.display_id
