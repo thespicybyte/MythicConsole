@@ -38,6 +38,15 @@ def arachne_commands_fixture():
 
 
 @pytest.fixture
+def richtype_commands_fixture():
+    """Synthetic `get_all_commands_for_payloadtype("richagent", ...)` response exercising every rich
+    type (File, PayloadList, CredentialJson, AgentConnect, LinkInfo, TypedArray) and every dynamic
+    kind (choices_are_all_commands, choices_are_loaded_commands, dynamic_query_function), plus a
+    static-choices param and a grouped command."""
+    return json.loads((FIXTURES / "richtype_commands.json").read_text())
+
+
+@pytest.fixture
 def make_task(fake_instance):
     def _make_task(command="ls", args="", callback_display_id=1, loaded_commands=None,
                    completed=True, **extra):
@@ -100,6 +109,19 @@ async def arachne_agent(fake_instance, arachne_commands_fixture):
 
     async def _fetch_server_commands():
         return arachne_commands_fixture
+
+    agent._fetch_server_commands = _fetch_server_commands
+    await agent.load_commands()
+    return agent
+
+
+@pytest.fixture
+async def richtype_agent(fake_instance, richtype_commands_fixture):
+    """A loaded base MythicAgent, fed the synthetic rich/dynamic-param fixture."""
+    agent = MythicAgent("richagent", fake_instance, DefaultFormatter())
+
+    async def _fetch_server_commands():
+        return richtype_commands_fixture
 
     agent._fetch_server_commands = _fetch_server_commands
     await agent.load_commands()
