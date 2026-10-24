@@ -4,6 +4,6 @@
   "payload_type": "poseidon",
   "entrypoint": "poseidon:Poseidon",
   "version": "1.0.0",
-  "author": "its-a-feature",
+  "author": "spicybyte",
   "description": "Reference plugin for the Poseidon Mythic agent"
 }
