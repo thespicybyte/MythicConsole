@@ -1,7 +1,8 @@
 import argparse
 import base64
 import json
-from typing import Optional, AsyncGenerator, TYPE_CHECKING
+import os
+from typing import Dict, Optional, AsyncGenerator, TYPE_CHECKING
 
 import mythic.mythic
 
@@ -61,6 +62,7 @@ class Task:
         self.background = False
         self.verify_prompt: Optional[TaskPrompt] = None
         self.console_args: Optional[argparse.Namespace] = None
+        self.file_params: Dict[str, str] = {}
 
     def __eq__(self, other):
         if isinstance(other, Task):
@@ -233,6 +235,14 @@ class Task:
             raise ValueError("callback display id not set")
 
         try:
+            for dest, local_path in self.file_params.items():
+                with open(local_path, 'rb') as f:
+                    data = f.read()
+                file_id = await mythic.mythic.register_file(self.mythic, os.path.basename(local_path), data)
+                if not file_id:
+                    raise Exception(f"failed to register file for '{dest}': {local_path}")
+                self.args[dest] = file_id
+
             if self.callback is not None and self.callback.loaded_commands is not None \
                     and self.command_name not in self.callback.loaded_commands:
                 raise TaskError(f"command '{self.command_name}' is not loaded on this callback")

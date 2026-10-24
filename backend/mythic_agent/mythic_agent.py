@@ -1,9 +1,11 @@
+import argparse
+import json
 import os
 import importlib
 import shlex
 import types
 from pathlib import Path
-from typing import List, Dict, Iterable, Optional
+from typing import List, Dict, Iterable, Optional, Tuple
 
 from cmd2 import cmd2, with_argparser, Cmd, Cmd2ArgumentParser
 from glob import glob
@@ -68,16 +70,65 @@ class AgentCommandAlias:
         return {self.name: self.__str__()}
 
 
-_RICH_TYPE_HINTS = {
-    "File": "a file UUID",
-    "PayloadList": "a payload UUID",
-    "CredentialJson": "a JSON credential object",
-    "AgentConnect": "a JSON connection blob",
-    "LinkInfo": "a JSON connection blob",
-    "TypedArray": "a JSON array of [type, value] pairs",
+_JSON_OBJECT_TEMPLATES = {
+    "CredentialJson": '{"realm": "...", "account": "...", "credential": "...", "type": "plaintext|hash|ticket"}',
+    "AgentConnect": '{"host": "...", "agent_uuid": "...", "c2_profile": {"name": "...", "parameters": {...}}}',
+    "LinkInfo": '{"host": "...", "callback_uuid": "...", "c2_profile": {"name": "...", "parameters": {...}}}',
 }
 
 _SKIP_SERIALIZE_KEYS = {"background", "func", "cmd2_statement", "cmd2_subcommand_func"}
+
+
+def _json_object_loader(flag: str, template: str):
+    """argparse `type=` for a rich param whose server-side shape is a JSON object."""
+
+    def _load(value: str):
+        try:
+            parsed = json.loads(value)
+        except (json.JSONDecodeError, TypeError) as e:
+            raise argparse.ArgumentTypeError(f"{flag} expects a JSON object, e.g. {template}") from e
+        if not isinstance(parsed, dict):
+            raise argparse.ArgumentTypeError(f"{flag} expects a JSON object, e.g. {template}")
+        return parsed
+
+    return _load
+
+
+def _typed_array_loader(flag: str, choices: Optional[List[str]]):
+    """argparse `type=` for TypedArray: a JSON list of [type, value] pairs."""
+    sample_type = choices[0] if choices else "type"
+    template = f'[["{sample_type}", "value"]]'
+
+    def _load(value: str):
+        try:
+            parsed = json.loads(value)
+        except (json.JSONDecodeError, TypeError) as e:
+            raise argparse.ArgumentTypeError(
+                f"{flag} expects a JSON array of [type, value] pairs, e.g. {template}") from e
+        if not isinstance(parsed, list):
+            raise argparse.ArgumentTypeError(f"{flag} expects a JSON array of [type, value] pairs")
+        for item in parsed:
+            if not (isinstance(item, list) and len(item) == 2):
+                raise argparse.ArgumentTypeError(f"{flag} expects each element to be a [type, value] pair")
+            if choices and item[0] not in choices:
+                raise argparse.ArgumentTypeError(f"{flag} element type {item[0]!r} must be one of {choices}")
+        return parsed
+
+    return _load
+
+
+def _loaded_command_validator(agent: Optional["MythicAgent"]):
+    """argparse `type=` for choices_are_loaded_commands: fail-open when the loaded set is unknown,
+    matching Task.execute's existing fail-open gate."""
+
+    def _validate(value: str) -> str:
+        callback = getattr(getattr(agent, "tasker", None), "callback", None) if agent else None
+        loaded = getattr(callback, "loaded_commands", None) if callback else None
+        if loaded is not None and value not in loaded:
+            raise argparse.ArgumentTypeError(f"'{value}' is not a command loaded on this callback")
+        return value
+
+    return _validate
 
 
 def _serialize(ns) -> dict:
@@ -99,13 +150,43 @@ def _group_params(params: List[dict]) -> Dict[str, List[dict]]:
     return groups
 
 
-def _add_param_argument(parser: Cmd2ArgumentParser, param: dict) -> None:
+def _add_param_argument(parser: Cmd2ArgumentParser, param: dict, agent: Optional["MythicAgent"] = None,
+                        all_command_names: Optional[List[str]] = None) -> None:
     flag = f"--{param.get('cli_name') or param['name']}"
     param_type = param.get("type")
     required = bool(param.get("required"))
     default = param.get("default_value") or None
     help_text = param.get("description") or ""
     choices = param.get("choices") or None
+    multiple = param_type == "ChooseMultiple"
+
+    # Dynamic-choice kinds take priority over the static ChooseOne/ChooseMultiple handling below,
+    # since a param can be type ChooseOne/ChooseMultiple *and* carry one of these flags.
+    if param.get("choices_are_all_commands"):
+        kwargs = {"choices": all_command_names} if all_command_names else {}
+        help_suffix = f"{help_text} (a command name)".strip()
+        if multiple:
+            parser.add_argument(flag, nargs="+", required=required, help=help_suffix, **kwargs)
+        else:
+            parser.add_argument(flag, default=default, required=required, help=help_suffix, **kwargs)
+        return
+
+    if param.get("choices_are_loaded_commands"):
+        validator = _loaded_command_validator(agent)
+        help_suffix = f"{help_text} (a command loaded on this callback)".strip()
+        if multiple:
+            parser.add_argument(flag, nargs="+", type=validator, required=required, help=help_suffix)
+        else:
+            parser.add_argument(flag, type=validator, default=default, required=required, help=help_suffix)
+        return
+
+    if param.get("dynamic_query_function"):
+        help_suffix = f"{help_text} (options are provided by the agent at runtime)".strip()
+        if multiple:
+            parser.add_argument(flag, nargs="+", required=required, help=help_suffix)
+        else:
+            parser.add_argument(flag, default=default, required=required, help=help_suffix)
+        return
 
     if param_type == "Boolean":
         # default=None (not the usual False) so an unset flag is omitted from the scripting dict
@@ -119,10 +200,22 @@ def _add_param_argument(parser: Cmd2ArgumentParser, param: dict) -> None:
         parser.add_argument(flag, choices=choices, default=default, required=required, help=help_text)
     elif param_type == "ChooseMultiple":
         parser.add_argument(flag, nargs="+", choices=choices, required=required, help=help_text)
-    elif param_type in _RICH_TYPE_HINTS:
-        hint = _RICH_TYPE_HINTS[param_type]
-        parser.add_argument(flag, default=default, required=required, metavar=param_type.upper(),
-                            help=f"{help_text} (paste {hint})".strip())
+    elif param_type in _JSON_OBJECT_TEMPLATES:
+        template = _JSON_OBJECT_TEMPLATES[param_type]
+        parser.add_argument(flag, type=_json_object_loader(flag, template), default=default,
+                            required=required, metavar="JSON",
+                            help=f"{help_text} JSON object, e.g. {template}".strip())
+    elif param_type == "TypedArray":
+        choices_note = f" (types: {choices})" if choices else ""
+        parser.add_argument(flag, type=_typed_array_loader(flag, choices), default=default or [],
+                            required=required, metavar="JSON",
+                            help=f"{help_text} JSON array of [type, value] pairs{choices_note}".strip())
+    elif param_type == "File":
+        parser.add_argument(flag, default=default, required=required, metavar="PATH|UUID",
+                            help=f"{help_text} (local file to upload, or an existing file UUID)".strip())
+    elif param_type == "PayloadList":
+        parser.add_argument(flag, default=default, required=required, metavar="PAYLOAD_UUID",
+                            help=f"{help_text} (payload UUID - see `payload list`)".strip())
     else:
         parser.add_argument(flag, default=default, required=required, help=help_text)
 
@@ -132,12 +225,13 @@ def _dispatch_group(command: "AgentCommand", ns) -> Task:
     return command._build_task(ns)
 
 
-def _build_parsers(name: str, groups: Dict[str, List[dict]]):
+def _build_parsers(name: str, groups: Dict[str, List[dict]], agent: Optional["MythicAgent"] = None,
+                   all_command_names: Optional[List[str]] = None):
     if len(groups) <= 1:
         parser = Cmd2ArgumentParser()
         for group_params in groups.values():
             for param in group_params:
-                _add_param_argument(parser, param)
+                _add_param_argument(parser, param, agent, all_command_names)
         add_default_options(parser)
         return parser, {}
 
@@ -147,7 +241,7 @@ def _build_parsers(name: str, groups: Dict[str, List[dict]]):
     for group_name, group_params in groups.items():
         sub = subparsers.add_parser(group_name, help=f"{name} ({group_name})")
         for param in group_params:
-            _add_param_argument(sub, param)
+            _add_param_argument(sub, param, agent, all_command_names)
         add_default_options(sub)
         sub.set_defaults(func=_dispatch_group)
         subcommand_parsers[group_name] = sub
@@ -171,6 +265,8 @@ class AgentCommand(cmd2.Cmd):
         self._subcommand_parsers: Dict[str, Cmd2ArgumentParser] = subcommand_parsers or {}
         self._aliases: List[AgentCommandAlias] = aliases or []
         self._params: List[dict] = []
+        self._file_param_keys: set = set()
+        self._flag_param_map: Dict[Optional[str], Dict[str, dict]] = {}
         self.verify_prompt: Optional[TaskPrompt] = None
         self.force_background = False
 
@@ -240,24 +336,67 @@ class AgentCommand(cmd2.Cmd):
         return options
 
     @classmethod
-    def from_server(cls, agent: MythicAgent, spec: dict) -> "AgentCommand":
+    def from_server(cls, agent: MythicAgent, spec: dict,
+                    all_command_names: Optional[List[str]] = None) -> "AgentCommand":
         """Build a generated command from one server `command` row (cmd/description/commandparameters)."""
         params = spec.get("commandparameters") or []
         groups = _group_params(params)
-        parser, subparsers = _build_parsers(spec["cmd"], groups)
+        parser, subparsers = _build_parsers(spec["cmd"], groups, agent, all_command_names)
 
         command = cls(agent, name=spec["cmd"], description=spec.get("description") or "",
                       command_parser=parser, subcommand_parsers=subparsers, aliases=[])
         command._params = params
+        command._file_param_keys = {
+            (p.get("cli_name") or p["name"]).replace("-", "_")
+            for p in params if p.get("type") == "File"
+        }
+        # Keyed per parameter group so a flag that repeats across groups (grouped commands)
+        # resolves against the right group's param when completing its value.
+        command._flag_param_map = {
+            (None if len(groups) <= 1 else group_name): {
+                f"--{p.get('cli_name') or p['name']}": p for p in group_params
+            }
+            for group_name, group_params in groups.items()
+        }
         return command
 
+    def get_value_candidates(self, flag: str, subcommand: str = None) -> Optional[List[str]]:
+        """Candidate values for a value-bearing flag, or None if it's free-form."""
+        group_map = self._flag_param_map.get(subcommand) or self._flag_param_map.get(None)
+        if not group_map:
+            return None
+
+        param = group_map.get(flag)
+        if not param:
+            return None
+
+        if param.get("choices_are_all_commands"):
+            return self._agent._get_command_names() if self._agent else []
+        if param.get("choices_are_loaded_commands"):
+            callback = getattr(self._agent.tasker, "callback", None) if self._agent else None
+            loaded = getattr(callback, "loaded_commands", None) if callback else None
+            return sorted(loaded) if loaded else []
+        if param.get("dynamic_query_function"):
+            return self._agent.get_dynamic_choices(self._name, param.get("name")) if self._agent else []
+        if param.get("type") == "PayloadList":
+            return list(getattr(self._agent, "_payload_uuid_cache", None) or [])
+
+        choices = param.get("choices")
+        return list(choices) if choices else None
+
     def _build_task(self, ns) -> Task:
-        task = Task(self._agent.instance, command=self._name, args=_serialize(ns),
+        args = _serialize(ns)
+        task = Task(self._agent.instance, command=self._name, args=args,
                     callback=self._agent.tasker.callback)
         task.console_args = ns
         task.background = self.force_background or getattr(ns, "background", False)
         if self.verify_prompt:
             task.verify_prompt = self.verify_prompt
+
+        for key in self._file_param_keys:
+            value = args.get(key)
+            if isinstance(value, str) and os.path.isfile(value):
+                task.file_params[key] = value
 
         return task
 
@@ -340,6 +479,8 @@ class MythicAgent:
         self._commands: AgentCommands = AgentCommands()
         self._scripts: List[ScriptCommand] = []
         self._current_foreground_task: Optional[Worker] = None
+        self._payload_uuid_cache: List[str] = []
+        self._dynamic_query_cache: Dict[Tuple[str, str], List[str]] = {}
 
         if tasker:
             self.tasker = tasker
@@ -374,6 +515,14 @@ class MythicAgent:
 
     def _get_commands(self) -> List[AgentCommand]:
         return list(self._commands)
+
+    def _get_command_names(self) -> List[str]:
+        return [command.name for command in self._get_commands()]
+
+    def get_dynamic_choices(self, command_name: str, param_name: str) -> List[str]:
+        """Cached options for a `dynamic_query_function` param. Empty when not (yet) resolved -
+        value completion then degrades cleanly to free-form, matching an offline/unresolved state."""
+        return list(self._dynamic_query_cache.get((command_name, param_name), []))
 
     def _get_aliases_names(self) -> List[str]:
         return [alias.name for alias in self.aliases]
@@ -489,6 +638,19 @@ class MythicAgent:
                 if self.get_subcommands(command):
                     subcommand = tokens[1]
 
+            # A value-expecting flag immediately before the cursor ("--flag " or a partial word
+            # right after one) completes to that flag's candidates instead of the usual
+            # flag/subcommand options. Free-form flags (get_value_candidates returns None) and
+            # unknown commands fall through to the existing logic below.
+            trailing_space = bool(tokens) and line[-1:].isspace()
+            preceding_flag = tokens[-1] if trailing_space else (tokens[-2] if len(tokens) >= 2 else None)
+            if preceding_flag and preceding_flag.startswith("-"):
+                agent_command = self.get_command(command)
+                if agent_command:
+                    candidates = agent_command.get_value_candidates(preceding_flag, subcommand)
+                    if candidates is not None:
+                        return candidates
+
             options = self.get_subcommand_options(command, subcommand)
             for option in options:
                 if option in tokens:
@@ -538,12 +700,14 @@ class MythicAgent:
 
     async def get_agent_commands(self) -> AgentCommands:
         specs = await self._fetch_server_commands()
-        return AgentCommands(AgentCommand.from_server(self, spec) for spec in specs)
+        all_command_names = [spec["cmd"] for spec in specs]
+        return AgentCommands(AgentCommand.from_server(self, spec, all_command_names) for spec in specs)
 
     async def load_commands(self):
         self.commands = await self.get_agent_commands()
         self.get_script_classes()
         await self._cache_loaded_commands()
+        await self._cache_payload_uuids()
 
     async def _cache_loaded_commands(self):
         callback = self.tasker.callback
@@ -556,6 +720,17 @@ class MythicAgent:
             return
         if loaded:
             callback.loaded_commands = set(loaded)
+
+    async def _cache_payload_uuids(self):
+        """Warm the PayloadList value-completion cache. The completer is synchronous, so a
+        network-backed candidate source has to be resolved and cached up front, here."""
+        operation_id = getattr(self.mythic, "current_operation_id", None)
+        if not operation_id:
+            return
+        try:
+            self._payload_uuid_cache = await PayloadQueries.get_all_payload_uuids(self.mythic, operation_id)
+        except Exception as e:
+            logger.warning(f"could not cache payload uuids: {e}")
 
     def get_script_classes(self) -> List[ScriptCommand]:
         script_files = self.get_script_files()
