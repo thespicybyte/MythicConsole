@@ -130,8 +130,8 @@ class MythicConsole(App, inherit_bindings=False):
         self.authenticated = False
         self.instance = None
 
-        logger.debug(app.workers)
-        for worker in app.workers:
+        logger.debug(self.workers)
+        for worker in self.workers:
             worker.cancel()
 
         while len(self.screen_stack) > 1:
