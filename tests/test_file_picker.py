@@ -1,3 +1,5 @@
+import asyncio
+import os
 import types
 from pathlib import Path
 
@@ -9,9 +11,15 @@ from textual.widgets import DirectoryTree, TabPane
 from backend.task.task import Task
 from screens.home import Home
 from screens.prompts import FilePrompt
+from utils import state
 from widgets.console import ConsolePanel
 
 CSS_PATH = Path(__file__).resolve().parent.parent / "mythic.tcss"
+
+
+@pytest.fixture(autouse=True)
+def isolated_config_home(tmp_path, monkeypatch):
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path / "config"))
 
 
 class _PromptHarness(App):
@@ -92,6 +100,129 @@ async def test_file_prompt_escape_dismisses_with_none(tmp_path):
         await pilot.pause()
 
         assert result.get("value") is None
+
+
+# --- FilePrompt start directory: cwd default, remembered dir, persistence on pick ---
+
+async def test_file_prompt_defaults_to_cwd_when_no_state(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+
+    app = _PromptHarness()
+    async with app.run_test() as pilot:
+        prompt = FilePrompt("file")
+        app.push_screen(prompt)
+        await pilot.pause()
+
+        assert prompt.start_path == os.getcwd()
+
+
+async def test_file_prompt_uses_the_remembered_directory(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    remembered = tmp_path / "remembered"
+    remembered.mkdir()
+    state.set_last_file_dir(str(remembered))
+
+    app = _PromptHarness()
+    async with app.run_test() as pilot:
+        prompt = FilePrompt("file")
+        app.push_screen(prompt)
+        await pilot.pause()
+
+        assert prompt.start_path == str(remembered)
+
+
+async def test_file_prompt_falls_back_to_cwd_on_corrupt_state(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    from utils.environment import Environment
+
+    config_dir = Environment().config_directory()
+    with open(os.path.join(config_dir, "state.json"), "w") as f:
+        f.write("not json{{{")
+
+    app = _PromptHarness()
+    async with app.run_test() as pilot:
+        prompt = FilePrompt("file")
+        app.push_screen(prompt)
+        await pilot.pause()
+
+        assert prompt.start_path == os.getcwd()
+
+
+async def test_file_prompt_select_persists_the_chosen_files_directory(tmp_path):
+    picked_dir = tmp_path / "subdir"
+    picked_dir.mkdir()
+    chosen = picked_dir / "pick_me.txt"
+    chosen.write_text("hi")
+
+    app = _PromptHarness()
+    async with app.run_test() as pilot:
+        prompt = FilePrompt("file", start_path=str(tmp_path))
+        app.push_screen(prompt)
+        await pilot.pause()
+
+        tree = prompt.query_one(DirectoryTree)
+        tree.post_message(DirectoryTree.FileSelected(tree.root, chosen))
+        await pilot.pause()
+
+        await pilot.click("#select")
+        await pilot.pause()
+
+        assert state.get_last_file_dir() == str(picked_dir)
+
+
+async def test_file_prompt_cancel_does_not_persist_a_directory(tmp_path):
+    app = _PromptHarness()
+    async with app.run_test() as pilot:
+        prompt = FilePrompt("file", start_path=str(tmp_path))
+        app.push_screen(prompt)
+        await pilot.pause()
+
+        await pilot.click("#cancel")
+        await pilot.pause()
+
+        assert state.get_last_file_dir() is None
+
+
+# --- FilePrompt "Up" affordance: re-root toward the filesystem root ---
+
+async def test_file_prompt_up_button_rerootes_to_the_parent_directory(tmp_path):
+    nested = tmp_path / "a" / "b"
+    nested.mkdir(parents=True)
+
+    app = _PromptHarness()
+    async with app.run_test() as pilot:
+        prompt = FilePrompt("file", start_path=str(nested))
+        app.push_screen(prompt)
+        await pilot.pause()
+
+        tree = prompt.query_one(DirectoryTree)
+        assert tree.path == nested
+
+        await pilot.click("#up")
+        await asyncio.sleep(0.2)
+        await pilot.pause()
+
+        assert tree.path == nested.parent
+
+        await pilot.click("#up")
+        await asyncio.sleep(0.2)
+        await pilot.pause()
+
+        assert tree.path == nested.parent.parent
+
+
+async def test_file_prompt_up_at_filesystem_root_is_a_noop():
+    app = _PromptHarness()
+    async with app.run_test() as pilot:
+        prompt = FilePrompt("file", start_path="/")
+        app.push_screen(prompt)
+        await pilot.pause()
+
+        tree = prompt.query_one(DirectoryTree)
+        await pilot.click("#up")
+        await pilot.pause()
+
+        assert str(tree.path) == "/"
 
 
 # --- screens/home.py wiring: pre-execute file-picker loop ---
