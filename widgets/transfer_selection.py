@@ -96,9 +96,6 @@ class CheckSelectionList(SelectionList):
         super().action_page_down()
 
     def _on_click(self, event: events.Click) -> None:
-        # Only clear the keyboard cursor here. Textual dispatches every
-        # `_on_click` in the MRO, so the base class's selection handler runs on
-        # its own; calling it again via super() would toggle the row twice.
         self._use_mouse_cursor()
 
     def _get_left_gutter_width(self) -> int:

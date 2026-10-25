@@ -17,9 +17,6 @@ _ID_W = 4
 _HOST_W = 16
 _PAYLOAD_W = 10
 _CHECKIN_W = 9
-# Leading width before the ID column in a rendered row: the checkbox (2) plus
-# the status glyph and its trailing space (2). The list's border and option
-# padding are matched separately by the header's left padding in mythic.tcss.
 _ROW_GUTTER = " " * 4
 
 _HEADER_TEXT = _ROW_GUTTER + (
@@ -149,8 +146,6 @@ class ManageCallbacks(ModalScreen):
         for which in ("shown", "hidden"):
             _, selected, widget, _ = self._pane(which)
             visible = self._visible(which)
-            # Selection lives on the screen, not the widget: clear_options wipes
-            # the widget's own selection, so re-apply it after rebuilding.
             with widget.prevent(SelectionList.SelectedChanged):
                 widget.clear_options()
                 for uuid in visible:
