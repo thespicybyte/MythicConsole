@@ -31,6 +31,8 @@ class CallbackFragments:
               extra_info
               sleep_info
               timestamp
+              dead
+              current_time
               payload {
                 id
                 uuid

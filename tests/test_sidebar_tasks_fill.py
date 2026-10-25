@@ -1,8 +1,8 @@
 from pathlib import Path
 
 from textual.app import App, ComposeResult
-from textual.containers import VerticalScroll
-from textual.widgets import Static
+from textual.containers import HorizontalScroll, VerticalScroll
+from textual.widgets import DataTable, Static
 
 from widgets.callbacks import Callbacks
 from widgets.tasks_table import TasksTable
@@ -66,3 +66,11 @@ async def test_callbacks_module_height_unchanged(fake_instance):
         async with app.run_test(size=size) as pilot:
             await pilot.pause()
             assert app.callbacks_module.region.height == 12
+
+
+async def test_callbacks_module_wraps_table_in_horizontal_scroll(fake_instance):
+    app = _Harness(fake_instance)
+    async with app.run_test(size=(100, 50)) as pilot:
+        await pilot.pause()
+        scroll = app.callbacks_module.query_one(HorizontalScroll)
+        assert scroll.query_one(DataTable) is app.callbacks_module.datatable

@@ -1,16 +1,34 @@
 import json
+from datetime import datetime, timezone
 from typing import Optional
 
 from textual import events, on, work
 from textual.app import ComposeResult
+from textual.binding import Binding
+from textual.containers import HorizontalScroll
 from textual.message import Message
 from textual.reactive import reactive
 from textual.widgets import DataTable
+from textual.widgets._data_table import RowDoesNotExist
 from textual.events import Click, MouseUp, Timer, Key
 
 from backend import Callback, MythicInstance
+from utils.callback_status import alive_state, checkin_text, display_ip, status_glyph
 from utils.logger import logger
 from widgets.sidebar_module import SidebarModule
+
+
+def build_callback_row(cb: Callback, now: datetime) -> tuple:
+    state = alive_state(cb.dead, cb.last_checkin, cb.sleep_info, now)
+    return (
+        status_glyph(state),
+        cb.display_id,
+        cb.hostname,
+        cb.payload_type_name,
+        cb.uuid,
+        display_ip(cb.ip, cb.external_ip),
+        checkin_text(cb.last_checkin, now),
+    )
 
 
 class CallbackTable(DataTable):
@@ -20,18 +38,60 @@ class CallbackTable(DataTable):
             self.row_key = row_key
             self.callback_uuid = callback_uuid
 
-    headers = ("ID", "Hostname", "Payload", "UUID")
+    class ManageCallbacksRequested(Message):
+        pass
+
+    headers = ("", "ID", "Hostname", "Payload", "UUID", "IP", "Checkin")
     current_tab_id: reactive[str | None] = reactive(None)
+
+    BINDINGS = [
+        Binding(key="m", action="manage_callbacks", description="manage callbacks"),
+    ]
 
     def __init__(self, instance: MythicInstance):
         super().__init__(cursor_type="row", id="callback_table", zebra_stripes=True, show_cursor=False)
         self.instance = instance
         self.double_click_timer: Timer | None = None
         self.current_row_id: Optional[int] = None
+        self.add_column("", key="status", width=3)
         self.add_column("ID", key="id")
         self.add_column("Hostname", key="hostname")
         self.add_column("Payload", key="payload")
         self.add_column("UUID", key="uuid", width=8)
+        self.add_column("IP", key="ip")
+        self.add_column("Checkin", key="checkin")
+
+    def is_displayed(self, callback_uuid: str) -> bool:
+        try:
+            self.get_row_index(row_key=callback_uuid)
+            return True
+        except RowDoesNotExist:
+            return False
+
+    def reconcile_callback(self, cb: Callback, current_tab_id) -> None:
+        shown = self.is_displayed(cb.uuid)
+        if cb.active and not shown:
+            self.add_row(*build_callback_row(cb, datetime.now(timezone.utc)), key=cb.uuid)
+        elif (not cb.active) and shown:
+            try:
+                self.remove_row(cb.uuid)
+            except RowDoesNotExist:
+                pass
+        elif shown:
+            self.update_cell(cb.uuid, "ip", display_ip(cb.ip, cb.external_ip), update_width=False)
+
+    def refresh_live_cells(self, active_callbacks: dict[str, Callback]) -> None:
+        """1s-tick refresh: rewrite only the checkin+status cells for displayed rows."""
+        now = datetime.now(timezone.utc)
+        for uuid, cb in active_callbacks.items():
+            if not self.is_displayed(uuid):
+                continue
+            state = alive_state(cb.dead, cb.last_checkin, cb.sleep_info, now)
+            self.update_cell(uuid, "checkin", checkin_text(cb.last_checkin, now), update_width=False)
+            self.update_cell(uuid, "status", status_glyph(state), update_width=False)
+
+    def action_manage_callbacks(self) -> None:
+        self.post_message(self.ManageCallbacksRequested())
 
     def _copy_callback_info(self, callback: Callback) -> None:
         info = callback.__dict__
@@ -60,8 +120,12 @@ class CallbackTable(DataTable):
         """
         row_index = self.cursor_row
         cursor_coordinate = self.cursor_coordinate
-        row_key, _ = self.coordinate_to_cell_key(cursor_coordinate)
-        row = self.get_row_at(row_index)
+        try:
+            row_key, _ = self.coordinate_to_cell_key(cursor_coordinate)
+            row = self.get_row_at(row_index)
+        except Exception:
+            # the row under the cursor may have just been removed by a remote active=false flip
+            return
         callback_uuid = row[self.get_column_index("uuid")]
         self.post_message(self.RowUpdated(row_key=row_key, callback_uuid=callback_uuid))
 
@@ -75,7 +139,11 @@ class CallbackTable(DataTable):
 
         logger.debug(f"new current tab id: {self.current_tab_id}")
         self.show_cursor = True
-        index = self.get_row_index(row_key=self.current_tab_id)
+        try:
+            index = self.get_row_index(row_key=self.current_tab_id)
+        except RowDoesNotExist:
+            # the current tab's callback may have just been hidden by another operator
+            return
         self.move_cursor(row=index)
 
     @on(MouseUp)
@@ -96,7 +164,10 @@ class CallbackTable(DataTable):
         if not self.current_tab_id:
             return
 
-        index = self.get_row_index(row_key=self.current_tab_id)
+        try:
+            index = self.get_row_index(row_key=self.current_tab_id)
+        except RowDoesNotExist:
+            return
         self.move_cursor(row=index)
 
     @on(Key)
@@ -112,12 +183,15 @@ class CallbackTable(DataTable):
             self._post_new_row_selected()
 
     @work()
-    async def get_selected_callback(self) -> Callback:
+    async def get_selected_callback(self) -> Optional[Callback]:
         """
         Based on the location of the cursor, return a callback object based on the index in the table
         """
         row_index = self.cursor_row
-        row = self.get_row_at(row_index)
+        try:
+            row = self.get_row_at(row_index)
+        except Exception:
+            return None
         selected_cb_uuid = row[self.get_column_index("uuid")]
         callback = Callback(self.instance, callback_uuid=selected_cb_uuid)
         worker = self.run_worker(callback.query())
@@ -132,6 +206,8 @@ class CallbackTable(DataTable):
         worker = self.get_selected_callback()
         await worker.wait()
         callback = worker.result
+        if callback is None:
+            return
         self._copy_callback_info(callback)
 
     @work()
@@ -161,4 +237,5 @@ class Callbacks(SidebarModule):
         self.datatable = CallbackTable(instance=instance)
 
     def compose(self) -> ComposeResult:
-        yield self.datatable
+        with HorizontalScroll():
+            yield self.datatable
