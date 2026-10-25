@@ -208,7 +208,10 @@ class Home(Screen):
             table.reconcile_callback(cb, self.current_tab_id)
             self._refresh_callbacks_title()
 
-    async def action_manage_callbacks(self) -> None:
+    def action_manage_callbacks(self) -> None:
+        self.run_worker(self._manage_callbacks())
+
+    async def _manage_callbacks(self) -> None:
         changes = await self.app.push_screen_wait(ManageCallbacks(self.instance))
         if not changes:
             return
@@ -220,7 +223,7 @@ class Home(Screen):
 
     @on(CallbackTable.ManageCallbacksRequested)
     def _manage_callbacks_requested(self, _message: CallbackTable.ManageCallbacksRequested) -> None:
-        self.run_worker(self.action_manage_callbacks())
+        self.run_worker(self._manage_callbacks())
 
     @on(TabClosed)
     def tab_closed(self, message: TabClosed):

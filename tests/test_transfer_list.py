@@ -1,4 +1,4 @@
-from utils.transfer_list import compute_active_changes, move_all, move_selected
+from utils.transfer_list import compute_active_changes, move_selected
 
 
 def test_move_selected_moves_only_selected_and_preserves_order():
@@ -17,18 +17,6 @@ def test_move_selected_preserves_source_order_for_multiple_moves():
     src, dst = move_selected(["a", "b", "c", "d"], [], {"a", "c"})
     assert src == ["b", "d"]
     assert dst == ["a", "c"]
-
-
-def test_move_all_moves_everything_and_empties_source():
-    src, dst = move_all(["a", "b"], ["x"])
-    assert src == []
-    assert dst == ["x", "a", "b"]
-
-
-def test_move_all_from_empty_source():
-    src, dst = move_all([], ["x"])
-    assert src == []
-    assert dst == ["x"]
 
 
 def test_compute_active_changes_only_includes_side_changers():

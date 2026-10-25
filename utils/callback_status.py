@@ -64,13 +64,9 @@ def checkin_text(last_checkin: Optional[str], now: datetime) -> str:
 
 
 def display_ip(ip: Optional[list], external_ip: Optional[str] = None) -> str:
-    """ip[0] is the operator-selected IP (encoded by list order); remaining entries collapse to +N."""
+    """ip[0] is the operator-selected IP (encoded by list order)."""
     if not ip:
         return external_ip or ""
-
-    extra = len(ip) - 1
-    if extra > 0:
-        return f"{ip[0]} +{extra}"
     return ip[0]
 
 

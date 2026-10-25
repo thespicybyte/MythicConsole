@@ -74,8 +74,8 @@ def test_display_ip_single_entry():
     assert display_ip(["10.0.0.1"]) == "10.0.0.1"
 
 
-def test_display_ip_first_entry_is_authoritative_with_plus_n():
-    assert display_ip(["10.0.0.1", "192.168.1.1", "172.16.0.1"]) == "10.0.0.1 +2"
+def test_display_ip_shows_only_first_entry_no_suffix():
+    assert display_ip(["10.0.0.1", "192.168.1.1", "172.16.0.1"]) == "10.0.0.1"
 
 
 def test_display_ip_falls_back_to_external_ip_when_no_ip_list():

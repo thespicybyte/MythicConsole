@@ -101,6 +101,32 @@ TasksTable {
     max-height: 100%;
 }
 
+CallbackTable {
+    background: $panel;
+}
+
+CallbackTable > .datatable--header {
+    background: $panel;
+    color: $text-muted;
+    text-style: bold;
+}
+
+CallbackTable > .datatable--odd-row {
+    background: $panel;
+}
+
+CallbackTable > .datatable--even-row {
+    background: $panel-lighten-1;
+}
+
+CallbackTable > .datatable--cursor {
+    background: $primary 25%;
+}
+
+CallbackTable > .datatable--hover {
+    background: $panel-lighten-2;
+}
+
 SessionInfo {
     border: $accent;
     margin: 1;
@@ -210,17 +236,110 @@ ManageCallbacks #shown_list,
 ManageCallbacks #hidden_list {
     height: 1fr;
     border: solid $primary-background-lighten-1 100%;
+    /* Match the option rows so the list has no inner ring/second border. */
+    background: $panel;
+}
+
+ManageCallbacks #shown_filter,
+ManageCallbacks #hidden_filter {
+    margin: 0 0 1 0;
+    background: $panel;
+    border: solid $primary-background-lighten-1 100%;
+}
+
+ManageCallbacks #shown_filter:focus,
+ManageCallbacks #hidden_filter:focus {
+    background: $panel;
+    border: solid $primary 100%;
+}
+
+ManageCallbacks #shown_header,
+ManageCallbacks #hidden_header {
+    color: $text-muted;
+    text-style: bold;
+    margin: 0;
+    /* Match the list's left border (1) + option padding (1) so the header
+       columns line up with the rows below. */
+    padding: 0 0 0 2;
+}
+
+ManageCallbacks Checkbox {
+    border: none;
+    background: $panel;
+}
+
+ManageCallbacks Checkbox:focus {
+    background: $panel;
+    background-tint: $panel 0%;
+    border: none;
+}
+
+ManageCallbacks Checkbox:focus > .toggle--label {
+    color: $text;
+    background: $panel;
+    text-style: none;
+}
+
+ManageCallbacks Checkbox > .toggle--button {
+    color: $text-muted;
+    background: $panel;
+}
+
+ManageCallbacks Checkbox.-on > .toggle--button {
+    color: $text-success;
+    background: $panel;
+    text-style: bold;
+}
+
+ManageCallbacks SelectionList > .selection-list--button,
+ManageCallbacks SelectionList > .selection-list--button-highlighted {
+    color: $text-muted;
+    background: $panel;
+}
+
+ManageCallbacks SelectionList > .selection-list--button-selected,
+ManageCallbacks SelectionList > .selection-list--button-selected-highlighted {
+    color: $text-success;
+    background: $panel;
+    text-style: bold;
+}
+
+/* Selection is shown by the checkbox only: no cursor/hover highlight band. */
+ManageCallbacks SelectionList > .option-list--option,
+ManageCallbacks SelectionList > .option-list--option-highlighted,
+ManageCallbacks SelectionList > .option-list--option-hover {
+    background: $panel;
+    color: $text;
+    text-style: none;
 }
 
 ManageCallbacks #move_buttons {
     width: auto;
     height: 100%;
     align: center middle;
+    margin: 0 2;
 }
 
 ManageCallbacks #move_buttons > Button {
-    width: 6;
+    width: 5;
+    min-width: 5;
     margin: 1 0;
+    color: $text;
+    background: $panel;
+    border: tall $primary-background-lighten-1;
+}
+
+ManageCallbacks #move_buttons > Button:hover {
+    background: $primary-background-lighten-1;
+    border: tall $primary-background-lighten-1;
+}
+
+ManageCallbacks #move_buttons > Button:focus {
+    background: $panel;
+    /* Keep the normal border on focus (no blue accent), and don't
+       reverse/highlight the arrow glyph when the button holds focus. */
+    border: tall $primary-background-lighten-1;
+    text-style: none;
 }
 
 ManageCallbacks #actions {

@@ -150,7 +150,8 @@ class MythicInstance:
         modal and the showing X/Y count
         :return: list of callback detail dicts
         """
-        attrs = "agent_callback_id display_id host active payload { payloadtype { name } }"
+        attrs = ("agent_callback_id display_id host active dead last_checkin sleep_info "
+                 "payload { payloadtype { name } }")
         return await mythic.get_all_callbacks(self.mythic, custom_return_attributes=attrs)
 
     async def monitor_tasks_updates(self) -> AsyncGenerator[int, None]:
