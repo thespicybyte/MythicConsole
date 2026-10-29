@@ -373,11 +373,11 @@ CallbackTabs {
 }
 
 * {
-    scrollbar-background: $surface;
-    scrollbar-background-hover: $surface;
-    scrollbar-background-active: $surface;
-    scrollbar-color: $primary 50%;
-    scrollbar-color-hover: $primary;
-    scrollbar-color-active: $accent;
-    scrollbar-corner-color: $surface;
+    scrollbar-background: $panel-darken-2;
+    scrollbar-background-hover: $panel-darken-2;
+    scrollbar-background-active: $panel-darken-2;
+    scrollbar-color: $primary;
+    scrollbar-color-hover: $primary-lighten-1;
+    scrollbar-color-active: $primary-lighten-2;
+    scrollbar-corner-color: $panel-darken-2;
 }
