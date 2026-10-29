@@ -14,8 +14,9 @@ from mythic import mythic
 from rich.console import RenderableType
 from textual.worker import Worker
 
-from backend import MythicInstance, Task, User, Operation, Payload
+from backend import MythicInstance, Task, User, Operation, Payload, Callback
 from utils.logger import logger
+from utils.environment import Environment
 from screens.prompts import TaskPrompt
 from . import mythic_command_parsers
 from ..callback.queries import CallbackQueries
@@ -837,6 +838,8 @@ class MythicCommands(Cmd):
             "user create": mythic_command_parsers.user_create_parser,
             "payload list": mythic_command_parsers.payload_list_parser,
             "payload download": mythic_command_parsers.payload_download_parser,
+            "callback export": mythic_command_parsers.callback_export_parser,
+            "callback import": mythic_command_parsers.callback_import_parser,
         }
 
     @property
@@ -1052,3 +1055,48 @@ class MythicCommands(Cmd):
             return f"[-] Error: {e}"
 
     mythic_command_parsers.payload_download_parser.set_defaults(func=_payload_download)
+
+    @with_argparser(mythic_command_parsers.callback_parser)
+    def do_callback(self, args):
+        func = getattr(args, 'func', None)
+        if func:
+            return func(self, args)
+
+    async def _callback_export(self, args):
+        try:
+            path = " ".join(args.path) if args.path else None
+            if not path:
+                path = os.path.join(Environment().download_directory(),
+                                    f"callback_{args.id}_export.json")
+            path = Path(path)
+            if not os.path.isdir(path.parent):
+                os.makedirs(path.parent, exist_ok=True)
+
+            callback = Callback(self.instance, callback_id=args.id)
+            await callback.export(str(path))
+            return f"[+] Callback {args.id} config exported to {path}"
+        except Exception as e:
+            logger.error(e)
+            return f"[-] Error: {e}"
+
+    mythic_command_parsers.callback_export_parser.set_defaults(func=_callback_export)
+
+    async def _callback_import(self, args):
+        try:
+            path = " ".join(args.path)
+            if not os.path.isfile(path):
+                return f"[-] Error: file not found: {path}"
+
+            with open(path, "r") as f:
+                config_json = json.loads(f.read())
+
+            await CallbackQueries.import_callback(self.instance.mythic, config_json)
+            return f"[+] Callback config imported from {path}"
+        except json.JSONDecodeError as e:
+            logger.error(e)
+            return f"[-] Error: invalid config JSON in {path}: {e}"
+        except Exception as e:
+            logger.error(e)
+            return f"[-] Error: {e}"
+
+    mythic_command_parsers.callback_import_parser.set_defaults(func=_callback_import)

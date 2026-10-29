@@ -28,3 +28,17 @@ payload_list_parser = payload_subparsers.add_parser('list', help='list payloads'
 payload_download_parser = payload_subparsers.add_parser('download', help='download a payload')
 payload_download_parser.add_argument("id", type=int, help="payload id to download")
 payload_download_parser.add_argument("path", nargs="+", help="local path to save payload to")
+
+##### Callback Parsers #####
+
+callback_parser = Cmd2ArgumentParser()
+callback_subparsers = callback_parser.add_subparsers(title='subcommands', help='subcommand help')
+
+callback_export_parser = callback_subparsers.add_parser('export', help='export a callback config to a file')
+callback_export_parser.add_argument("id", type=int, help="callback id to export")
+callback_export_parser.add_argument("path", nargs="*",
+                                    help="local path to save config to "
+                                         "(default: DOWNLOAD_DIRECTORY/callback_<id>_export.json)")
+
+callback_import_parser = callback_subparsers.add_parser('import', help='import a callback config from a file')
+callback_import_parser.add_argument("path", nargs="+", help="local path to the config file to import")
