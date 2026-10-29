@@ -65,6 +65,15 @@ Other variables may be passed to further configure your environment.
 python console.py
 ```
 
+## Keyboard Shortcuts
+
+Use `Ctrl+<` to shrink the sidebar. Use `Ctrl+>` to grow the sidebar. These work on Ghostty and
+other terminals that support the Kitty keyboard protocol (for example kitty, WezTerm, and iTerm2
+with the protocol enabled).
+
+On a terminal that sends `Alt` correctly, you can also use `Alt+Left` to shrink the sidebar and
+`Alt+Right` to grow it. On older terminals that support neither, the sidebar keys do nothing.
+
 # Extend Mythic Console
 
 Supporting a new agent needs zero code. Check out the [customization page](customize.md) to learn

@@ -141,6 +141,8 @@ class Home(Screen):
         Binding(key="ctrl+pagedown", action="previous_tab", description="previous tab", key_display="^pagedown"),
         Binding(key="ctrl+pageup", action="next_tab", description="next tab", key_display="^pageup"),
         Binding(key="ctrl+q", action="close_tab", description="close tab", key_display="^q"),
+        Binding(key="ctrl+shift+comma", action="shrink_sidebar", description="shrink sidebar", key_display="<"),
+        Binding(key="ctrl+shift+full_stop", action="grow_sidebar", description="grow sidebar", key_display=">"),
         Binding(key="alt+left", action="shrink_sidebar", description="shrink sidebar", show=False),
         Binding(key="alt+right", action="grow_sidebar", description="grow sidebar", show=False),
         Binding(key="ctrl+q", action="close_tab", description="close tab", key_display="^q"),
