@@ -3,12 +3,12 @@ from pathlib import Path
 import pytest
 from textual.app import App, ComposeResult
 from textual.color import Color
-from textual.containers import HorizontalScroll, VerticalScroll
-from textual.widgets import DataTable, Static, TabPane, Tabs
+from textual.containers import VerticalScroll
+from textual.widgets import Static, TabPane, Tabs
 
 from widgets.calback_tabs import CallbackTabs
 from widgets.callbacks import Callbacks
-from widgets.sidebar_module import SidebarModule
+from widgets.tasks_table import TasksTable
 
 CSS_PATH = Path(__file__).resolve().parent.parent / "mythic.tcss"
 
@@ -101,29 +101,9 @@ async def test_scrollbar_color_differs_between_light_and_dark(fake_instance):
         assert dark_color != light_color
 
 
-class _TasksLikeModule(SidebarModule):
-    """CSS-equivalent stand-in for TasksTable: a DataTable in a HorizontalScroll inside a
-    SidebarModule, which is all that matters for the scrollbar styling under test.
-
-    TasksTable.datatable is a class-level attribute shared by every TasksTable instance,
-    so repeatedly instantiating the real class across separate `run_test()` apps (one per
-    theme) leaks widget/event-loop state between them. This double builds its DataTable
-    per-instance instead, which is the only thing CSS resolution depends on.
-    """
-
-    def __init__(self):
-        super().__init__()
-        self.datatable = DataTable(cursor_type="row", zebra_stripes=True)
-        self.datatable.add_column("ID", key="id")
-
-    def compose(self) -> ComposeResult:
-        with HorizontalScroll():
-            yield self.datatable
-
-
-class _SidebarTablesHarness(App):
-    """Mirrors how Callbacks/TasksTable are sized in the real sidebar (SidebarModule's
-    max-height cap), so their DataTables are forced to overflow and scroll."""
+class _CallbacksHarness(App):
+    """Mirrors how Callbacks is sized in the real sidebar (SidebarModule's max-height
+    cap), so its DataTable is forced to overflow and scroll."""
 
     CSS_PATH = CSS_PATH
 
@@ -131,13 +111,31 @@ class _SidebarTablesHarness(App):
         super().__init__()
         self._instance = instance
         self.callbacks_module: Callbacks | None = None
-        self.tasks_module: _TasksLikeModule | None = None
 
     def compose(self) -> ComposeResult:
         with VerticalScroll():
             self.callbacks_module = Callbacks(self._instance)
             yield self.callbacks_module
-            self.tasks_module = _TasksLikeModule()
+
+
+class _TasksTableHarness(App):
+    """Mirrors the sizing test_sidebar_tasks_fill.py uses for the real TasksTable: a
+    tall spacer above it inside a VerticalScroll, so it's forced to overflow."""
+
+    CSS_PATH = CSS_PATH
+
+    def __init__(self, instance):
+        super().__init__()
+        self._instance = instance
+        self.tasks_module: TasksTable | None = None
+
+    def compose(self) -> ComposeResult:
+        with VerticalScroll():
+            spacer = Static("")
+            spacer.styles.height = 15
+            spacer.styles.margin = 1
+            yield spacer
+            self.tasks_module = TasksTable(self._instance)
             yield self.tasks_module
 
 
@@ -148,12 +146,12 @@ def _fill_callback_table(table, count=40):
 
 def _fill_tasks_table(table, count=40):
     for i in range(count):
-        table.add_row(i, key=f"task{i}")
+        table.add_row(i, "operator", "completed", "ls", "", key=f"task{i}")
 
 
 @pytest.mark.parametrize("theme", THEMES)
 async def test_callback_table_scrollbar_appears_on_overflow(fake_instance, theme):
-    app = _SidebarTablesHarness(fake_instance)
+    app = _CallbacksHarness(fake_instance)
     async with app.run_test(size=(100, 50)) as pilot:
         app.theme = theme
         await pilot.pause()
@@ -165,7 +163,7 @@ async def test_callback_table_scrollbar_appears_on_overflow(fake_instance, theme
 
 @pytest.mark.parametrize("theme", THEMES)
 async def test_callback_table_scrollbar_contrasts_with_box(fake_instance, theme):
-    app = _SidebarTablesHarness(fake_instance)
+    app = _CallbacksHarness(fake_instance)
     async with app.run_test(size=(100, 50)) as pilot:
         app.theme = theme
         await pilot.pause()
@@ -181,31 +179,33 @@ async def test_callback_table_scrollbar_contrasts_with_box(fake_instance, theme)
         assert _contrast(handle, box_background) >= MIN_HANDLE_CONTRAST
 
 
-@pytest.mark.parametrize("theme", THEMES)
-async def test_tasks_table_scrollbar_appears_on_overflow(fake_instance, theme):
-    app = _SidebarTablesHarness(fake_instance)
-    async with app.run_test(size=(100, 50)) as pilot:
-        app.theme = theme
-        await pilot.pause()
-        datatable = app.tasks_module.datatable
-        _fill_tasks_table(datatable)
-        await pilot.pause()
-        assert datatable.show_vertical_scrollbar
+async def test_tasks_table_scrollbar_visible_across_themes(fake_instance):
+    """Exercises the real TasksTable/DataTable, not a stand-in.
 
-
-@pytest.mark.parametrize("theme", THEMES)
-async def test_tasks_table_scrollbar_contrasts_with_box(fake_instance, theme):
-    app = _SidebarTablesHarness(fake_instance)
+    TasksTable.datatable (widgets/tasks_table.py) is a class-level attribute shared by
+    every TasksTable instance. Instantiating TasksTable repeatedly across separate
+    `run_test()` apps was confirmed (outside pytest, via a standalone repro script) to
+    leave stale layout/scrollbar state behind and produce non-deterministic
+    `show_vertical_scrollbar` results on the next instance — unrelated to CSS. A single
+    instance, re-themed in place across one `run_test()` run, avoids that and still
+    proves the real widget picks up the themed scrollbar colors.
+    """
+    app = _TasksTableHarness(fake_instance)
     async with app.run_test(size=(100, 50)) as pilot:
-        app.theme = theme
         await pilot.pause()
         datatable = app.tasks_module.datatable
         _fill_tasks_table(datatable)
         await pilot.pause()
 
-        handle = datatable.styles.scrollbar_color
-        track = datatable.styles.scrollbar_background
-        box_background = datatable.styles.background
+        for theme in THEMES:
+            app.theme = theme
+            await pilot.pause()
 
-        assert handle != track
-        assert _contrast(handle, box_background) >= MIN_HANDLE_CONTRAST
+            assert datatable.show_vertical_scrollbar
+
+            handle = datatable.styles.scrollbar_color
+            track = datatable.styles.scrollbar_background
+            box_background = datatable.styles.background
+
+            assert handle != track
+            assert _contrast(handle, box_background) >= MIN_HANDLE_CONTRAST
