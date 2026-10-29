@@ -70,6 +70,14 @@ class Task:
 
         return value
 
+    @property
+    def display_status(self) -> str:
+        if not self.status:
+            return ""
+        if "error" in self.status.lower():
+            return "error"
+        return self.status
+
     def _update(self, data: dict):
         if data.get("id"):
             self.id = data.get("id")

@@ -261,12 +261,12 @@ class Home(Screen):
                     task_table = None
                 if task_table is not None:
                     try:
-                        task_table.update_cell(row_key=task.uuid, column_key="status", value=task.status)
+                        task_table.update_cell(row_key=task.uuid, column_key="status", value=task.display_status)
                     except CellDoesNotExist:
                         # a fast task can be updated here before the new-task
                         # row has been added; add it now instead of dropping it
                         try:
-                            task_table.add_row(task.id, task.username, task.status, task.command_name, task.params,
+                            task_table.add_row(task.id, task.username, task.display_status, task.command_name, task.params,
                                                 key=task.uuid)
                         except DuplicateKey:
                             pass
@@ -467,7 +467,7 @@ class Home(Screen):
                 # sidebar's CALLBACK view, so tasks_table may not be mounted
                 return
             try:
-                task_table.add_row(task.id, task.username, task.status, task.command_name, task.params,
+                task_table.add_row(task.id, task.username, task.display_status, task.command_name, task.params,
                                    key=task.uuid)
             except DuplicateKey:
                 pass
@@ -605,7 +605,7 @@ class Home(Screen):
         task_table.clear()
         for t in callback.tasks:
             try:
-                task_table.add_row(t.id, t.username, t.status, t.command_name, t.params, key=t.uuid)
+                task_table.add_row(t.id, t.username, t.display_status, t.command_name, t.params, key=t.uuid)
             except DuplicateKey:
                 continue
         task_table.loading = False
