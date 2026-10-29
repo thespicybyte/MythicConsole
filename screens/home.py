@@ -536,6 +536,7 @@ class Home(Screen):
         command_table.add_row("operation", "View, change, and create operations")
         command_table.add_row("payload", "Create, download, show payloads")
         command_table.add_row("user", "View/modify operators/spectators")
+        command_table.add_row("callback", "Export/import a callback config")
         console_panel.write_string(command_table)
 
     @on(TasksTable.NewTask)
