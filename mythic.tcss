@@ -364,3 +364,20 @@ ConsoleOutput {
         border: solid $background-darken-1;
     }
 }
+
+CallbackTabs {
+    background: $surface;
+    & > ContentTabs {
+        background: $surface;
+    }
+}
+
+* {
+    scrollbar-background: $surface;
+    scrollbar-background-hover: $surface;
+    scrollbar-background-active: $surface;
+    scrollbar-color: $primary 50%;
+    scrollbar-color-hover: $primary;
+    scrollbar-color-active: $accent;
+    scrollbar-corner-color: $surface;
+}
