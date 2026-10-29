@@ -7,7 +7,6 @@ from textual.containers import HorizontalScroll
 from textual.events import MouseUp, Timer
 from textual.message import Message
 from textual.widgets import DataTable
-from textual.widgets._data_table import DuplicateKey
 
 from backend import Task, MythicInstance
 from widgets.sidebar_module import SidebarModule
@@ -25,24 +24,24 @@ class TasksTable(SidebarModule):
             self.task = task
             super().__init__()
 
-    datatable = DataTable(cursor_type="row", id="tasks_table", zebra_stripes=True)
-
     def __init__(self, instance: MythicInstance):
         super().__init__()
+        self.datatable = DataTable(cursor_type="row", id="tasks_table", zebra_stripes=True)
         self.instance = instance
         self.border_title = "Tasks"
         self.double_click_timer: Timer | None = None
         self.current_row_id: Optional[int] = None
 
     def _on_mount(self, event: events.Mount) -> None:
-        try:
-            self.datatable.add_column("ID", key="id")
-            self.datatable.add_column("User", key="user")
-            self.datatable.add_column("Status", key="status")
-            self.datatable.add_column("Command", key="command")
-            self.datatable.add_column("Arguments", key="args")
-        except DuplicateKey:
-            pass
+        # Sidebar recomposes on view_mode changes, which remounts this same instance
+        # (and its already-populated datatable) more than once.
+        if self.datatable.columns:
+            return
+        self.datatable.add_column("ID", key="id")
+        self.datatable.add_column("User", key="user")
+        self.datatable.add_column("Status", key="status")
+        self.datatable.add_column("Command", key="command")
+        self.datatable.add_column("Arguments", key="args")
 
     def _clear_double_click(self) -> None:
         self.consecutive_clicks = 0
