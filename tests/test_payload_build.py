@@ -139,7 +139,7 @@ async def test_payload_build_requires_operation():
 async def test_payload_build_missing_config_file(payload_commands, tmp_path):
     missing = tmp_path / "missing.json"
     resp = await payload_commands._payload_build(_args(config=str(missing)))
-    assert "config file not found" in resp
+    assert "neither a readable file nor valid JSON" in resp
 
 
 async def test_run_build_missing_selected_os_errors(payload_commands):
