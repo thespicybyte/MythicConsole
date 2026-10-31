@@ -49,7 +49,7 @@ class ViewMode(Enum):
 
 
 class Sidebar(Container):
-    view_mode = reactive(ViewMode.HOME, recompose=True)
+    view_mode = reactive(ViewMode.HOME)
 
     def __init__(self, instance: MythicInstance, *children: Widget):
         self.instance = instance

@@ -33,10 +33,6 @@ class TasksTable(SidebarModule):
         self.current_row_id: Optional[int] = None
 
     def _on_mount(self, event: events.Mount) -> None:
-        # Sidebar recomposes on view_mode changes, which remounts this same instance
-        # (and its already-populated datatable) more than once.
-        if self.datatable.columns:
-            return
         self.datatable.add_column("ID", key="id")
         self.datatable.add_column("User", key="user")
         self.datatable.add_column("Status", key="status")
