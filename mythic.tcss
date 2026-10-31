@@ -403,3 +403,118 @@ Sidebar VerticalScroll.-scrolling, CallbackTable.-scrolling, TasksTable DataTabl
     scrollbar-background: $panel-lighten-1 50%;
     scrollbar-color: $primary;
 }
+
+TextPrompt {
+    align: center middle;
+}
+
+TextPrompt > Container {
+    width: 60%;
+    height: auto;
+    padding: 1 2;
+    background: $panel;
+}
+
+TextPrompt > Container > Label {
+    width: 100%;
+    content-align-horizontal: center;
+    padding: 0 1;
+}
+
+TextPrompt > Container > #description {
+    color: $text-muted;
+}
+
+TextPrompt > Container > Input {
+    margin: 1 0 0 0;
+}
+
+TextPrompt > Container > Horizontal {
+    width: auto;
+    height: auto;
+}
+
+TextPrompt > Container > Horizontal > Button {
+    margin: 1 0 0 0;
+}
+
+ChoicePrompt {
+    align: center middle;
+}
+
+ChoicePrompt > Container {
+    width: 60%;
+    height: 80%;
+    padding: 1 2;
+    background: $panel;
+}
+
+ChoicePrompt > Container > Label {
+    width: 100%;
+    content-align-horizontal: center;
+    padding: 0 1;
+}
+
+ChoicePrompt > Container > #description {
+    color: $text-muted;
+}
+
+ChoicePrompt > Container > CheckSelectionList {
+    height: 1fr;
+    margin: 1 0;
+    border: solid $primary-background-lighten-1 100%;
+    background: $panel;
+}
+
+ChoicePrompt > Container > Horizontal {
+    width: auto;
+    height: auto;
+}
+
+ChoicePrompt > Container > Horizontal > Button {
+    margin: 0;
+}
+
+SelectCommands {
+    align: center middle;
+}
+
+SelectCommands > Container {
+    width: 70%;
+    height: 80%;
+    padding: 1 2;
+    background: $panel;
+}
+
+SelectCommands > Container > #title {
+    width: 100%;
+    content-align-horizontal: center;
+}
+
+SelectCommands > Container > #filter {
+    margin: 1 0;
+    background: $panel;
+    border: solid $primary-background-lighten-1 100%;
+}
+
+SelectCommands > Container > #filter:focus {
+    background: $panel;
+    border: solid $primary 100%;
+}
+
+SelectCommands > Container > #commands {
+    height: 1fr;
+    border: solid $primary-background-lighten-1 100%;
+    background: $panel;
+}
+
+SelectCommands > Container > Horizontal {
+    width: auto;
+    height: auto;
+    margin: 1 0 0 0;
+}
+
+SelectCommands Checkbox {
+    border: none;
+    background: $panel;
+}
