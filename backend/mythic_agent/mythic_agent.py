@@ -641,8 +641,9 @@ class MythicAgent:
             script = self.get_script(command)
             if script:
                 parser = script.get_subcommand_parser(command)
-                for option in parser._actions:
-                    items += option.option_strings
+                if parser:
+                    for option in parser._actions:
+                        items += option.option_strings
 
             for subcommand in self.get_subcommands(command):
                 items.append(subcommand)
