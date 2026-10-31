@@ -35,9 +35,7 @@ from ..user import UserQueries
 
 async def _prompt(screen):
     """Push a modal from within a command coroutine's worker and await its dismissal value.
-    The only place this module reaches for the running App; see mythicconsole-124_plan_v1.md
-    §1.2 for why (active_app is the idiomatic handle from a worker, not a documented-stable
-    API, so the lookup stays isolated here)."""
+    The only place this module reaches for the running App."""
     return await active_app.get().push_screen_wait(screen)
 
 
@@ -843,10 +841,7 @@ _PAYLOAD_BUILD_TIMEOUT_SECONDS = 600
 
 
 def _config_is_complete(config: dict) -> bool:
-    """A `payload build` config is complete enough to skip the questionnaire when it already
-    carries the two fields the build core requires outright. build_parameters/c2_profiles/
-    commands are all optional/server-defaulted, so their absence doesn't make a config
-    incomplete -- it just means the questionnaire will ask about them."""
+    """A config is complete once it has both `selected_os` and `filename`."""
     return bool(config.get("selected_os")) and bool(config.get("filename"))
 
 
@@ -1187,7 +1182,7 @@ class MythicCommands(Cmd):
     async def _run_build(self, args, payload_type_name: str, config: dict) -> RenderableType:
         """The build/download core: a complete canonical config in, a built-and-downloaded
         payload (or an early background-mode return) out. Shared by the non-interactive
-        complete-config path and the questionnaire path -- no behaviour change from #123."""
+        complete-config path and the questionnaire path."""
         selected_os = config.get("selected_os")
         if not selected_os:
             return "[-] Error: config is missing required field 'selected_os'"
@@ -1349,7 +1344,7 @@ class MythicCommands(Cmd):
 
     async def _prompt_for_param(self, param: dict):
         """Prompt for one build/C2 parameter, re-prompting on a failed advisory check
-        (required/choices/Number/verifier_regex -- plan §5). Returns the value, _SKIPPED for a
+        (required/choices/Number/verifier_regex). Returns the value, _SKIPPED for a
         blank optional param, or _CANCELLED if the operator bailed."""
         name = param.get("name")
         param_type = param.get("parameter_type")

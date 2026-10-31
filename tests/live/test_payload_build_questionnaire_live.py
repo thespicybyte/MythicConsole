@@ -49,8 +49,8 @@ def _fallback_text(default: str) -> str:
 
 def _answer(screen, attempts: dict):
     """A sensible default answer for whichever modal the questionnaire just pushed. A param
-    can legitimately re-prompt (advisory required/choices/Number/verifier_regex checks --
-    plan §5); a server's own documented default_value isn't guaranteed to satisfy its own
+    can legitimately re-prompt (advisory required/choices/Number/verifier_regex checks);
+    a server's own documented default_value isn't guaranteed to satisfy its own
     verifier_regex (seen live: websocket's callback_host default `ws://127.0.0.1` fails its
     `^(ws|wss)://[a-zA-Z0-9]+` regex, since dots aren't in that character class), so a second
     attempt for the same label falls back to a generic value instead of looping on the same
