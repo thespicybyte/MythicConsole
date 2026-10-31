@@ -115,3 +115,35 @@ class PayloadTypeQueries:
 
         return payload_types[0].get("buildparameters") or []
 
+    @staticmethod
+    async def query_supported_c2_profiles(session: Mythic, payload_type_name: str) -> Dict:
+        """The payload type's installed+supported C2 profiles (the `payloadtypec2profiles` join,
+        filtered to non-deleted profiles) and whether it accepts multiple C2 profiles per build.
+        Each profile dict carries its `c2profileparameters`, the same shape
+        `C2ProfileQueries.query_all_c2_profiles` returns."""
+
+        resp = await mythic.execute_custom_query(
+            mythic=session,
+            query=f"""
+                        query Query($name: String!) {{
+                          payloadtype(where: {{name: {{_eq: $name}}}}) {{
+                            ...supported_c2_fragment
+                          }}
+                        }}
+                        {PayloadTypeFragments.supported_c2_fragment()}
+                        """,
+            variables={"name": payload_type_name}
+        )
+
+        payload_types = resp.get("payloadtype")
+        if not payload_types:
+            raise Exception(f"failed to query supported c2 profiles: {resp}")
+
+        payload_type = payload_types[0]
+        profiles = [join["c2profile"] for join in payload_type.get("payloadtypec2profiles") or []
+                   if join.get("c2profile")]
+        return {
+            "supports_multiple": bool(payload_type.get("supports_multiple_c2_in_build")),
+            "profiles": profiles,
+        }
+
