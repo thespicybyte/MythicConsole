@@ -845,9 +845,13 @@ class MythicCommands(Cmd):
     @property
     def commands(self) -> List[str]:
         if not self._commands:
-            methods = dir(self)
-            commands = [method for method in methods if
-                        method.startswith('do_') and callable(getattr(self, method))]
+            commands: List[str] = []
+            for klass in type(self).__mro__:
+                if klass is Cmd:
+                    break
+                for name, attr in vars(klass).items():
+                    if name.startswith('do_') and callable(attr) and name not in commands:
+                        commands.append(name)
             self._commands = commands
 
         return self._commands

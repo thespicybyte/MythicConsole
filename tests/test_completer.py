@@ -1,3 +1,37 @@
+import pytest
+
+from backend.mythic_agent.mythic_agent import MythicCommands
+
+CMD2_BUILTINS = {
+    "_eof", "_relative_run_script", "alias", "edit", "help", "history",
+    "macro", "quit", "run_pyscript", "run_script", "set", "shell", "shortcuts",
+}
+
+
+@pytest.fixture
+def mythic_commands(fake_instance):
+    return MythicCommands(fake_instance)
+
+
+def test_empty_line_lists_only_real_global_commands(mythic_commands):
+    items = mythic_commands.get_completer_items("")
+
+    assert set(items) == {"callback", "operation", "payload", "user", "op"}
+
+
+def test_empty_line_excludes_cmd2_builtins(mythic_commands):
+    items = mythic_commands.get_completer_items("")
+
+    assert CMD2_BUILTINS.isdisjoint(items)
+
+
+def test_commands_property_excludes_cmd2_builtins(mythic_commands):
+    # the property returns do_-prefixed names; none may be a cmd2 built-in
+    names = {name.removeprefix("do_") for name in mythic_commands.commands}
+
+    assert names == {"callback", "operation", "payload", "user"}
+
+
 async def test_empty_string_lists_top_level_commands(test_plugin_agent):
     items = test_plugin_agent.get_completer_items("")
 
