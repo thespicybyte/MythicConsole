@@ -3,10 +3,13 @@ from enum import Enum
 from typing import List, Optional
 
 import asyncio
-from textual import on
+from textual import events, on
 from textual.app import App, ComposeResult
 from textual.command import CommandPalette
+from textual.errors import NoWidget
 from textual.reactive import var
+from textual.timer import Timer
+from textual.widget import Widget
 from textual.widgets import Header, Footer
 
 from backend import MythicInstance
@@ -31,6 +34,11 @@ class State(Enum):
     ExtendedInteractive = 6,
 
 
+VERTICAL_SCROLL_EVENTS = (events.MouseScrollDown, events.MouseScrollUp)
+HORIZONTAL_SCROLL_EVENTS = (events.MouseScrollLeft, events.MouseScrollRight)
+SCROLLBAR_HIDE_DELAY = 1.0
+
+
 class MythicConsole(App, inherit_bindings=False):
     authenticated = var(False)
     instance: Optional[MythicInstance] = None
@@ -47,6 +55,38 @@ class MythicConsole(App, inherit_bindings=False):
         self.state = State.Login
         self._theme_preview_active = False
         self._theme_before_preview: Optional[str] = None
+        self._scrollbar_hide_timers: dict[Widget, Timer] = {}
+
+    async def on_event(self, event: events.Event) -> None:
+        if isinstance(event, VERTICAL_SCROLL_EVENTS + HORIZONTAL_SCROLL_EVENTS) and not event.is_forwarded:
+            self._reveal_scrollbars(event)
+        await super().on_event(event)
+
+    def _reveal_scrollbars(self, event: events.MouseEvent) -> None:
+        """Show the scrollbars of the widget being wheel-scrolled until scrolling stops."""
+        try:
+            widget, _ = self.screen.get_widget_at(event.screen_x, event.screen_y)
+        except NoWidget:
+            return
+
+        horizontal = isinstance(event, HORIZONTAL_SCROLL_EVENTS) or event.ctrl or event.shift
+        for node in widget.ancestors_with_self:
+            if not isinstance(node, Widget):
+                break
+            if node.allow_horizontal_scroll if horizontal else node.allow_vertical_scroll:
+                node.add_class("-scrolling")
+                timer = self._scrollbar_hide_timers.get(node)
+                if timer is not None:
+                    timer.reset()
+                else:
+                    self._scrollbar_hide_timers[node] = self.set_timer(
+                        SCROLLBAR_HIDE_DELAY, lambda: self._hide_scrollbars(node)
+                    )
+                return
+
+    def _hide_scrollbars(self, widget: Widget) -> None:
+        self._scrollbar_hide_timers.pop(widget, None)
+        widget.remove_class("-scrolling")
 
     def search_themes(self) -> None:
         self._theme_before_preview = self.theme
