@@ -101,30 +101,30 @@ TasksTable {
     max-height: 100%;
 }
 
-CallbackTable {
+CallbackTable, TasksTable DataTable {
     background: $panel;
 }
 
-CallbackTable > .datatable--header {
+CallbackTable > .datatable--header, TasksTable DataTable > .datatable--header {
     background: $panel;
     color: $text-muted;
     text-style: bold;
 }
 
-CallbackTable > .datatable--odd-row {
+CallbackTable > .datatable--odd-row, TasksTable DataTable > .datatable--odd-row {
     background: $panel;
 }
 
-CallbackTable > .datatable--even-row {
+CallbackTable > .datatable--even-row, TasksTable DataTable > .datatable--even-row {
     background: $panel-lighten-1;
 }
 
-CallbackTable > .datatable--cursor {
+CallbackTable > .datatable--cursor, TasksTable DataTable > .datatable--cursor {
     background: $primary 25%;
 }
 
-CallbackTable > .datatable--hover {
-    background: $panel-lighten-2;
+CallbackTable > .datatable--hover, TasksTable DataTable > .datatable--hover {
+    background: $panel-lighten-1 50%;
 }
 
 SessionInfo {
@@ -373,11 +373,33 @@ CallbackTabs {
 }
 
 * {
-    scrollbar-background: $panel-darken-2;
-    scrollbar-background-hover: $panel-darken-2;
-    scrollbar-background-active: $panel-darken-2;
-    scrollbar-color: $primary;
+    scrollbar-background: $surface;
+    scrollbar-background-hover: $surface-lighten-1 50%;
+    scrollbar-background-active: $surface-lighten-1 50%;
+    scrollbar-color: $surface;
     scrollbar-color-hover: $primary-lighten-1;
     scrollbar-color-active: $primary-lighten-2;
-    scrollbar-corner-color: $panel-darken-2;
+    scrollbar-corner-color: $surface;
+    scrollbar-size-vertical: 0;
+    scrollbar-size-horizontal: 0;
+}
+
+.-scrolling {
+    scrollbar-background: $surface-lighten-1 50%;
+    scrollbar-color: $primary;
+    scrollbar-size-vertical: 2;
+    scrollbar-size-horizontal: 1;
+}
+
+Sidebar VerticalScroll, CallbackTable, TasksTable DataTable {
+    scrollbar-background: $panel;
+    scrollbar-background-hover: $panel-lighten-1 50%;
+    scrollbar-background-active: $panel-lighten-1 50%;
+    scrollbar-color: $panel;
+    scrollbar-corner-color: $panel;
+}
+
+Sidebar VerticalScroll.-scrolling, CallbackTable.-scrolling, TasksTable DataTable.-scrolling {
+    scrollbar-background: $panel-lighten-1 50%;
+    scrollbar-color: $primary;
 }
