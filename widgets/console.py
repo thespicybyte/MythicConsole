@@ -39,6 +39,9 @@ class ConsolePanel(Container):
                 yield self.console_input
                 yield self.auto
 
+    def on_mount(self) -> None:
+        self.run_worker(self.mythic_commands.cache_payload_types(), exit_on_error=False)
+
     def _completer_items(self, text: str) -> List[str]:
         """Candidate source for CommandAutoComplete: last-word matching is handled by the
         package itself, so this just delegates to the active agent or global commands.

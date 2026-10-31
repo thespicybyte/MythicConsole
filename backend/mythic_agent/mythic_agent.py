@@ -3,6 +3,7 @@ import json
 import os
 import importlib
 import shlex
+import tempfile
 import types
 from pathlib import Path
 from typing import List, Dict, Iterable, Optional, Tuple
@@ -22,6 +23,7 @@ from . import mythic_command_parsers
 from ..callback.queries import CallbackQueries
 from ..operation.queries import OperationQueries
 from ..payload.queries import PayloadQueries
+from ..payload_type.queries import PayloadTypeQueries
 from ..tasker.tasker import Tasker
 from ..formatter.formatter import Formatter, DefaultFormatter
 from ..user import UserQueries
@@ -819,6 +821,52 @@ class MythicAgent:
         return target_files
 
 
+_PAYLOAD_BUILD_TIMEOUT_SECONDS = 600
+
+
+def _normalize_build_parameters(raw) -> List[dict]:
+    """`payload build` config `build_parameters` -> the `[{"name":..., "value":...}, ...]` shape
+    `mythic.create_payload` wants. Accepts the canonical `{name: value}` dict, or a list already in
+    the lib's shape (e.g. straight from `exportPayloadConfig`), unchanged."""
+    if raw is None:
+        return []
+    if isinstance(raw, dict):
+        return [{"name": name, "value": value} for name, value in raw.items()]
+    if isinstance(raw, list):
+        return raw
+    raise ValueError(f"build_parameters must be an object or a list, got {type(raw).__name__}")
+
+
+def _normalize_c2_profile_parameters(raw: Optional[dict]) -> dict:
+    """Unwrap the crypto-parameter echo shape (`{"value":..., "enc_key":..., "dec_key":...}`) that
+    `exportPayloadConfig` emits for crypto_type params, since `create_payload` wants the plain value."""
+    normalized = {}
+    for name, value in (raw or {}).items():
+        if isinstance(value, dict) and "value" in value:
+            value = value["value"]
+        normalized[name] = value
+    return normalized
+
+
+def _normalize_c2_profiles(raw) -> List[dict]:
+    """`payload build` config `c2_profiles` -> the `[{"c2_profile":..., "c2_profile_parameters":...}]`
+    shape `mythic.create_payload` wants. Accepts either the canonical `{"name":..., "parameters":...}`
+    entries or raw `exportPayloadConfig` entries (`{"c2_profile":..., "c2_profile_parameters":...}`)."""
+    profiles = []
+    for entry in raw or []:
+        name = entry.get("name") or entry.get("c2_profile")
+        if not name:
+            raise ValueError(f"c2_profiles entry missing 'name'/'c2_profile': {entry}")
+        parameters = entry.get("parameters")
+        if parameters is None:
+            parameters = entry.get("c2_profile_parameters")
+        profiles.append({
+            "c2_profile": name,
+            "c2_profile_parameters": _normalize_c2_profile_parameters(parameters),
+        })
+    return profiles
+
+
 class MythicCommands(Cmd):
     """Global, agent-independent console commands (operation/payload/user), a cmd2.Cmd.
     Unrelated to AgentCommands (a per-agent command collection)."""
@@ -827,6 +875,7 @@ class MythicCommands(Cmd):
         super().__init__()
         self.instance = instance
         self._commands: List[str] = []
+        self._payload_type_cache: List[str] = []
         self._aliases = [
             AgentCommandAlias("op", "operation"),
         ]
@@ -839,6 +888,7 @@ class MythicCommands(Cmd):
             "user create": mythic_command_parsers.user_create_parser,
             "payload list": mythic_command_parsers.payload_list_parser,
             "payload download": mythic_command_parsers.payload_download_parser,
+            "payload build": mythic_command_parsers.payload_build_parser,
             "callback export": mythic_command_parsers.callback_export_parser,
             "callback import": mythic_command_parsers.callback_import_parser,
         }
@@ -940,6 +990,11 @@ class MythicCommands(Cmd):
             for subcommand in self._subcommand_parsers.keys():
                 if subcommand.startswith(f"{command} "):
                     items.append(subcommand.removeprefix(f"{command} "))
+
+        elif count == 3 and tokens[0] == "payload" and tokens[1] == "build":
+            # the <payload_type> positional slot is still open
+            items = list(self._payload_type_cache)
+            items += self.get_subcommand_options("payload", "build")
 
         else:
             # return the subcommands options
@@ -1060,6 +1115,112 @@ class MythicCommands(Cmd):
             return f"[-] Error: {e}"
 
     mythic_command_parsers.payload_download_parser.set_defaults(func=_payload_download)
+
+    async def cache_payload_types(self):
+        """Warm the `payload build <payload_type>` positional completion cache. The completer is
+        synchronous, so the candidate list is resolved and cached up front, mirroring
+        MythicAgent._cache_payload_uuids."""
+        operation_id = getattr(self.instance.mythic, "current_operation_id", None)
+        if not operation_id:
+            return
+        try:
+            payload_types = await PayloadTypeQueries.query_all_payload_types(self.instance.mythic)
+            self._payload_type_cache = [p["name"] for p in payload_types or [] if p.get("name")]
+        except Exception as e:
+            logger.warning(f"could not cache payload types: {e}")
+
+    async def _payload_build(self, args) -> RenderableType:
+        try:
+            if not self.instance.mythic.current_operation_id:
+                return "Error: Operation not set"
+
+            payload_type_name = args.payload_type
+
+            config = {}
+            if args.config:
+                if not os.path.isfile(args.config):
+                    return f"[-] Error: config file not found: {args.config}"
+                with open(args.config, "r") as f:
+                    config = json.loads(f.read())
+
+            config_payload_type = config.get("payload_type")
+            if config_payload_type and config_payload_type != payload_type_name:
+                return (f"[-] Error: config payload_type '{config_payload_type}' conflicts with "
+                        f"requested payload type '{payload_type_name}'")
+
+            selected_os = config.get("selected_os")
+            if not selected_os:
+                return "[-] Error: config is missing required field 'selected_os'"
+
+            filename = config.get("filename")
+            if not filename:
+                return "[-] Error: config is missing required field 'filename'"
+
+            try:
+                build_parameters = _normalize_build_parameters(config.get("build_parameters"))
+                c2_profiles = _normalize_c2_profiles(config.get("c2_profiles"))
+            except ValueError as e:
+                return f"[-] Error: {e}"
+
+            commands = config.get("commands")
+            description = config.get("description", "")
+
+            if args.background:
+                resp = await mythic.create_payload(
+                    self.instance.mythic,
+                    payload_type_name=payload_type_name,
+                    filename=filename,
+                    operating_system=selected_os,
+                    c2_profiles=c2_profiles,
+                    commands=commands,
+                    build_parameters=build_parameters,
+                    description=description,
+                    return_on_complete=False,
+                )
+                return f"[+] Build started: uuid={resp.get('uuid')} status={resp.get('status')}"
+
+            resp = await mythic.create_payload(
+                self.instance.mythic,
+                payload_type_name=payload_type_name,
+                filename=filename,
+                operating_system=selected_os,
+                c2_profiles=c2_profiles,
+                commands=commands,
+                build_parameters=build_parameters,
+                description=description,
+                return_on_complete=True,
+                timeout=_PAYLOAD_BUILD_TIMEOUT_SECONDS,
+            )
+
+            if resp is None:
+                return "[-] Error: timed out waiting for payload build to complete"
+
+            build_phase = resp.get("build_phase")
+            uuid = resp.get("uuid")
+            if build_phase != "success":
+                detail = "\n".join(part for part in (resp.get("build_message"), resp.get("build_stderr")) if part)
+                return f"[-] Build failed (phase={build_phase}): {detail}"
+
+            if args.output:
+                output_path = Path(args.output)
+            else:
+                fd, temp_name = tempfile.mkstemp(prefix="payload_", suffix=f"_{filename}")
+                os.close(fd)
+                output_path = Path(temp_name)
+
+            if not os.path.isdir(output_path.parent):
+                os.makedirs(output_path.parent, exist_ok=True)
+
+            payload = Payload(self.instance, payload_uuid=uuid)
+            await payload.download(output_path)
+
+            return f"[+] Payload built and saved to {output_path} (uuid={uuid})"
+        except Exception as e:
+            logger.error(e)
+            return f"[-] Error: {e}"
+
+    add_default_options(mythic_command_parsers.payload_build_parser)
+    mythic_command_parsers.payload_build_parser.set_defaults(func=_payload_build)
 
     @with_argparser(mythic_command_parsers.callback_parser)
     def do_callback(self, args):
