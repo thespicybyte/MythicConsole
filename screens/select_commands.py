@@ -5,27 +5,35 @@ from textual.app import ComposeResult
 from textual.binding import Binding
 from textual.containers import Container, Horizontal
 from textual.screen import ModalScreen
-from textual.widgets import Button, Checkbox, Input, Label, SelectionList
+from textual.widgets import Button, Checkbox, Input, Label, Select, SelectionList
 
 from widgets.transfer_selection import CheckSelection, CheckSelectionList, GlyphCheckbox
 
+_MODES = ["default", "all", "custom"]
+
 
 class SelectCommands(ModalScreen):
-    """Pick a subset of a payload type's command catalog for `payload build`'s custom
-    command-set option. A single filterable checklist rather than ManageCallbacks' two-pane
-    transfer list -- there is nothing to move between, just a catalog to pick from."""
+    """Pick a payload type's command set for `payload build`: a mode pulldown
+    (default/all/custom) plus a filterable checklist that's shown only in custom mode. Dismisses
+    with `None` for default, `SelectCommands.ALL` for all (the caller expands it to the full
+    catalog), the chosen `list[str]` for custom, or `SelectCommands.CANCELLED` on cancel."""
+
+    ALL = object()
+    CANCELLED = object()
 
     BINDINGS = [Binding(key="escape", action="cancel", description="cancel", show=False)]
 
-    def __init__(self, catalog: List[dict], preselected: Optional[List[str]] = None):
+    def __init__(self, catalog: List[dict], *, mode: str = "default", preselected: Optional[List[str]] = None):
         super().__init__()
         self.names = sorted({c["cmd"] for c in catalog if c.get("cmd")})
         self.selected: set[str] = set(preselected or [])
         self.text_filter = ""
+        self.mode = mode if mode in _MODES else "default"
 
     def compose(self) -> ComposeResult:
         yield Container(
             Label("Select commands", id="title"),
+            Select([(m.capitalize(), m) for m in _MODES], value=self.mode, allow_blank=False, id="mode"),
             Input(placeholder="Filter...", id="filter"),
             GlyphCheckbox("select all", id="select_all"),
             CheckSelectionList(id="commands"),
@@ -37,6 +45,18 @@ class SelectCommands(ModalScreen):
 
     def on_mount(self) -> None:
         self._rebuild()
+        self._apply_mode_visibility()
+
+    def _apply_mode_visibility(self) -> None:
+        show_custom = self.mode == "custom"
+        self.query_one("#filter", Input).display = show_custom
+        self.query_one("#select_all", GlyphCheckbox).display = show_custom
+        self.query_one("#commands", CheckSelectionList).display = show_custom
+
+    @on(Select.Changed, "#mode")
+    def _mode_changed(self, event: Select.Changed) -> None:
+        self.mode = event.value
+        self._apply_mode_visibility()
 
     def _visible(self) -> List[str]:
         if not self.text_filter:
@@ -84,11 +104,16 @@ class SelectCommands(ModalScreen):
 
     @on(Button.Pressed, "#ok")
     def _ok(self) -> None:
-        self.dismiss(sorted(self.selected))
+        if self.mode == "default":
+            self.dismiss(None)
+        elif self.mode == "all":
+            self.dismiss(SelectCommands.ALL)
+        else:
+            self.dismiss(sorted(self.selected))
 
     @on(Button.Pressed, "#cancel")
     def _cancel(self) -> None:
-        self.dismiss(None)
+        self.dismiss(SelectCommands.CANCELLED)
 
     def action_cancel(self) -> None:
-        self.dismiss(None)
+        self.dismiss(SelectCommands.CANCELLED)

@@ -2,7 +2,6 @@ import argparse
 import json
 import os
 import importlib
-import re
 import shlex
 import tempfile
 import types
@@ -20,7 +19,8 @@ from textual.worker import Worker
 from backend import MythicInstance, Task, User, Operation, Payload, Callback
 from utils.logger import logger
 from utils.environment import Environment
-from screens.prompts import TaskPrompt, TextPrompt, ChoicePrompt, YesNoPrompt, FilePrompt
+from screens.forms import ParamForm, FieldSpec, field_spec_from_param
+from screens.prompts import TaskPrompt, ChoicePrompt, YesNoPrompt
 from screens.select_commands import SelectCommands
 from . import mythic_command_parsers
 from ..c2_profile.queries import C2ProfileQueries
@@ -37,12 +37,6 @@ async def _prompt(screen):
     """Push a modal from within a command coroutine's worker and await its dismissal value.
     The only place this module reaches for the running App."""
     return await active_app.get().push_screen_wait(screen)
-
-
-# Sentinels distinguishing "operator left an optional param blank" from "operator cancelled
-# the whole questionnaire" in _prompt_for_param's return value.
-_SKIPPED = object()
-_CANCELLED = object()
 
 
 class MythicAgent:
@@ -845,6 +839,18 @@ def _config_is_complete(config: dict) -> bool:
     return bool(config.get("selected_os")) and bool(config.get("filename"))
 
 
+def _load_config(value: str) -> dict:
+    """`--config` accepts a file path or a raw JSON string. An on-disk path wins first, since a
+    bare filename (e.g. `build.json`) isn't valid JSON itself and shouldn't be misread as one."""
+    if os.path.isfile(value):
+        with open(value) as f:
+            return json.loads(f.read())
+    try:
+        return json.loads(value)
+    except json.JSONDecodeError:
+        raise ValueError(f"--config is neither a readable file nor valid JSON: {value!r}")
+
+
 def _normalize_build_parameters(raw) -> List[dict]:
     """`payload build` config `build_parameters` -> the `[{"name":..., "value":...}, ...]` shape
     `mythic.create_payload` wants. Accepts the canonical `{name: value}` dict, or a list already in
@@ -1159,10 +1165,7 @@ class MythicCommands(Cmd):
 
             config = {}
             if args.config:
-                if not os.path.isfile(args.config):
-                    return f"[-] Error: config file not found: {args.config}"
-                with open(args.config, "r") as f:
-                    config = json.loads(f.read())
+                config = _load_config(args.config)
 
             config_payload_type = config.get("payload_type")
             if config_payload_type and config_payload_type != payload_type_name:
@@ -1252,75 +1255,89 @@ class MythicCommands(Cmd):
         return f"[+] Payload built and saved to {output_path} (uuid={uuid})"
 
     async def _payload_build_questionnaire(self, payload_type_name: str, config: dict) -> Optional[dict]:
-        """Walk the operator through whatever `config` doesn't already answer, then return the
-        assembled canonical config (`{payload_type, selected_os, filename, build_parameters,
-        c2_profiles, commands, description}`) for `_run_build`. None means the operator
-        cancelled somewhere along the way."""
+        """Walk the operator through whatever `config` doesn't already answer via a handful of
+        aggregated form modals (one for the payload itself, one per selected C2 profile, one for
+        the command set), pre-filling every field from `config`, then return the assembled
+        canonical config (`{payload_type, selected_os, filename, build_parameters, c2_profiles,
+        commands, description}`) for `_run_build`. None means the operator cancelled somewhere
+        along the way."""
         payload_type = await PayloadTypeQueries.query_by_name(self.instance.mythic, payload_type_name)
+        build_param_schema = await PayloadTypeQueries.query_build_parameters(
+            self.instance.mythic, payload_type_name)
+        existing_build_parameters = dict(config.get("build_parameters") or {})
 
-        selected_os = config.get("selected_os")
-        if not selected_os:
-            supported_os = payload_type.get("supported_os") or []
-            if supported_os:
-                selected_os = await _prompt(ChoicePrompt("Operating system", supported_os, mode="single"))
-            else:
-                selected_os = await _prompt(TextPrompt("Operating system"))
-            if not selected_os:
-                return None
+        supported_os = payload_type.get("supported_os") or []
+        if supported_os:
+            os_spec = FieldSpec(name="selected_os", parameter_type="ChooseOne", choices=supported_os,
+                                initial=config.get("selected_os"), required=True, label="Operating system")
+        else:
+            os_spec = FieldSpec(name="selected_os", parameter_type="String",
+                                initial=config.get("selected_os"), required=True, label="Operating system")
 
-        filename = config.get("filename")
-        if not filename:
-            filename = await _prompt(TextPrompt("Filename", default=payload_type_name))
-            if not filename:
-                return None
+        filename_spec = FieldSpec(name="filename", parameter_type="String", required=True, label="Filename",
+                                  initial=config.get("filename") or payload_type_name)
 
-        build_parameters = dict(config.get("build_parameters") or {})
-        schema = await PayloadTypeQueries.query_build_parameters(self.instance.mythic, payload_type_name)
-        for param in schema:
-            name = param["name"]
-            if name in build_parameters:
-                continue
-            value = await self._prompt_for_param(param)
-            if value is _CANCELLED:
-                return None
-            if value is not _SKIPPED:
-                build_parameters[name] = value
+        payload_specs = [os_spec, filename_spec]
+        payload_specs += [field_spec_from_param(param, initial=existing_build_parameters.get(param["name"]))
+                          for param in build_param_schema]
 
-        c2_profiles = config.get("c2_profiles")
-        if not c2_profiles:
+        payload_answers = await _prompt(ParamForm(f"Build '{payload_type_name}'", payload_specs))
+        if payload_answers is None:
+            return None
+
+        selected_os = payload_answers.pop("selected_os")
+        filename = payload_answers.pop("filename")
+        build_parameters = payload_answers
+
+        supported = await PayloadTypeQueries.query_supported_c2_profiles(
+            self.instance.mythic, payload_type_name)
+        available = supported["profiles"]
+        if not available:
             available = await C2ProfileQueries.query_all_c2_profiles(self.instance.mythic)
+
+        existing_profiles = {entry["name"]: entry.get("parameters") or {}
+                             for entry in (config.get("c2_profiles") or [])}
+
+        if supported["supports_multiple"]:
             chosen_names = await _prompt(ChoicePrompt(
-                "C2 profile(s)", [p["name"] for p in available], mode="multi"))
+                "C2 profile(s)", [p["name"] for p in available], mode="multi",
+                preselected=list(existing_profiles)))
             if not chosen_names:
                 return None
+        else:
+            profile_spec = FieldSpec(name="profile", parameter_type="ChooseOne", required=True,
+                                     choices=[p["name"] for p in available],
+                                     initial=next(iter(existing_profiles), None))
+            profile_answer = await _prompt(ParamForm("C2 profile", [profile_spec], groups_as_sections=False))
+            if not profile_answer or not profile_answer.get("profile"):
+                return None
+            chosen_names = [profile_answer["profile"]]
 
-            c2_profiles = []
-            for profile in available:
-                if profile["name"] not in chosen_names:
-                    continue
-                parameters = {}
-                for param in profile.get("c2profileparameters") or []:
-                    value = await self._prompt_for_param(param)
-                    if value is _CANCELLED:
-                        return None
-                    if value is not _SKIPPED:
-                        parameters[param["name"]] = value
-                c2_profiles.append({"name": profile["name"], "parameters": parameters})
+        c2_profiles = []
+        for profile in available:
+            if profile["name"] not in chosen_names:
+                continue
+            profile_params = profile.get("c2profileparameters") or []
+            if not profile_params:
+                c2_profiles.append({"name": profile["name"], "parameters": {}})
+                continue
+
+            existing_params = existing_profiles.get(profile["name"], {})
+            specs = [field_spec_from_param(param, initial=existing_params.get(param["name"]))
+                    for param in profile_params]
+            answers = await _prompt(ParamForm(f"{profile['name']} parameters", specs))
+            if answers is None:
+                return None
+            c2_profiles.append({"name": profile["name"], "parameters": answers})
 
         commands = config.get("commands")
-        if commands is None:
-            choice = await _prompt(ChoicePrompt("Command set", ["default", "all", "custom"], mode="single"))
-            if not choice:
-                return None
-            if choice == "all" or choice == "custom":
-                catalog = await self._fetch_build_command_catalog(payload_type_name)
-                if choice == "all":
-                    commands = [c["cmd"] for c in catalog]
-                else:
-                    commands = await _prompt(SelectCommands(catalog))
-                    if commands is None:
-                        return None
-            # choice == "default" leaves commands as None -> Mythic's builtin/recommended set.
+        catalog = await self._fetch_build_command_catalog(payload_type_name)
+        mode = "custom" if isinstance(commands, list) else "default"
+        commands_result = await _prompt(SelectCommands(
+            catalog, mode=mode, preselected=commands if mode == "custom" else None))
+        if commands_result is SelectCommands.CANCELLED:
+            return None
+        commands = [c["cmd"] for c in catalog] if commands_result is SelectCommands.ALL else commands_result
 
         assembled = {
             "payload_type": payload_type_name,
@@ -1341,88 +1358,6 @@ class MythicCommands(Cmd):
     async def _fetch_build_command_catalog(self, payload_type_name: str) -> List[dict]:
         return await mythic.get_all_commands_for_payloadtype(
             self.instance.mythic, payload_type_name, custom_return_attributes=_CMD_ATTRS)
-
-    async def _prompt_for_param(self, param: dict):
-        """Prompt for one build/C2 parameter, re-prompting on a failed advisory check
-        (required/choices/Number/verifier_regex). Returns the value, _SKIPPED for a
-        blank optional param, or _CANCELLED if the operator bailed."""
-        name = param.get("name")
-        param_type = param.get("parameter_type")
-        required = bool(param.get("required"))
-        default_value = param.get("default_value")
-        choices = param.get("choices") or []
-        verifier_regex = param.get("verifier_regex") or None
-        description = param.get("description") or ""
-
-        while True:
-            if param_type == "Boolean":
-                value = await _prompt(YesNoPrompt(f"{name}? {description}".strip()))
-                if value is None:
-                    return _CANCELLED if required else _SKIPPED
-                return value
-
-            if param_type == "ChooseOne":
-                value = await _prompt(ChoicePrompt(name, choices, mode="single", description=description))
-                if not value:
-                    return _CANCELLED if required else _SKIPPED
-                return value
-
-            if param_type == "ChooseMultiple":
-                value = await _prompt(ChoicePrompt(name, choices, mode="multi", description=description))
-                if not value:
-                    return _CANCELLED if required else _SKIPPED
-                return value
-
-            if param_type == "File":
-                value = await _prompt(FilePrompt(name))
-                if not value:
-                    return _CANCELLED if required else _SKIPPED
-                return value
-
-            if param_type in ("Array", "TypedArray"):
-                raw = await _prompt(TextPrompt(name, default=default_value or "", description=description))
-                if raw is None:
-                    return _CANCELLED
-                if not raw.strip():
-                    if required:
-                        continue
-                    return _SKIPPED
-                return [line for line in raw.splitlines() if line.strip()]
-
-            if param_type == "Dictionary":
-                help_text = f"{description} (JSON object)".strip()
-                raw = await _prompt(TextPrompt(name, default=default_value or "", description=help_text))
-                if raw is None:
-                    return _CANCELLED
-                if not raw.strip():
-                    if required:
-                        continue
-                    return _SKIPPED
-                try:
-                    return json.loads(raw)
-                except json.JSONDecodeError:
-                    continue
-
-            # String, Number, Date, and anything else not covered above: free text.
-            raw = await _prompt(TextPrompt(name, default=default_value or "", description=description))
-            if raw is None:
-                return _CANCELLED
-            if not raw.strip():
-                if required:
-                    continue
-                return _SKIPPED
-
-            value = raw
-            if param_type == "Number":
-                try:
-                    value = int(raw)
-                except ValueError:
-                    continue
-
-            if verifier_regex and not re.fullmatch(verifier_regex, str(value)):
-                continue
-
-            return value
 
     add_default_options(mythic_command_parsers.payload_build_parser)
     mythic_command_parsers.payload_build_parser.set_defaults(func=_payload_build)

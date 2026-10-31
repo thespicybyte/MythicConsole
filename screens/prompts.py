@@ -94,44 +94,6 @@ class FilePrompt(TaskPrompt):
         self.dismiss(None)
 
 
-class TextPrompt(TaskPrompt):
-    """Free-text input modal: a build/C2 param value, or any other single string answer.
-    Returns the entered string (possibly empty) on submit, or None on cancel."""
-
-    BINDINGS = [Binding(key="escape", action="cancel", description="cancel", show=False)]
-
-    def __init__(self, label: str, default: str = "", description: str = ""):
-        super().__init__()
-        self.label = label
-        self.default = default or ""
-        self.description = description
-
-    def compose(self) -> ComposeResult:
-        widgets = [Label(self.label)]
-        if self.description:
-            widgets.append(Label(self.description, id="description"))
-        widgets.append(Input(value=self.default, id="value"))
-        widgets.append(Horizontal(
-            Button(label="OK", variant="success", id="ok"),
-            Button(label="Cancel", variant="error", id="cancel"),
-        ))
-        yield Container(*widgets)
-
-    @on(Input.Submitted, "#value")
-    def _submitted(self, event: Input.Submitted) -> None:
-        self.dismiss(event.value)
-
-    @on(Button.Pressed)
-    def _button_pressed(self, event: Button.Pressed) -> None:
-        if event.button.id == "ok":
-            self.dismiss(self.query_one("#value", Input).value)
-            return
-        self.dismiss(None)
-
-    def action_cancel(self) -> None:
-        self.dismiss(None)
-
-
 class ChoicePrompt(TaskPrompt):
     """Single- or multi-select modal built on the shared `CheckSelectionList`. In "single"
     mode selecting an option deselects any other and OK returns a lone string; in "multi"
@@ -139,12 +101,14 @@ class ChoicePrompt(TaskPrompt):
 
     BINDINGS = [Binding(key="escape", action="cancel", description="cancel", show=False)]
 
-    def __init__(self, label: str, choices: List[str], mode: str = "single", description: str = ""):
+    def __init__(self, label: str, choices: List[str], mode: str = "single", description: str = "",
+                 preselected: Optional[List[str]] = None):
         super().__init__()
         self.label = label
         self.choices = list(choices)
         self.mode = mode
         self.description = description
+        self.preselected = set(preselected or [])
 
     def compose(self) -> ComposeResult:
         widgets = [Label(self.label)]
@@ -152,7 +116,7 @@ class ChoicePrompt(TaskPrompt):
             widgets.append(Label(self.description, id="description"))
         choice_list = CheckSelectionList(id="choices")
         for choice in self.choices:
-            choice_list.add_option(CheckSelection(choice, choice))
+            choice_list.add_option(CheckSelection(choice, choice, choice in self.preselected))
         widgets.append(choice_list)
         widgets.append(Horizontal(
             Button(label="OK", variant="success", id="ok"),
