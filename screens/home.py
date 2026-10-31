@@ -43,6 +43,11 @@ from widgets.tasks_table import TasksTable, ReplayTask
 cmd2.rich_utils.ALLOW_STYLE = cmd2.rich_utils.AllowStyle.NEVER
 
 
+def _sort_tasks_table(task_table: DataTable) -> None:
+    """Keep the Tasks table ordered by numeric task ID, newest first."""
+    task_table.sort("id", key=lambda task_id: int(task_id), reverse=True)
+
+
 class ViewMode(Enum):
     HOME = 1
     CALLBACK = 2
@@ -352,6 +357,7 @@ class Home(Screen):
                                                 key=task.uuid)
                         except DuplicateKey:
                             pass
+                        _sort_tasks_table(task_table)
 
         if task not in tasked_callback.tasks:
             tasked_callback.tasks.append(task)
@@ -562,6 +568,7 @@ class Home(Screen):
                                    key=task.uuid)
             except DuplicateKey:
                 pass
+            _sort_tasks_table(task_table)
 
     @on(CallbackTable.RowUpdated)
     async def _row_updated(self, message: CallbackTable.RowUpdated):
@@ -702,6 +709,7 @@ class Home(Screen):
                 task_table.add_row(t.id, t.username, t.display_status, t.command_name, t.params, key=t.uuid)
             except DuplicateKey:
                 continue
+        _sort_tasks_table(task_table)
         task_table.loading = False
 
     def action_close_tab(self):
