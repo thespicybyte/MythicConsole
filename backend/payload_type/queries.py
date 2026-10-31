@@ -1,4 +1,4 @@
-from typing import Dict
+from typing import Dict, List
 
 from mythic.mythic_classes import Mythic
 from mythic import mythic
@@ -83,4 +83,35 @@ class PayloadTypeQueries:
 
         payload_types = resp.get("payloadtype")
         return payload_types
+
+    @staticmethod
+    async def query_build_parameters(session: Mythic, payload_type_name: str) -> List[dict]:
+        """
+        Query the build parameters a payload type accepts
+
+        :param session:
+        :param payload_type_name:
+        :return: list of build parameter dicts
+        """
+
+        resp = await mythic.execute_custom_query(
+            mythic=session,
+            query=f"""
+                        query Query($name: String!) {{
+                          payloadtype(where: {{name: {{_eq: $name}}}}) {{
+                            buildparameters {{
+                              ...build_parameters_fragment
+                            }}
+                          }}
+                        }}
+                        {PayloadTypeFragments.build_parameters_fragment()}
+                        """,
+            variables={"name": payload_type_name}
+        )
+
+        payload_types = resp.get("payloadtype")
+        if not payload_types:
+            raise Exception(f"failed to query build parameters: {resp}")
+
+        return payload_types[0].get("buildparameters") or []
 

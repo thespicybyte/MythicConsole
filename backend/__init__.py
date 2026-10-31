@@ -6,6 +6,7 @@ from backend.callback.callback import Callback
 from backend.response.response import Response
 from backend.payload.payload import Payload
 from backend.payload_type.payload_type import PayloadType
+from backend.c2_profile.c2_profile import C2Profile
 from backend.tasker.tasker import Tasker
 from backend.formatter import FormatterNotAvailable
 from backend.formatter.formatter import Formatter, renders
