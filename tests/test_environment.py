@@ -12,7 +12,7 @@ def isolated_cwd(tmp_path, monkeypatch):
     monkeypatch.chdir(tmp_path)
     for key in ("MYTHIC_CONSOLE_USER", "MYTHIC_CONSOLE_PASSWORD", "MYTHIC_SERVER_URL",
                 "DOWNLOAD_DIRECTORY", "LOG_DIRECTORY", "LOG_FILE", "LOG_LEVEL",
-                "PLUGIN_DIRECTORY", "XDG_CONFIG_HOME"):
+                "PLUGIN_DIRECTORY", "HISTORY_FILE", "XDG_CONFIG_HOME"):
         monkeypatch.delenv(key, raising=False)
 
 
@@ -142,3 +142,26 @@ def test_plugins_directory_dotenv_override(tmp_path):
     result = Environment().plugins_directory()
     assert result == str(target)
     assert os.path.isdir(target)
+
+
+def test_history_file_default_is_in_config_directory(tmp_path, monkeypatch):
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path / "config"))
+    result = Environment().history_file()
+    assert result == str(tmp_path / "config" / "mythicconsole" / "history.json")
+
+
+def test_history_file_env_override(tmp_path, monkeypatch):
+    target = tmp_path / "custom_history.json"
+    monkeypatch.setenv("HISTORY_FILE", str(target))
+    assert Environment().history_file() == str(target)
+
+
+def test_history_file_env_override_expands_user(monkeypatch):
+    monkeypatch.setenv("HISTORY_FILE", "~/history.json")
+    assert Environment().history_file() == os.path.expanduser("~/history.json")
+
+
+def test_history_file_dotenv_override(tmp_path):
+    target = tmp_path / "from_dotenv_history.json"
+    (tmp_path / ".env").write_text(f"HISTORY_FILE={target}\n")
+    assert Environment().history_file() == str(target)
