@@ -3,13 +3,17 @@ import json
 
 from textual import on, events, work
 from textual.app import ComposeResult
+from textual.content import Content
 from textual.events import MouseUp, Timer
 from textual.reactive import reactive
 from textual.widget import Widget
-from textual.widgets import Pretty, Static
+from textual.widgets import Static
 
 from backend import MythicInstance, Operation
 from version import __version__
+
+_KEY_STYLE = "bold $primary"
+_VALUE_STYLE = "$text"
 
 
 class SessionInfo(Static):
@@ -39,7 +43,17 @@ class SessionInfo(Static):
     def compose(self) -> ComposeResult:
         self.session_info["current_operation"] = self.operation.name or ""
         self.session_info["mythic_server_version"] = self.server_version
-        yield Pretty(self.session_info)
+        yield Static(self._session_content())
+
+    def _session_content(self) -> Content:
+        parts = []
+        for key, value in self.session_info.items():
+            parts.append((f"{key}: ", _KEY_STYLE))
+            parts.append((str(value), _VALUE_STYLE))
+            parts.append(("\n", ""))
+        if parts:
+            parts.pop()  # drop the trailing newline
+        return Content.assemble(*parts)
 
     @staticmethod
     def _mythic_library_version() -> str:
