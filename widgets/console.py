@@ -10,6 +10,7 @@ from textual.widget import Widget
 from textual_console import CommandAutoComplete, ConsoleInput, ConsoleOutput
 
 from backend import MythicInstance
+from utils.history import load_history
 
 if TYPE_CHECKING:
     from backend import MythicAgent
@@ -29,7 +30,7 @@ class ConsolePanel(Container):
         self.agent: Optional["MythicAgent"] = None
         self.mythic_commands = MythicCommands(instance)
         self.console_output = ConsoleOutput()
-        self.console_input = ConsoleInput(prompt="> ", id="prompt")
+        self.console_input = ConsoleInput(prompt="> ", id="prompt", history=load_history())
         self.auto = CommandAutoComplete(self.console_input, candidates=self._completer_items)
 
     def compose(self) -> ComposeResult:
