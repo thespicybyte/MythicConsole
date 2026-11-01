@@ -10,7 +10,8 @@ from backend.mythic_agent.mythic_agent import MythicCommands, _load_config
 from backend.payload_type.queries import PayloadTypeQueries
 from backend.c2_profile.queries import C2ProfileQueries
 from screens.forms import FieldSpec, ParamForm
-from screens.prompts import ChoicePrompt, YesNoPrompt
+from screens.prompts import BACK, ChoicePrompt
+from screens.build_summary import BuildSummary
 from screens.select_commands import SelectCommands
 from widgets.transfer_selection import CheckSelectionList
 
@@ -154,7 +155,7 @@ async def test_prefilled_fields_populate_form_defaults(payload_commands, monkeyp
         (ChoicePrompt, ["websocket"]),
         (ParamForm, {"callback_port": "80"}),
         (SelectCommands, None),
-        (YesNoPrompt, True),
+        (BuildSummary, True),
     ])
 
     captured_args = {}
@@ -184,7 +185,7 @@ async def test_prefilled_fields_populate_form_defaults(payload_commands, monkeyp
     assert profile_form.specs[0].initial == "80"
 
     commands_modal = captured[3]
-    assert commands_modal.mode == "default"
+    assert commands_modal.included == []
 
     assembled = captured_args["config"]
     assert assembled["filename"] == "custom.bin"
@@ -220,7 +221,7 @@ async def test_full_questionnaire_assembles_canonical_config(payload_commands, m
         (ChoicePrompt, ["websocket"]),
         (ParamForm, {"callback_port": "8080"}),
         (SelectCommands, None),
-        (YesNoPrompt, True),
+        (BuildSummary, True),
     ])
 
     captured_args = {}
@@ -275,7 +276,7 @@ async def test_supported_profiles_filter_choices(payload_commands, monkeypatch):
         (ParamForm, {"selected_os": "Linux", "filename": "payload.bin"}),
         (ChoicePrompt, ["websocket"]),
         (SelectCommands, None),
-        (YesNoPrompt, True),
+        (BuildSummary, True),
     ])
 
     config = await payload_commands._payload_build_questionnaire("poseidon", {})
@@ -307,7 +308,7 @@ async def test_supported_profiles_fallback_when_join_empty(payload_commands, mon
         (ParamForm, {"selected_os": "Linux", "filename": "payload.bin"}),
         (ChoicePrompt, ["tcp"]),
         (SelectCommands, None),
-        (YesNoPrompt, True),
+        (BuildSummary, True),
     ])
 
     config = await payload_commands._payload_build_questionnaire("poseidon", {})
@@ -337,7 +338,7 @@ async def test_single_c2_profile_uses_pulldown_form(payload_commands, monkeypatc
         (ParamForm, {"selected_os": "Linux", "filename": "payload.bin"}),
         (ParamForm, {"profile": "webshell"}),
         (SelectCommands, None),
-        (YesNoPrompt, True),
+        (BuildSummary, True),
     ])
 
     config = await payload_commands._payload_build_questionnaire("poseidon", {})
@@ -355,7 +356,7 @@ async def test_multi_c2_profile_uses_checkbox_choice_prompt(payload_commands, mo
         (ParamForm, {"selected_os": "Linux", "filename": "payload.bin"}),
         (ChoicePrompt, ["websocket"]),
         (SelectCommands, None),
-        (YesNoPrompt, True),
+        (BuildSummary, True),
     ])
 
     await payload_commands._payload_build_questionnaire("poseidon", {})
@@ -364,23 +365,125 @@ async def test_multi_c2_profile_uses_checkbox_choice_prompt(payload_commands, mo
     assert captured[1].mode == "multi"
 
 
-# ----- command set -----
+# ----- back navigation -----
 
-async def test_command_set_default_leaves_commands_none(payload_commands, monkeypatch):
-    await _bare_questionnaire_setup(monkeypatch)
+def _spec(form, name):
+    return next(spec for spec in form.specs if spec.name == name)
 
-    _queue_prompt(monkeypatch, [
-        (ParamForm, {"selected_os": "Linux", "filename": "payload.bin"}),
-        (ChoicePrompt, ["websocket"]),
-        (SelectCommands, None),
-        (YesNoPrompt, True),
+
+async def test_back_from_profiles_returns_to_prefilled_payload_form(payload_commands, monkeypatch):
+    await _bare_questionnaire_setup(monkeypatch, supports_multiple=True)
+
+    _queue, captured = _queue_prompt(monkeypatch, [
+        (ParamForm, {"selected_os": "Linux", "filename": "first.bin"}),   # payload
+        (ChoicePrompt, BACK),                                             # profiles -> Back
+        (ParamForm, {"selected_os": "Linux", "filename": "second.bin"}),  # payload (re-shown)
+        (ChoicePrompt, ["websocket"]),                                    # profiles
+        (SelectCommands, None),                                           # commands
+        (BuildSummary, True),                                              # confirm
     ])
 
     config = await payload_commands._payload_build_questionnaire("poseidon", {})
-    assert config["commands"] is None
+
+    # The re-shown payload form keeps what was entered the first time.
+    reshown = captured[2]
+    assert isinstance(reshown, ParamForm)
+    assert _spec(reshown, "selected_os").initial == "Linux"
+    assert _spec(reshown, "filename").initial == "first.bin"
+    # The second pass's edit is what wins.
+    assert config["filename"] == "second.bin"
 
 
-async def test_command_set_all_uses_full_catalog(payload_commands, monkeypatch):
+async def test_back_from_confirm_returns_to_commands(payload_commands, monkeypatch):
+    await _bare_questionnaire_setup(monkeypatch, supports_multiple=True)
+
+    queue, captured = _queue_prompt(monkeypatch, [
+        (ParamForm, {"selected_os": "Linux", "filename": "payload.bin"}),  # payload
+        (ChoicePrompt, ["websocket"]),                                     # profiles
+        (SelectCommands, None),                                            # commands
+        (BuildSummary, BACK),                                               # confirm -> Back
+        (SelectCommands, None),                                            # commands (re-shown)
+        (BuildSummary, True),                                               # confirm
+    ])
+
+    config = await payload_commands._payload_build_questionnaire("poseidon", {})
+
+    assert queue == []
+    assert isinstance(captured[4], SelectCommands)
+    assert config["payload_type"] == "poseidon"
+    assert config["c2_profiles"] == [{"name": "websocket", "parameters": {}}]
+
+
+async def test_back_preserves_entered_c2_profile_parameters(payload_commands, monkeypatch):
+    async def fake_query_by_name(_session, _name):
+        return {"supported_os": ["Linux"]}
+
+    async def fake_query_build_parameters(_session, _name):
+        return []
+
+    async def fake_query_supported_c2_profiles(_session, _name):
+        return {"supports_multiple": True, "profiles": [
+            {"name": "websocket", "c2profileparameters": [
+                {"name": "callback_port", "parameter_type": "String", "required": False},
+            ]},
+        ]}
+
+    monkeypatch.setattr(PayloadTypeQueries, "query_by_name", fake_query_by_name)
+    monkeypatch.setattr(PayloadTypeQueries, "query_build_parameters", fake_query_build_parameters)
+    monkeypatch.setattr(PayloadTypeQueries, "query_supported_c2_profiles", fake_query_supported_c2_profiles)
+    monkeypatch.setattr(mythic_agent.mythic, "get_all_commands_for_payloadtype", _no_catalog)
+
+    # Back from the commands modal returns to the profile-params form, which must be
+    # pre-filled with what was just entered.
+    queue, captured = _queue_prompt(monkeypatch, [
+        (ParamForm, {"selected_os": "Linux", "filename": "payload.bin"}),  # payload
+        (ChoicePrompt, ["websocket"]),                                     # profiles
+        (ParamForm, {"callback_port": "8080"}),                            # websocket params
+        (SelectCommands, BACK),                                            # commands -> Back
+        (ParamForm, {"callback_port": "8080"}),                            # websocket params (re-shown)
+        (SelectCommands, None),                                            # commands
+        (BuildSummary, True),                                               # confirm
+    ])
+
+    config = await payload_commands._payload_build_questionnaire("poseidon", {})
+
+    reshown_params = captured[4]
+    assert isinstance(reshown_params, ParamForm)
+    assert _spec(reshown_params, "callback_port").initial == "8080"
+    assert config["c2_profiles"] == [{"name": "websocket", "parameters": {"callback_port": "8080"}}]
+
+
+# ----- command set -----
+
+async def test_command_set_opens_with_builtin_and_suggested_included(payload_commands, monkeypatch):
+    await _bare_questionnaire_setup(monkeypatch)
+
+    async def fake_catalog(_session, _payload_type_name, custom_return_attributes=None):
+        return [
+            {"cmd": "exit", "attributes": {"builtin": True}},
+            {"cmd": "shell", "attributes": {"suggested_command": True}},
+            {"cmd": "ls", "attributes": {}},
+        ]
+
+    monkeypatch.setattr(mythic_agent.mythic, "get_all_commands_for_payloadtype", fake_catalog)
+
+    _queue, captured = _queue_prompt(monkeypatch, [
+        (ParamForm, {"selected_os": "Linux", "filename": "payload.bin"}),
+        (ChoicePrompt, ["websocket"]),
+        (SelectCommands, ["exit", "shell"]),
+        (BuildSummary, True),
+    ])
+
+    config = await payload_commands._payload_build_questionnaire("poseidon", {})
+
+    commands_modal = captured[2]
+    assert commands_modal.included == ["exit", "shell"]
+    assert commands_modal.excluded == ["ls"]
+    assert commands_modal.builtin == {"exit"}
+    assert config["commands"] == ["exit", "shell"]
+
+
+async def test_command_set_returns_included_list(payload_commands, monkeypatch):
     await _bare_questionnaire_setup(monkeypatch)
 
     async def fake_catalog(_session, _payload_type_name, custom_return_attributes=None):
@@ -391,8 +494,8 @@ async def test_command_set_all_uses_full_catalog(payload_commands, monkeypatch):
     _queue_prompt(monkeypatch, [
         (ParamForm, {"selected_os": "Linux", "filename": "payload.bin"}),
         (ChoicePrompt, ["websocket"]),
-        (SelectCommands, SelectCommands.ALL),
-        (YesNoPrompt, True),
+        (SelectCommands, ["cat", "ls", "shell"]),
+        (BuildSummary, True),
     ])
 
     config = await payload_commands._payload_build_questionnaire("poseidon", {})
@@ -411,14 +514,14 @@ async def test_command_set_custom_uses_selected_subset(payload_commands, monkeyp
         (ParamForm, {"selected_os": "Linux", "filename": "payload.bin"}),
         (ChoicePrompt, ["websocket"]),
         (SelectCommands, ["ls"]),
-        (YesNoPrompt, True),
+        (BuildSummary, True),
     ])
 
     config = await payload_commands._payload_build_questionnaire("poseidon", {})
     assert config["commands"] == ["ls"]
 
 
-async def test_command_set_prefill_opens_custom_mode_prechecked(payload_commands, monkeypatch):
+async def test_command_set_prefill_included_from_config(payload_commands, monkeypatch):
     await _bare_questionnaire_setup(monkeypatch)
 
     async def fake_catalog(_session, _payload_type_name, custom_return_attributes=None):
@@ -430,14 +533,14 @@ async def test_command_set_prefill_opens_custom_mode_prechecked(payload_commands
         (ParamForm, {"selected_os": "Linux", "filename": "payload.bin"}),
         (ChoicePrompt, ["websocket"]),
         (SelectCommands, ["ls"]),
-        (YesNoPrompt, True),
+        (BuildSummary, True),
     ])
 
     config = await payload_commands._payload_build_questionnaire("poseidon", {"commands": ["ls"]})
 
     commands_modal = captured[2]
-    assert commands_modal.mode == "custom"
-    assert commands_modal.selected == {"ls"}
+    assert commands_modal.included == ["ls"]
+    assert commands_modal.excluded == ["cat"]
     assert config["commands"] == ["ls"]
 
 
@@ -460,7 +563,7 @@ async def test_cancel_at_payload_form_aborts_without_building(payload_commands, 
     monkeypatch.setattr(MythicCommands, "_run_build", boom)
 
     resp = await payload_commands._payload_build(_args(config="{}"))
-    assert resp == "[-] build cancelled"
+    assert str(resp) == "[-] build cancelled"
 
 
 async def test_cancel_at_profile_selection_aborts(payload_commands, monkeypatch):
@@ -495,7 +598,7 @@ async def test_cancel_at_final_confirm_aborts(payload_commands, monkeypatch):
         (ParamForm, {"selected_os": "Linux", "filename": "payload.bin"}),
         (ChoicePrompt, ["websocket"]),
         (SelectCommands, None),
-        (YesNoPrompt, False),
+        (BuildSummary, False),
     ])
 
     config = await payload_commands._payload_build_questionnaire("poseidon", {})
@@ -511,7 +614,7 @@ async def test_background_flag_survives_questionnaire_path(payload_commands, mon
         (ParamForm, {"selected_os": "Linux", "filename": "payload.bin"}),
         (ChoicePrompt, ["websocket"]),
         (SelectCommands, None),
-        (YesNoPrompt, True),
+        (BuildSummary, True),
     ])
 
     async def fake_create_payload(*_a, **kwargs):
@@ -579,6 +682,29 @@ async def test_param_form_regex_mismatch_blocks_submit():
 
         assert "value" not in dismissed
         assert "match" in str(modal.query_one("#error_0", Label).content)
+
+
+async def test_param_form_anchored_prefix_regex_accepts_valid_value():
+    """Mythic's verifier_regex are anchored prefix patterns (search semantics). A value
+    like `ws://127.0.0.1` must pass `^(ws|wss)://+` rather than be rejected by full-match."""
+    app = App()
+    async with app.run_test() as pilot:
+        modal = ParamForm("Build", [FieldSpec(
+            name="callback_host", parameter_type="String", required=True,
+            verifier_regex=r"^(ws|wss)://+")])
+        app.push_screen(modal)
+        await pilot.pause()
+
+        modal.query_one("#field_0", Input).value = "ws://127.0.0.1"
+        await pilot.pause()
+
+        dismissed = {}
+        modal.dismiss = lambda v=None: dismissed.setdefault("value", v)
+        await pilot.click("#ok")
+        await pilot.pause()
+
+        assert dismissed.get("value") == {"callback_host": "ws://127.0.0.1"}
+        assert str(modal.query_one("#error_0", Label).content) == ""
 
 
 async def test_param_form_one_bad_field_does_not_block_the_rest():
@@ -712,84 +838,122 @@ async def test_choice_prompt_cancel_returns_none():
         assert dismissed["value"] is None
 
 
-# ----- SelectCommands (mode selector) -----
+# ----- SelectCommands (two-pane transfer list) -----
 
-async def test_select_commands_default_mode_hides_catalog_and_returns_none():
+_CATALOG_WITH_DEFAULTS = [
+    {"cmd": "exit", "attributes": {"builtin": True}},
+    {"cmd": "shell", "attributes": {"suggested_command": True}},
+    {"cmd": "ls", "attributes": {}},
+    {"cmd": "cat", "attributes": {}},
+]
+
+
+async def test_select_commands_opens_with_default_set_included():
     app = App()
     async with app.run_test() as pilot:
-        catalog = [{"cmd": "ls"}, {"cmd": "cat"}]
-        modal = SelectCommands(catalog)
+        modal = SelectCommands(_CATALOG_WITH_DEFAULTS)
         app.push_screen(modal)
         await pilot.pause()
 
-        assert modal.query_one("#commands", CheckSelectionList).display is False
-
-        dismissed = {}
-        modal.dismiss = lambda v=None: dismissed.setdefault("value", v)
-        await pilot.click("#ok")
-        await pilot.pause()
-        assert dismissed["value"] is None
-
-
-async def test_select_commands_all_mode_returns_all_marker():
-    app = App()
-    async with app.run_test() as pilot:
-        catalog = [{"cmd": "ls"}, {"cmd": "cat"}]
-        modal = SelectCommands(catalog, mode="all")
-        app.push_screen(modal)
-        await pilot.pause()
-
-        dismissed = {}
-        modal.dismiss = lambda v=None: dismissed.setdefault("value", v)
-        await pilot.click("#ok")
-        await pilot.pause()
-        assert dismissed["value"] is SelectCommands.ALL
-
-
-async def test_select_commands_custom_mode_shows_catalog_and_filters():
-    app = App()
-    async with app.run_test() as pilot:
-        catalog = [{"cmd": "ls"}, {"cmd": "cat"}, {"cmd": "shell"}]
-        modal = SelectCommands(catalog, mode="custom")
-        app.push_screen(modal)
-        await pilot.pause()
-
-        assert modal.query_one("#commands", CheckSelectionList).display is True
-
-        filt = modal.query_one("#filter", Input)
-        filt.value = "sh"
-        filt.post_message(Input.Changed(filt, "sh"))
-        await pilot.pause()
-
-        commands_list = modal.query_one("#commands", CheckSelectionList)
-        assert [o.value for o in commands_list.options] == ["shell"]
-
-        filt.value = ""
-        filt.post_message(Input.Changed(filt, ""))
-        await pilot.pause()
-
-        commands_list.select_all()
-        await pilot.pause()
-        assert modal.selected == {"cat", "ls", "shell"}
+        included = modal.query_one("#included_list", CheckSelectionList)
+        excluded = modal.query_one("#excluded_list", CheckSelectionList)
+        assert [o.value for o in included.options] == ["exit", "shell"]
+        assert [o.value for o in excluded.options] == ["cat", "ls"]
 
         dismissed = {}
         modal.dismiss = lambda v=None: dismissed.setdefault("value", v)
         modal._ok()
-        assert dismissed["value"] == ["cat", "ls", "shell"]
+        assert dismissed["value"] == ["exit", "shell"]
 
 
-async def test_select_commands_custom_mode_preselected():
+async def test_select_commands_move_right_adds_excluded_to_included():
     app = App()
     async with app.run_test() as pilot:
-        catalog = [{"cmd": "ls"}, {"cmd": "cat"}]
-        modal = SelectCommands(catalog, mode="custom", preselected=["cat"])
+        modal = SelectCommands(_CATALOG_WITH_DEFAULTS)
         app.push_screen(modal)
         await pilot.pause()
+
+        # `>` moves from the left (Excluded) into Included.
+        excluded = modal.query_one("#excluded_list", CheckSelectionList)
+        excluded.select("ls")
+        await pilot.pause()
+        await pilot.click("#move_right")
+        await pilot.pause()
+
+        # The destination pane re-sorts alphabetically after the move.
+        assert modal.included == ["exit", "ls", "shell"]
+        assert modal.excluded == ["cat"]
+
+
+async def test_select_commands_move_left_removes_from_included():
+    app = App()
+    async with app.run_test() as pilot:
+        modal = SelectCommands(_CATALOG_WITH_DEFAULTS)
+        app.push_screen(modal)
+        await pilot.pause()
+
+        # `<` moves from the right (Included) into Excluded.
+        included = modal.query_one("#included_list", CheckSelectionList)
+        included.select("shell")
+        await pilot.pause()
+        await pilot.click("#move_left")
+        await pilot.pause()
+
+        # The destination pane re-sorts alphabetically after the move.
+        assert modal.included == ["exit"]
+        assert modal.excluded == ["cat", "ls", "shell"]
+
+
+async def test_select_commands_builtin_cannot_be_removed():
+    app = App()
+    async with app.run_test() as pilot:
+        modal = SelectCommands(_CATALOG_WITH_DEFAULTS)
+        app.push_screen(modal)
+        await pilot.pause()
+
+        # Select-all in the Included pane, then try to move everything to Excluded:
+        # the builtin (exit) stays put.
+        included = modal.query_one("#included_list", CheckSelectionList)
+        included.select_all()
+        await pilot.pause()
+        await pilot.click("#move_left")
+        await pilot.pause()
+
+        assert modal.included == ["exit"]
+        assert "exit" not in modal.excluded
+
+
+async def test_select_commands_filter_narrows_a_pane():
+    app = App()
+    async with app.run_test() as pilot:
+        modal = SelectCommands(_CATALOG_WITH_DEFAULTS)
+        app.push_screen(modal)
+        await pilot.pause()
+
+        filt = modal.query_one("#excluded_filter", Input)
+        filt.value = "ca"
+        filt.post_message(Input.Changed(filt, "ca"))
+        await pilot.pause()
+
+        excluded = modal.query_one("#excluded_list", CheckSelectionList)
+        assert [o.value for o in excluded.options] == ["cat"]
+
+
+async def test_select_commands_included_prefill_overrides_default():
+    app = App()
+    async with app.run_test() as pilot:
+        modal = SelectCommands(_CATALOG_WITH_DEFAULTS, included=["ls"])
+        app.push_screen(modal)
+        await pilot.pause()
+
+        # The explicit set wins, but builtins are always folded in.
+        assert modal.included == ["exit", "ls"]
+        assert sorted(modal.excluded) == ["cat", "shell"]
 
         dismissed = {}
         modal.dismiss = lambda v=None: dismissed.setdefault("value", v)
         modal._ok()
-        assert dismissed["value"] == ["cat"]
+        assert dismissed["value"] == ["exit", "ls"]
 
 
 async def test_select_commands_cancel_returns_cancelled_sentinel():
@@ -804,3 +968,185 @@ async def test_select_commands_cancel_returns_cancelled_sentinel():
         await pilot.click("#cancel")
         await pilot.pause()
         assert dismissed["value"] is SelectCommands.CANCELLED
+
+
+_OS_CATALOG = [
+    {"cmd": "shell", "attributes": {"suggested_command": True}},                       # all OSes
+    {"cmd": "powershell", "attributes": {"supported_os": ["Windows"], "suggested_command": True}},
+    {"cmd": "sudo", "attributes": {"supported_os": ["Linux", "macOS"]}},
+]
+
+
+async def test_select_commands_os_incompatible_is_locked_in_excluded():
+    app = App()
+    async with app.run_test() as pilot:
+        modal = SelectCommands(_OS_CATALOG, selected_os="Linux")
+        app.push_screen(modal)
+        await pilot.pause()
+
+        # powershell is Windows-only: excluded, locked, with a tooltip explaining why.
+        assert "powershell" in modal.reasons
+        assert "sudo" not in modal.reasons
+        # It stays out of the default set even though it's a suggested command.
+        assert modal.included == ["shell"]
+        assert "powershell" in modal.excluded
+
+        excluded = modal.query_one("#excluded_list", CheckSelectionList)
+        locked = next(o for o in excluded.options if o.value == "powershell")
+        assert locked.disabled is True
+        assert "Windows" in excluded.option_tooltips["powershell"]
+
+        # Even force-selected, an incompatible command can't be moved into Included.
+        modal.excluded_selected = {"powershell"}
+        modal._move_right()
+        assert "powershell" not in modal.included
+
+
+async def test_select_commands_filters_by_build_parameter():
+    app = App()
+    async with app.run_test() as pilot:
+        catalog = [
+            {"cmd": "keylog", "attributes": {"filter_by_build_parameter": {"mode": "advanced"}}},
+            {"cmd": "ls", "attributes": {}},
+        ]
+
+        blocked = SelectCommands(catalog, build_parameters={"mode": "basic"})
+        app.push_screen(blocked)
+        await pilot.pause()
+        assert "keylog" in blocked.reasons
+        assert "mode = advanced" in blocked.reasons["keylog"]
+        assert "keylog" in blocked.excluded
+
+        allowed = SelectCommands(catalog, build_parameters={"mode": "advanced"})
+        assert "keylog" not in allowed.reasons
+
+
+async def test_command_set_filters_commands_for_selected_os(payload_commands, monkeypatch):
+    await _bare_questionnaire_setup(monkeypatch)
+
+    async def fake_catalog(_session, _payload_type_name, custom_return_attributes=None):
+        return _OS_CATALOG
+
+    monkeypatch.setattr(mythic_agent.mythic, "get_all_commands_for_payloadtype", fake_catalog)
+
+    _queue, captured = _queue_prompt(monkeypatch, [
+        (ParamForm, {"selected_os": "Linux", "filename": "payload.bin"}),
+        (ChoicePrompt, ["websocket"]),
+        (SelectCommands, ["shell"]),
+        (BuildSummary, True),
+    ])
+
+    await payload_commands._payload_build_questionnaire("poseidon", {})
+
+    commands_modal = captured[2]
+    assert "powershell" in commands_modal.reasons
+
+
+# ----- BuildSummary (final review) -----
+
+async def test_build_summary_shows_collapsible_sections_and_builds():
+    from textual.widgets import Collapsible, Static
+
+    app = App()
+    async with app.run_test() as pilot:
+        modal = BuildSummary(
+            payload_type="poseidon", selected_os="Linux", filename="imp.bin",
+            build_parameters={"mode": "default"},
+            c2_profiles=[{"name": "websocket", "parameters": {"callback_port": "8080"}}],
+            commands=["shell", "ls"], description="demo", show_back=True)
+        app.push_screen(modal)
+        await pilot.pause()
+
+        titles = [c.title for c in modal.query(Collapsible)]
+        assert titles == ["Payload", "C2 profile: websocket", "Commands (2)"]
+
+        # Payload section carries the core fields (CollapsibleTitle subclasses Static, so
+        # restrict to the plain-Static section bodies).
+        bodies = " ".join(str(s.render()) for s in modal.query(Static) if type(s) is Static)
+        assert "poseidon" in bodies and "imp.bin" in bodies and "callback_port" in bodies
+
+        dismissed = {}
+        modal.dismiss = lambda v=None: dismissed.setdefault("value", v)
+        await pilot.click("#build")
+        await pilot.pause()
+        assert dismissed["value"] is True
+
+
+async def test_build_summary_back_returns_sentinel():
+    app = App()
+    async with app.run_test() as pilot:
+        modal = BuildSummary(payload_type="p", selected_os="Linux", filename="f", show_back=True)
+        app.push_screen(modal)
+        await pilot.pause()
+
+        dismissed = {}
+        modal.dismiss = lambda v=None: dismissed.setdefault("value", v)
+        await pilot.click("#back")
+        await pilot.pause()
+        assert dismissed["value"] is BACK
+
+
+async def test_build_summary_cancel_returns_false():
+    app = App()
+    async with app.run_test() as pilot:
+        modal = BuildSummary(payload_type="p", selected_os="Linux", filename="f", show_back=True)
+        app.push_screen(modal)
+        await pilot.pause()
+
+        dismissed = {}
+        modal.dismiss = lambda v=None: dismissed.setdefault("value", v)
+        await pilot.click("#cancel")
+        await pilot.pause()
+        assert dismissed["value"] is False
+
+
+# ----- colored output + quick-build line -----
+
+def test_quick_build_command_roundtrips_to_complete_config():
+    config = {
+        "selected_os": "Linux", "filename": "imp.bin",
+        "build_parameters": {"mode": "default"},
+        "c2_profiles": [{"name": "websocket", "parameters": {"callback_port": "443"}}],
+        "commands": ["ls", "shell"], "description": "x",
+    }
+    line = mythic_agent._quick_build_command("poseidon", config)
+
+    assert line.startswith("payload build poseidon --config '")
+    assert "\n" not in line  # single line
+    json_part = line[len("payload build poseidon --config '"):-1]
+    # compact separators, not pretty-printed
+    assert ", " not in json_part and '": ' not in json_part
+
+    parsed = _load_config(json_part)
+    assert mythic_agent._config_is_complete(parsed)
+    assert parsed["payload_type"] == "poseidon"
+    assert parsed["commands"] == ["ls", "shell"]
+    assert parsed["c2_profiles"] == [{"name": "websocket", "parameters": {"callback_port": "443"}}]
+
+
+async def test_successful_build_output_is_green_with_quick_build(payload_commands, monkeypatch):
+    async def fake_create_payload(*_a, **_kw):
+        return {"build_phase": "success", "uuid": "abc-123"}
+
+    async def fake_download(self, path):
+        pass
+
+    monkeypatch.setattr(mythic_agent.mythic, "create_payload", fake_create_payload)
+    monkeypatch.setattr(mythic_agent.Payload, "download", fake_download)
+
+    resp = await payload_commands._payload_build(
+        _args(config=json.dumps({"selected_os": "Linux", "filename": "payload.bin"})))
+
+    styles = {span.style for span in resp.spans}
+    assert "green" in styles and "dim" in styles
+    assert "Payload built and saved" in str(resp)
+    assert "quick build: payload build poseidon --config" in str(resp)
+
+
+async def test_cancelled_build_output_is_red(payload_commands, monkeypatch):
+    await _bare_questionnaire_setup(monkeypatch)
+    _queue_prompt(monkeypatch, [(ParamForm, None)])
+
+    resp = await payload_commands._payload_build(_args(config="{}"))
+    assert str(resp) == "[-] build cancelled"
+    assert resp.style == "red"

@@ -1,16 +1,29 @@
 import os
+import textwrap
 from typing import List, Optional
 
 from textual import on
 from textual.app import ComposeResult
 from textual.binding import Binding
 from textual.containers import Container, Horizontal
+from textual.content import Content
 from textual.screen import ModalScreen
-from textual.widgets import Button, DirectoryTree, Input, Label, SelectionList
+from textual.widgets import Button, DirectoryTree, Label, SelectionList
 
 from utils.logger import logger
 from utils.state import get_last_file_dir, set_last_file_dir
-from widgets.transfer_selection import CheckSelection, CheckSelectionList
+from widgets.transfer_selection import CHECKBOX_WIDTH, CheckSelection, CheckSelectionList
+
+
+class _Back:
+    """Sentinel dismissal value meaning 'go to the previous questionnaire step'
+    (distinct from None, which cancels the whole flow)."""
+
+    def __repr__(self) -> str:
+        return "BACK"
+
+
+BACK = _Back()
 
 
 class TaskPrompt(ModalScreen):
@@ -18,22 +31,28 @@ class TaskPrompt(ModalScreen):
 
 
 class YesNoPrompt(TaskPrompt):
-    def __init__(self, question="Are you sure?"):
+    def __init__(self, question="Are you sure?", show_back: bool = False):
         super().__init__()
         self.question = question
+        self.show_back = show_back
 
     def compose(self) -> ComposeResult:
         logger.debug("yes no prompt")
+        buttons = []
+        if self.show_back:
+            buttons.append(Button(label="Back", variant="warning", id="back"))
+        buttons.append(Button(label="Yes", variant="success", id="yes"))
+        buttons.append(Button(label="No", variant="error", id="no"))
         yield Container(
             Label(self.question),
-            Horizontal(
-                Button(label="Yes", variant="success", id="yes"),
-                Button(label="No", variant="error", id="no"),
-            ),
+            Horizontal(*buttons),
         )
 
     @on(Button.Pressed)
     def _return(self, event: Button.Pressed):
+        if event.button.id == "back":
+            self.dismiss(BACK)
+            return
         self.dismiss(event.button.id == "yes")
 
 
@@ -102,27 +121,57 @@ class ChoicePrompt(TaskPrompt):
     BINDINGS = [Binding(key="escape", action="cancel", description="cancel", show=False)]
 
     def __init__(self, label: str, choices: List[str], mode: str = "single", description: str = "",
-                 preselected: Optional[List[str]] = None):
+                 preselected: Optional[List[str]] = None, descriptions: Optional[dict] = None,
+                 show_back: bool = False):
         super().__init__()
         self.label = label
         self.choices = list(choices)
         self.mode = mode
         self.description = description
         self.preselected = set(preselected or [])
+        self.descriptions = descriptions or {}
+        self.show_back = show_back
 
     def compose(self) -> ComposeResult:
         widgets = [Label(self.label)]
         if self.description:
             widgets.append(Label(self.description, id="description"))
-        choice_list = CheckSelectionList(id="choices")
-        for choice in self.choices:
-            choice_list.add_option(CheckSelection(choice, choice, choice in self.preselected))
-        widgets.append(choice_list)
-        widgets.append(Horizontal(
-            Button(label="OK", variant="success", id="ok"),
-            Button(label="Cancel", variant="error", id="cancel"),
-        ))
+        widgets.append(CheckSelectionList(id="choices"))
+        buttons = []
+        if self.show_back:
+            buttons.append(Button(label="Back", variant="warning", id="back"))
+        buttons.append(Button(label="OK", variant="success", id="ok"))
+        buttons.append(Button(label="Cancel", variant="error", id="cancel"))
+        widgets.append(Horizontal(*buttons))
         yield Container(*widgets)
+
+    def on_mount(self) -> None:
+        # Options are added after the first layout so descriptions can be wrapped
+        # to the list's real width.
+        self.call_after_refresh(self._populate)
+
+    def _populate(self) -> None:
+        choice_list = self.query_one("#choices", CheckSelectionList)
+        width = choice_list.content_size.width or 50
+        with choice_list.prevent(SelectionList.SelectedChanged):
+            for choice in self.choices:
+                prompt = self._option_prompt(choice, width)
+                choice_list.add_option(CheckSelection(prompt, choice, choice in self.preselected))
+
+    def _option_prompt(self, choice: str, width: int) -> Content:
+        description = (self.descriptions.get(choice) or "").strip()
+        if not description:
+            return Content.from_text(choice)
+
+        # Reserve the checkbox gutter plus a small indent so wrapped description
+        # lines sit under the name, not under the checkbox.
+        indent = 2
+        text_width = max(10, width - CHECKBOX_WIDTH - indent)
+        parts: List = [(choice, "bold")]
+        for line in textwrap.wrap(description, width=text_width):
+            parts.append("\n")
+            parts.append((" " * indent + line, "dim italic"))
+        return Content.assemble(*parts)
 
     @on(SelectionList.SelectedChanged, "#choices")
     def _selection_changed(self) -> None:
@@ -142,6 +191,9 @@ class ChoicePrompt(TaskPrompt):
 
     @on(Button.Pressed)
     def _button_pressed(self, event: Button.Pressed) -> None:
+        if event.button.id == "back":
+            self.dismiss(BACK)
+            return
         if event.button.id != "ok":
             self.dismiss(None)
             return

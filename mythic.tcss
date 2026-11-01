@@ -170,7 +170,11 @@ YesNoPrompt > Container > Horizontal {
 }
 
 YesNoPrompt > Container > Horizontal > Button {
-    margin: 1 0 0 0;
+    margin: 1 0 0 2;
+}
+
+YesNoPrompt > Container > Horizontal > Button:focus {
+    text-style: none;
 }
 
 FilePrompt {
@@ -438,6 +442,32 @@ TextPrompt > Container > Horizontal > Button {
     margin: 1 0 0 0;
 }
 
+/* Generic CheckSelectionList: selection is shown by the checkbox glyph only.
+   Muted box when unchecked, success when checked, and no full-row highlight
+   band in any state (including when the list is focused). These live at app
+   scope so they beat Textual's own `OptionList:focus` default rule. */
+CheckSelectionList > .selection-list--button,
+CheckSelectionList > .selection-list--button-highlighted {
+    color: $text-muted;
+    background: transparent;
+}
+
+CheckSelectionList > .selection-list--button-selected,
+CheckSelectionList > .selection-list--button-selected-highlighted {
+    color: $text-success;
+    background: transparent;
+    text-style: bold;
+}
+
+CheckSelectionList > .option-list--option,
+CheckSelectionList > .option-list--option-highlighted,
+CheckSelectionList > .option-list--option-hover,
+CheckSelectionList:focus > .option-list--option-highlighted {
+    background: transparent;
+    color: $text;
+    text-style: none;
+}
+
 ChoicePrompt {
     align: center middle;
 }
@@ -466,21 +496,34 @@ ChoicePrompt > Container > CheckSelectionList {
     background: $panel;
 }
 
+/* No row highlight band here at all: the checkbox alone shows selection. */
+ChoicePrompt > Container > CheckSelectionList > .check-selection-list--cursor {
+    background: transparent;
+}
+
 ChoicePrompt > Container > Horizontal {
-    width: auto;
+    width: 100%;
     height: auto;
+    align-horizontal: right;
+    margin: 1 0 0 0;
 }
 
 ChoicePrompt > Container > Horizontal > Button {
-    margin: 0;
+    margin: 0 0 0 2;
 }
+
+ChoicePrompt > Container > Horizontal > Button:focus {
+    text-style: none;
+}
+
+/* ---- SelectCommands: two-pane transfer list, mirrors ManageCallbacks ---- */
 
 SelectCommands {
     align: center middle;
 }
 
 SelectCommands > Container {
-    width: 70%;
+    width: 90%;
     height: 80%;
     padding: 1 2;
     background: $panel;
@@ -491,30 +534,400 @@ SelectCommands > Container > #title {
     content-align-horizontal: center;
 }
 
-SelectCommands > Container > #filter {
-    margin: 1 0;
-    background: $panel;
-    border: solid $primary-background-lighten-1 100%;
+SelectCommands #panes {
+    height: 1fr;
 }
 
-SelectCommands > Container > #filter:focus {
-    background: $panel;
-    border: solid $primary 100%;
+SelectCommands #included_pane,
+SelectCommands #excluded_pane {
+    width: 1fr;
+    height: 100%;
 }
 
-SelectCommands > Container > #commands {
+SelectCommands #included_list,
+SelectCommands #excluded_list {
     height: 1fr;
     border: solid $primary-background-lighten-1 100%;
+    /* Match the option rows so the list has no inner ring/second border. */
     background: $panel;
 }
 
-SelectCommands > Container > Horizontal {
-    width: auto;
-    height: auto;
-    margin: 1 0 0 0;
+SelectCommands #included_filter,
+SelectCommands #excluded_filter {
+    margin: 0 0 1 0;
+    background: $panel;
+    border: solid $primary-background-lighten-1 100%;
+}
+
+SelectCommands #included_filter:focus,
+SelectCommands #excluded_filter:focus {
+    background: $panel;
+    border: solid $primary 100%;
 }
 
 SelectCommands Checkbox {
     border: none;
     background: $panel;
+}
+
+SelectCommands Checkbox:focus {
+    background: $panel;
+    background-tint: $panel 0%;
+    border: none;
+}
+
+SelectCommands Checkbox:focus > .toggle--label {
+    color: $text;
+    background: $panel;
+    text-style: none;
+}
+
+SelectCommands Checkbox > .toggle--button {
+    color: $text-muted;
+    background: $panel;
+}
+
+SelectCommands Checkbox.-on > .toggle--button {
+    color: $text-success;
+    background: $panel;
+    text-style: bold;
+}
+
+SelectCommands SelectionList > .selection-list--button,
+SelectCommands SelectionList > .selection-list--button-highlighted {
+    color: $text-muted;
+    background: $panel;
+}
+
+SelectCommands SelectionList > .selection-list--button-selected,
+SelectCommands SelectionList > .selection-list--button-selected-highlighted {
+    color: $text-success;
+    background: $panel;
+    text-style: bold;
+}
+
+/* Selection is shown by the checkbox only: no cursor/hover highlight band. */
+SelectCommands SelectionList > .option-list--option,
+SelectCommands SelectionList > .option-list--option-highlighted,
+SelectCommands SelectionList > .option-list--option-hover {
+    background: $panel;
+    color: $text;
+    text-style: none;
+}
+
+SelectCommands #move_buttons {
+    width: auto;
+    height: 100%;
+    align: center middle;
+    margin: 0 2;
+}
+
+SelectCommands #move_buttons > Button {
+    width: 5;
+    min-width: 5;
+    margin: 1 0;
+    color: $text;
+    background: $panel;
+    border: tall $primary-background-lighten-1;
+}
+
+SelectCommands #move_buttons > Button:hover {
+    background: $primary-background-lighten-1;
+    border: tall $primary-background-lighten-1;
+}
+
+SelectCommands #move_buttons > Button:focus {
+    background: $panel;
+    /* Keep the normal border on focus (no blue accent), and don't reverse/highlight
+       the arrow glyph when the button holds focus. */
+    border: tall $primary-background-lighten-1;
+    text-style: none;
+}
+
+SelectCommands #actions {
+    width: 100%;
+    height: auto;
+    align-horizontal: right;
+    margin: 1 0 0 0;
+}
+
+SelectCommands #actions > Button {
+    margin: 0 0 0 2;
+}
+
+SelectCommands #actions > Button:focus {
+    text-style: none;
+}
+
+/* ---- ParamForm: the aggregated build/C2 parameter form ---- */
+
+ParamForm {
+    align: center middle;
+}
+
+ParamForm > #param-form {
+    width: 80%;
+    max-width: 110;
+    height: 80%;
+    padding: 1 2;
+    background: $panel;
+    border: round $primary;
+}
+
+ParamForm > #param-form > #form-title {
+    width: 100%;
+    content-align-horizontal: center;
+    text-style: bold;
+    color: $text;
+    padding: 0 0 1 0;
+    border-bottom: solid $primary-background-lighten-1;
+}
+
+ParamForm > #param-form > #fields {
+    height: 1fr;
+    background: $panel;
+    padding: 0 1;
+}
+
+/* group section header */
+ParamForm .form-section {
+    width: 100%;
+    text-style: bold;
+    color: $accent;
+    border-bottom: solid $accent-darken-1;
+    margin: 1 0 0 0;
+}
+
+/* one field block: name, optional description, control, error line */
+ParamForm .form-field {
+    height: auto;
+    width: 100%;
+    margin: 1 0 0 0;
+}
+
+ParamForm .form-field > .field-label {
+    width: 100%;
+    text-style: bold;
+    color: $text;
+}
+
+ParamForm .form-field > .field-description {
+    width: 100%;
+    text-style: italic;
+    color: $text-muted;
+}
+
+ParamForm .form-field > .field-error {
+    height: auto;
+    color: $error;
+    text-style: italic;
+}
+
+ParamForm .form-field > Input,
+ParamForm .form-field > Select {
+    width: 1fr;
+    margin: 0;
+}
+
+/* themed text/number/date/file inputs, selects and text areas */
+ParamForm Input,
+ParamForm TextArea {
+    background: $panel;
+    border: solid $primary-background-lighten-1;
+}
+
+ParamForm Input:focus,
+ParamForm TextArea:focus {
+    border: solid $primary;
+}
+
+ParamForm Select > SelectCurrent {
+    background: $panel;
+    border: solid $primary-background-lighten-1;
+}
+
+ParamForm Select:focus > SelectCurrent,
+ParamForm Select.-expanded > SelectCurrent {
+    border: solid $primary;
+}
+
+ParamForm Select > SelectOverlay {
+    background: $panel;
+    border: solid $primary;
+}
+
+/* glyph checkbox (☐/☑) matching the callbacks modal — no solid-block X button */
+ParamForm GlyphCheckbox {
+    border: none;
+    background: $panel;
+    height: auto;
+    padding: 0;
+}
+
+ParamForm GlyphCheckbox:focus {
+    background: $panel;
+    background-tint: $panel 0%;
+    border: none;
+}
+
+ParamForm GlyphCheckbox:focus > .toggle--label {
+    color: $text;
+    background: $panel;
+    text-style: none;
+}
+
+ParamForm GlyphCheckbox > .toggle--button {
+    color: $text-muted;
+    background: $panel;
+}
+
+ParamForm GlyphCheckbox.-on > .toggle--button {
+    color: $text-success;
+    background: $panel;
+    text-style: bold;
+}
+
+ParamForm .form-field > CheckSelectionList {
+    height: auto;
+    max-height: 6;
+    border: solid $primary-background-lighten-1;
+    background: $panel;
+}
+
+ParamForm .form-field > TextArea {
+    height: 4;
+    border: solid $primary-background-lighten-1;
+    background: $panel;
+}
+
+ParamForm .form-field > .file-field {
+    height: auto;
+    width: 100%;
+}
+
+ParamForm .form-field > .file-field > Input {
+    width: 1fr;
+}
+
+ParamForm > #param-form > Horizontal {
+    width: 100%;
+    height: auto;
+    align-horizontal: right;
+    margin: 1 0 0 0;
+}
+
+ParamForm > #param-form > Horizontal > Button {
+    margin: 0 0 0 2;
+}
+
+/* keep the variant colour on focus; drop the default reversed-label highlight (black box) */
+ParamForm > #param-form > Horizontal > Button:focus {
+    text-style: none;
+}
+
+/* compact layout: name + control on one row, description in the footer help line */
+ParamForm .form-field.compact {
+    margin: 1 0 0 0;
+}
+
+ParamForm .compact-row {
+    width: 100%;
+    height: auto;
+}
+
+ParamForm .compact-row > .compact-label {
+    width: 22;
+    text-style: bold;
+    color: $text;
+    padding: 1 1 0 0;
+}
+
+ParamForm .compact-row > Input,
+ParamForm .compact-row > Select {
+    width: 1fr;
+}
+
+/* description line beneath a compact row: align under the control, not the name */
+ParamForm .form-field.compact > .field-description {
+    padding: 0 0 0 22;
+}
+
+/* ---- BuildSummary: final review before building ---- */
+
+BuildSummary {
+    align: center middle;
+}
+
+BuildSummary > #build-summary {
+    width: 80%;
+    max-width: 110;
+    height: 80%;
+    padding: 1 2;
+    background: $panel;
+    border: round $primary;
+}
+
+BuildSummary > #build-summary > #summary-title {
+    width: 100%;
+    content-align-horizontal: center;
+    text-style: bold;
+    color: $text;
+    padding: 0 0 1 0;
+    border-bottom: solid $primary-background-lighten-1;
+}
+
+BuildSummary #summary-body {
+    height: 1fr;
+    background: $panel;
+    padding: 0 1;
+}
+
+BuildSummary Collapsible {
+    background: $panel;
+    border: none;
+    border-top: none;
+    margin: 1 0 0 0;
+    padding: 0;
+}
+
+/* Don't tint the whole section when the title inside it holds focus. */
+BuildSummary Collapsible:focus-within {
+    background-tint: $panel 0%;
+}
+
+/* The title is just an accent-coloured heading: no block-cursor highlight bar in
+   any state (the default focus/blur styles paint a full-width reverse band). */
+BuildSummary CollapsibleTitle,
+BuildSummary CollapsibleTitle:hover,
+BuildSummary CollapsibleTitle:focus {
+    background: $panel;
+    background-tint: $panel 0%;
+    color: $accent;
+    text-style: bold;
+}
+
+/* Match the body background so the left indent reads as spacing, not a dark gutter. */
+BuildSummary Collapsible > Contents {
+    background: $panel;
+    padding: 0 0 0 3;
+}
+
+BuildSummary Collapsible Static {
+    color: $text;
+    background: $panel;
+}
+
+BuildSummary #actions {
+    width: 100%;
+    height: auto;
+    align-horizontal: right;
+    margin: 1 0 0 0;
+}
+
+BuildSummary #actions > Button {
+    margin: 0 0 0 2;
+}
+
+BuildSummary #actions > Button:focus {
+    text-style: none;
 }
