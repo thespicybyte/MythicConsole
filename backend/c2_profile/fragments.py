@@ -5,6 +5,7 @@ class C2ProfileFragments:
             fragment query_fragment on c2profile {
               id
               name
+              description
               is_p2p
               c2profileparameters {
                 name

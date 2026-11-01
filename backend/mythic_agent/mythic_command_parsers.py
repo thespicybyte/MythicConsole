@@ -33,7 +33,8 @@ payload_build_parser = payload_subparsers.add_parser('build', help='build and do
 payload_build_parser.add_argument("payload_type", help="payload type to build (see `payload list`/server catalog)")
 payload_build_parser.add_argument("-o", "--output", default=None,
                                    help="local path to save the built payload (default: temp file)")
-payload_build_parser.add_argument("--config", default=None, help="path to JSON build config")
+payload_build_parser.add_argument("--config", default=None,
+                                   help="JSON build config: a file path or a JSON string")
 
 ##### Callback Parsers #####
 

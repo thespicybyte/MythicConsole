@@ -35,7 +35,8 @@ class CheckSelection(Selection):
     """A single-line `Selection` for a `CheckSelectionList`."""
 
     def __init__(self, prompt, value, initial_state: bool = False, id=None, disabled: bool = False):
-        Option.__init__(self, Content.from_text(prompt), id, disabled)
+        content = prompt if isinstance(prompt, Content) else Content.from_text(prompt)
+        Option.__init__(self, content, id, disabled)
         self._value = value
         self._initial_state = initial_state
 
@@ -60,6 +61,20 @@ class CheckSelectionList(SelectionList):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self._keyboard_cursor = False
+        # value -> hover tooltip text (e.g. why a disabled row can't be selected).
+        self.option_tooltips: dict = {}
+
+    def _on_mouse_move(self, event: events.MouseMove) -> None:
+        super()._on_mouse_move(event)
+        index = self._mouse_hovering_over
+        tip = None
+        if index is not None and self.option_tooltips:
+            try:
+                tip = self.option_tooltips.get(self.get_option_at_index(index).value)
+            except Exception:
+                tip = None
+        if self.tooltip != tip:
+            self.tooltip = tip
 
     def _use_keyboard_cursor(self) -> None:
         if not self._keyboard_cursor:
@@ -106,28 +121,41 @@ class CheckSelectionList(SelectionList):
 
         line_number = self.scroll_offset.y + y
         try:
-            option_index, _ = self._lines[line_number]
+            option_index, line_offset = self._lines[line_number]
         except IndexError:
             return line
 
         selection = self.get_option_at_index(option_index)
         selected = selection.value in self._selected
-        component_style = "selection-list--button"
-        if selected:
-            component_style += "-selected"
-        if self.highlighted == option_index:
-            component_style += "-highlighted"
+        underlying_style = next(iter(line), Segment("", self.rich_style)).style or self.rich_style
 
-        underlying_style = next(iter(line)).style or self.rich_style
-        button_style = self.get_component_rich_style(component_style)
-        button_style += Style(meta={"option": option_index})
-        inner = CHECKED if selected else UNCHECKED
+        if line_offset == 0:
+            # The checkbox glyph is drawn once, on the option's first line; any
+            # further lines (e.g. a wrapped description) are padded to match.
+            if selection.disabled:
+                # A locked row: grey the glyph to match its dimmed text.
+                button_style = underlying_style + Style(meta={"option": option_index})
+            else:
+                component_style = "selection-list--button"
+                if selected:
+                    component_style += "-selected"
+                if self.highlighted == option_index:
+                    component_style += "-highlighted"
 
-        segments = [
-            Segment(inner, style=button_style),
-            Segment(" ", style=underlying_style),
-            *line,
-        ]
+                button_style = self.get_component_rich_style(component_style)
+                button_style += Style(meta={"option": option_index})
+            inner = CHECKED if selected else UNCHECKED
+
+            segments = [
+                Segment(inner, style=button_style),
+                Segment(" ", style=underlying_style),
+                *line,
+            ]
+        else:
+            segments = [
+                Segment(" " * CHECKBOX_WIDTH, style=underlying_style),
+                *line,
+            ]
 
         if self._keyboard_cursor and self.highlighted == option_index:
             cursor_style = self.get_component_rich_style("check-selection-list--cursor")

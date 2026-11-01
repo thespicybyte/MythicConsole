@@ -13,13 +13,19 @@ from glob import glob
 from mythic import mythic
 
 from rich.console import RenderableType
+from rich.text import Text
+from textual.app import active_app
 from textual.worker import Worker
 
 from backend import MythicInstance, Task, User, Operation, Payload, Callback
 from utils.logger import logger
 from utils.environment import Environment
-from screens.prompts import TaskPrompt
+from screens.forms import ParamForm, FieldSpec, field_spec_from_param
+from screens.prompts import BACK, TaskPrompt, ChoicePrompt
+from screens.build_summary import BuildSummary
+from screens.select_commands import SelectCommands
 from . import mythic_command_parsers
+from ..c2_profile.queries import C2ProfileQueries
 from ..callback.queries import CallbackQueries
 from ..operation.queries import OperationQueries
 from ..payload.queries import PayloadQueries
@@ -27,6 +33,12 @@ from ..payload_type.queries import PayloadTypeQueries
 from ..tasker.tasker import Tasker
 from ..formatter.formatter import Formatter, DefaultFormatter
 from ..user import UserQueries
+
+
+async def _prompt(screen):
+    """Push a modal from within a command coroutine's worker and await its dismissal value.
+    The only place this module reaches for the running App."""
+    return await active_app.get().push_screen_wait(screen)
 
 
 class MythicAgent:
@@ -824,6 +836,53 @@ class MythicAgent:
 _PAYLOAD_BUILD_TIMEOUT_SECONDS = 600
 
 
+def _config_is_complete(config: dict) -> bool:
+    """A config is complete once it has both `selected_os` and `filename`."""
+    return bool(config.get("selected_os")) and bool(config.get("filename"))
+
+
+def _quick_build_command(payload_type_name: str, config: dict) -> str:
+    """A single-line, copy-pasteable `payload build` command that reproduces this exact build
+    (compact JSON, not pretty-printed)."""
+    quick = {
+        "payload_type": payload_type_name,
+        "selected_os": config.get("selected_os"),
+        "filename": config.get("filename"),
+        "build_parameters": config.get("build_parameters") or {},
+        "c2_profiles": config.get("c2_profiles") or [],
+        "commands": config.get("commands"),
+        "description": config.get("description", ""),
+    }
+    compact = json.dumps(quick, separators=(",", ":"))
+    return f"payload build {payload_type_name} --config '{compact}'"
+
+
+def _build_ok(message: str, payload_type_name: str, config: dict) -> Text:
+    """A green success message followed by a dim, reusable quick-build line."""
+    out = Text()
+    out.append(message, style="green")
+    out.append("\n")
+    out.append(f"[*] quick build: {_quick_build_command(payload_type_name, config)}", style="dim")
+    return out
+
+
+def _build_error(message: str) -> Text:
+    """A red failure/cancel message."""
+    return Text(message, style="red")
+
+
+def _load_config(value: str) -> dict:
+    """`--config` accepts a file path or a raw JSON string. An on-disk path wins first, since a
+    bare filename (e.g. `build.json`) isn't valid JSON itself and shouldn't be misread as one."""
+    if os.path.isfile(value):
+        with open(value) as f:
+            return json.loads(f.read())
+    try:
+        return json.loads(value)
+    except json.JSONDecodeError:
+        raise ValueError(f"--config is neither a readable file nor valid JSON: {value!r}")
+
+
 def _normalize_build_parameters(raw) -> List[dict]:
     """`payload build` config `build_parameters` -> the `[{"name":..., "value":...}, ...]` shape
     `mythic.create_payload` wants. Accepts the canonical `{name: value}` dict, or a list already in
@@ -1132,53 +1191,52 @@ class MythicCommands(Cmd):
     async def _payload_build(self, args) -> RenderableType:
         try:
             if not self.instance.mythic.current_operation_id:
-                return "Error: Operation not set"
+                return _build_error("Error: Operation not set")
 
             payload_type_name = args.payload_type
 
             config = {}
             if args.config:
-                if not os.path.isfile(args.config):
-                    return f"[-] Error: config file not found: {args.config}"
-                with open(args.config, "r") as f:
-                    config = json.loads(f.read())
+                config = _load_config(args.config)
 
             config_payload_type = config.get("payload_type")
             if config_payload_type and config_payload_type != payload_type_name:
-                return (f"[-] Error: config payload_type '{config_payload_type}' conflicts with "
-                        f"requested payload type '{payload_type_name}'")
+                return _build_error(
+                    f"[-] Error: config payload_type '{config_payload_type}' conflicts with "
+                    f"requested payload type '{payload_type_name}'")
 
-            selected_os = config.get("selected_os")
-            if not selected_os:
-                return "[-] Error: config is missing required field 'selected_os'"
+            if not _config_is_complete(config):
+                config = await self._payload_build_questionnaire(payload_type_name, config)
+                if config is None:
+                    return _build_error("[-] build cancelled")
 
-            filename = config.get("filename")
-            if not filename:
-                return "[-] Error: config is missing required field 'filename'"
+            return await self._run_build(args, payload_type_name, config)
+        except Exception as e:
+            logger.error(e)
+            return _build_error(f"[-] Error: {e}")
 
-            try:
-                build_parameters = _normalize_build_parameters(config.get("build_parameters"))
-                c2_profiles = _normalize_c2_profiles(config.get("c2_profiles"))
-            except ValueError as e:
-                return f"[-] Error: {e}"
+    async def _run_build(self, args, payload_type_name: str, config: dict) -> RenderableType:
+        """The build/download core: a complete canonical config in, a built-and-downloaded
+        payload (or an early background-mode return) out. Shared by the non-interactive
+        complete-config path and the questionnaire path."""
+        selected_os = config.get("selected_os")
+        if not selected_os:
+            return _build_error("[-] Error: config is missing required field 'selected_os'")
 
-            commands = config.get("commands")
-            description = config.get("description", "")
+        filename = config.get("filename")
+        if not filename:
+            return _build_error("[-] Error: config is missing required field 'filename'")
 
-            if args.background:
-                resp = await mythic.create_payload(
-                    self.instance.mythic,
-                    payload_type_name=payload_type_name,
-                    filename=filename,
-                    operating_system=selected_os,
-                    c2_profiles=c2_profiles,
-                    commands=commands,
-                    build_parameters=build_parameters,
-                    description=description,
-                    return_on_complete=False,
-                )
-                return f"[+] Build started: uuid={resp.get('uuid')} status={resp.get('status')}"
+        try:
+            build_parameters = _normalize_build_parameters(config.get("build_parameters"))
+            c2_profiles = _normalize_c2_profiles(config.get("c2_profiles"))
+        except ValueError as e:
+            return _build_error(f"[-] Error: {e}")
 
+        commands = config.get("commands")
+        description = config.get("description", "")
+
+        if args.background:
             resp = await mythic.create_payload(
                 self.instance.mythic,
                 payload_type_name=payload_type_name,
@@ -1188,36 +1246,226 @@ class MythicCommands(Cmd):
                 commands=commands,
                 build_parameters=build_parameters,
                 description=description,
-                return_on_complete=True,
-                timeout=_PAYLOAD_BUILD_TIMEOUT_SECONDS,
+                return_on_complete=False,
             )
+            return _build_ok(
+                f"[+] Build started: uuid={resp.get('uuid')} status={resp.get('status')}",
+                payload_type_name, config)
 
-            if resp is None:
-                return "[-] Error: timed out waiting for payload build to complete"
+        resp = await mythic.create_payload(
+            self.instance.mythic,
+            payload_type_name=payload_type_name,
+            filename=filename,
+            operating_system=selected_os,
+            c2_profiles=c2_profiles,
+            commands=commands,
+            build_parameters=build_parameters,
+            description=description,
+            return_on_complete=True,
+            timeout=_PAYLOAD_BUILD_TIMEOUT_SECONDS,
+        )
 
-            build_phase = resp.get("build_phase")
-            uuid = resp.get("uuid")
-            if build_phase != "success":
-                detail = "\n".join(part for part in (resp.get("build_message"), resp.get("build_stderr")) if part)
-                return f"[-] Build failed (phase={build_phase}): {detail}"
+        if resp is None:
+            return _build_error("[-] Error: timed out waiting for payload build to complete")
 
-            if args.output:
-                output_path = Path(args.output)
-            else:
-                fd, temp_name = tempfile.mkstemp(prefix="payload_", suffix=f"_{filename}")
-                os.close(fd)
-                output_path = Path(temp_name)
+        build_phase = resp.get("build_phase")
+        uuid = resp.get("uuid")
+        if build_phase != "success":
+            detail = "\n".join(part for part in (resp.get("build_message"), resp.get("build_stderr")) if part)
+            return _build_error(f"[-] Build failed (phase={build_phase}): {detail}")
 
-            if not os.path.isdir(output_path.parent):
-                os.makedirs(output_path.parent, exist_ok=True)
+        if args.output:
+            output_path = Path(args.output)
+        else:
+            fd, temp_name = tempfile.mkstemp(prefix="payload_", suffix=f"_{filename}")
+            os.close(fd)
+            output_path = Path(temp_name)
 
-            payload = Payload(self.instance, payload_uuid=uuid)
-            await payload.download(output_path)
+        if not os.path.isdir(output_path.parent):
+            os.makedirs(output_path.parent, exist_ok=True)
 
-            return f"[+] Payload built and saved to {output_path} (uuid={uuid})"
-        except Exception as e:
-            logger.error(e)
-            return f"[-] Error: {e}"
+        payload = Payload(self.instance, payload_uuid=uuid)
+        await payload.download(output_path)
+
+        return _build_ok(
+            f"[+] Payload built and saved to {output_path} (uuid={uuid})",
+            payload_type_name, config)
+
+    async def _payload_build_questionnaire(self, payload_type_name: str, config: dict) -> Optional[dict]:
+        """Walk the operator through whatever `config` doesn't already answer via a handful of
+        aggregated form modals (one for the payload itself, one per selected C2 profile, one for
+        the command set), pre-filling every field from `config`, then return the assembled
+        canonical config (`{payload_type, selected_os, filename, build_parameters, c2_profiles,
+        commands, description}`) for `_run_build`. None means the operator cancelled somewhere
+        along the way."""
+        payload_type = await PayloadTypeQueries.query_by_name(self.instance.mythic, payload_type_name)
+        build_param_schema = await PayloadTypeQueries.query_build_parameters(
+            self.instance.mythic, payload_type_name)
+        supported_os = payload_type.get("supported_os") or []
+
+        existing_profiles = {entry["name"]: entry.get("parameters") or {}
+                             for entry in (config.get("c2_profiles") or [])}
+
+        # Fetched lazily the first time their stage is reached (and cached here), so
+        # cancelling at the first form costs no extra server round-trips.
+        available: Optional[List[dict]] = None
+        supports_multiple = False
+        profile_descriptions: dict = {}
+        catalog: Optional[List[dict]] = None
+
+        # Running answers, seeded from `config` and carried across Back/forward moves so no
+        # step is ever lost. Each stage pre-fills its form from here and writes back on OK.
+        state = {
+            "selected_os": config.get("selected_os"),
+            "filename": config.get("filename") or payload_type_name,
+            "build_parameters": dict(config.get("build_parameters") or {}),
+            "chosen_names": list(existing_profiles),
+            "profile_params": {name: dict(params) for name, params in existing_profiles.items()},
+            "commands": config.get("commands"),
+        }
+
+        def profiles_needing_params() -> List[dict]:
+            return [p for p in available
+                    if p["name"] in state["chosen_names"] and (p.get("c2profileparameters"))]
+
+        stage = "payload"
+        profile_cursor = 0
+        while True:
+            if stage == "payload":
+                if supported_os:
+                    os_spec = FieldSpec(name="selected_os", parameter_type="ChooseOne", choices=supported_os,
+                                        initial=state["selected_os"], required=True, label="Operating system")
+                else:
+                    os_spec = FieldSpec(name="selected_os", parameter_type="String",
+                                        initial=state["selected_os"], required=True, label="Operating system")
+                filename_spec = FieldSpec(name="filename", parameter_type="String", required=True,
+                                          label="Filename", initial=state["filename"])
+                payload_specs = [os_spec, filename_spec]
+                payload_specs += [field_spec_from_param(param, initial=state["build_parameters"].get(param["name"]))
+                                  for param in build_param_schema]
+
+                answers = await _prompt(ParamForm(f"Build '{payload_type_name}'", payload_specs))
+                if answers is None:
+                    return None
+                state["selected_os"] = answers.pop("selected_os")
+                state["filename"] = answers.pop("filename")
+                state["build_parameters"] = answers
+                stage = "profiles"
+
+            elif stage == "profiles":
+                if available is None:
+                    supported = await PayloadTypeQueries.query_supported_c2_profiles(
+                        self.instance.mythic, payload_type_name)
+                    available = supported["profiles"]
+                    if not available:
+                        available = await C2ProfileQueries.query_all_c2_profiles(self.instance.mythic)
+                    supports_multiple = supported["supports_multiple"]
+                    profile_descriptions = {p["name"]: p.get("description") or "" for p in available}
+
+                if supports_multiple:
+                    result = await _prompt(ChoicePrompt(
+                        "C2 profile(s)", [p["name"] for p in available], mode="multi",
+                        preselected=state["chosen_names"], descriptions=profile_descriptions,
+                        show_back=True))
+                    if result is BACK:
+                        stage = "payload"
+                        continue
+                    if result is None:
+                        return None
+                    if not result:
+                        # Nothing picked: a payload needs at least one profile, so re-show.
+                        continue
+                    state["chosen_names"] = list(result)
+                else:
+                    profile_spec = FieldSpec(name="profile", parameter_type="ChooseOne", required=True,
+                                             choices=[p["name"] for p in available],
+                                             initial=(state["chosen_names"][0] if state["chosen_names"] else None))
+                    result = await _prompt(ParamForm("C2 profile", [profile_spec],
+                                                     groups_as_sections=False, show_back=True))
+                    if result is BACK:
+                        stage = "payload"
+                        continue
+                    if not result or not result.get("profile"):
+                        return None
+                    state["chosen_names"] = [result["profile"]]
+                profile_cursor = 0
+                stage = "profile_params"
+
+            elif stage == "profile_params":
+                needing = profiles_needing_params()
+                if not needing or profile_cursor >= len(needing):
+                    stage = "commands"
+                    continue
+                if profile_cursor < 0:
+                    stage = "profiles"
+                    continue
+                profile = needing[profile_cursor]
+                name = profile["name"]
+                existing = state["profile_params"].get(name, {})
+                specs = [field_spec_from_param(param, initial=existing.get(param["name"]))
+                         for param in profile["c2profileparameters"]]
+                answers = await _prompt(ParamForm(f"{name} parameters", specs, show_back=True))
+                if answers is None:
+                    return None
+                if answers is BACK:
+                    profile_cursor -= 1
+                    continue
+                state["profile_params"][name] = answers
+                profile_cursor += 1
+
+            elif stage == "commands":
+                if catalog is None:
+                    catalog = await self._fetch_build_command_catalog(payload_type_name)
+                included = state["commands"] if isinstance(state["commands"], list) else None
+                # Effective build-parameter values (operator entry, else the param default) so
+                # SelectCommands can apply Mythic's `filter_by_build_parameter` command rules.
+                effective_build_params = {
+                    param["name"]: state["build_parameters"].get(param["name"], param.get("default_value"))
+                    for param in build_param_schema}
+                result = await _prompt(SelectCommands(
+                    catalog, included=included, selected_os=state["selected_os"],
+                    build_parameters=effective_build_params, show_back=True))
+                if result is SelectCommands.CANCELLED:
+                    return None
+                if result is BACK:
+                    needing = profiles_needing_params()
+                    if needing:
+                        profile_cursor = len(needing) - 1
+                        stage = "profile_params"
+                    else:
+                        stage = "profiles"
+                    continue
+                state["commands"] = result
+                stage = "confirm"
+
+            elif stage == "confirm":
+                c2_profiles = [{"name": p["name"],
+                                "parameters": state["profile_params"].get(p["name"], {})}
+                               for p in available if p["name"] in state["chosen_names"]]
+                confirmed = await _prompt(BuildSummary(
+                    payload_type=payload_type_name, selected_os=state["selected_os"],
+                    filename=state["filename"], build_parameters=state["build_parameters"],
+                    c2_profiles=c2_profiles, commands=state["commands"],
+                    description=config.get("description", ""), show_back=True))
+                if confirmed is BACK:
+                    stage = "commands"
+                    continue
+                if not confirmed:
+                    return None
+
+                return {
+                    "payload_type": payload_type_name,
+                    "selected_os": state["selected_os"],
+                    "filename": state["filename"],
+                    "build_parameters": state["build_parameters"],
+                    "c2_profiles": c2_profiles,
+                    "commands": state["commands"],
+                    "description": config.get("description", ""),
+                }
+
+    async def _fetch_build_command_catalog(self, payload_type_name: str) -> List[dict]:
+        return await mythic.get_all_commands_for_payloadtype(
+            self.instance.mythic, payload_type_name, custom_return_attributes=_CMD_ATTRS)
 
     add_default_options(mythic_command_parsers.payload_build_parser)
     mythic_command_parsers.payload_build_parser.set_defaults(func=_payload_build)
