@@ -72,6 +72,16 @@ class Environment:
             return log_file
         return ".console.log"
 
+    def history_file(self) -> str:
+        """
+        check environment variables for `HISTORY_FILE`.
+        Returns `config_directory()/history.json` if not set
+        """
+        history_file = os.getenv("HISTORY_FILE") or self.get_value_from_config("HISTORY_FILE")
+        if history_file:
+            return os.path.expanduser(history_file)
+        return os.path.join(self.config_directory(), "history.json")
+
     def log_level(self) -> int:
         """
         check environment variables for `LOG_LEVEL`.
