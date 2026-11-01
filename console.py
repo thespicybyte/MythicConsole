@@ -17,6 +17,7 @@ from backend.payload_type.queries import PayloadTypeQueries
 from plugins import get_plugin_registry, load_installed_plugins
 from screens.home import Home
 from screens.login import LoginScreen
+from utils import state
 from utils.logger import logger
 
 
@@ -112,7 +113,9 @@ class MythicConsole(App, inherit_bindings=False):
         if not self._theme_preview_active:
             return
         self._theme_preview_active = False
-        if not event.option_selected and self._theme_before_preview is not None:
+        if event.option_selected:
+            state.set_theme(self.theme)
+        elif self._theme_before_preview is not None:
             self.theme = self._theme_before_preview
 
     def copy_to_clipboard(self, text: str) -> None:
@@ -126,6 +129,9 @@ class MythicConsole(App, inherit_bindings=False):
     def on_mount(self):
         logger.debug("starting console")
         load_installed_plugins()
+        saved_theme = state.get_theme()
+        if saved_theme and saved_theme in self.available_themes:
+            self.theme = saved_theme
         self.push_screen(LoginScreen(), callback=self.handle_login_response)
 
     def compose(self) -> ComposeResult:

@@ -6,6 +6,11 @@ from console import MythicConsole
 from screens.login import LoginScreen
 
 
+@pytest.fixture(autouse=True)
+def isolated_config_home(tmp_path, monkeypatch):
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path / "config"))
+
+
 @pytest.mark.asyncio
 async def test_logout_cancels_workers_and_returns_to_login():
     app = MythicConsole()

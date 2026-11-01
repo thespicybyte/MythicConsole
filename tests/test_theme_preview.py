@@ -2,6 +2,12 @@ import pytest
 from textual.command import CommandPalette
 
 from console import MythicConsole
+from utils import state
+
+
+@pytest.fixture(autouse=True)
+def isolated_config_home(tmp_path, monkeypatch):
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path / "config"))
 
 
 def _palette_background(app):
@@ -31,6 +37,7 @@ async def test_theme_preview_and_restore():
         await pilot.press("escape")
         await pilot.pause()
         assert app.theme == original
+        assert state.get_theme() is None
 
         app.search_themes()
         await pilot.pause()
@@ -43,6 +50,7 @@ async def test_theme_preview_and_restore():
         await pilot.press("enter")
         await pilot.pause()
         assert app.theme == "gruvbox"
+        assert state.get_theme() == "gruvbox"
 
         app.search_themes()
         await pilot.pause()

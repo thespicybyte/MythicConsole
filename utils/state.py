@@ -37,3 +37,14 @@ def set_last_file_dir(directory: str) -> None:
     state = _read_state()
     state["last_file_dir"] = directory
     _write_state(state)
+
+
+def get_theme() -> Optional[str]:
+    value = _read_state().get("theme")
+    return value if isinstance(value, str) else None
+
+
+def set_theme(name: str) -> None:
+    state = _read_state()
+    state["theme"] = name
+    _write_state(state)
