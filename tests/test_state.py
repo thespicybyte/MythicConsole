@@ -59,3 +59,54 @@ def test_set_last_file_dir_preserves_other_keys(tmp_path):
 
     assert data["other_key"] == "keep-me"
     assert data["last_file_dir"] == str(target)
+
+
+def test_get_theme_is_none_when_no_state_file():
+    assert state.get_theme() is None
+
+
+def test_set_then_get_theme_round_trips():
+    state.set_theme("gruvbox")
+
+    assert state.get_theme() == "gruvbox"
+
+
+def test_set_theme_preserves_last_file_dir(tmp_path):
+    target = tmp_path / "picks"
+    target.mkdir()
+    state.set_last_file_dir(str(target))
+
+    state.set_theme("nord")
+
+    assert state.get_last_file_dir() == str(target)
+    assert state.get_theme() == "nord"
+
+
+def test_set_last_file_dir_preserves_theme(tmp_path):
+    state.set_theme("nord")
+
+    target = tmp_path / "picks"
+    target.mkdir()
+    state.set_last_file_dir(str(target))
+
+    assert state.get_theme() == "nord"
+    assert state.get_last_file_dir() == str(target)
+
+
+def test_get_theme_falls_back_to_none_on_corrupt_state_file(tmp_path):
+    config_dir = os.path.join(str(tmp_path / "config"), "mythicconsole")
+    os.makedirs(config_dir, exist_ok=True)
+    with open(os.path.join(config_dir, "state.json"), "w") as f:
+        f.write("not json{{{")
+
+    assert state.get_theme() is None
+
+
+def test_get_theme_falls_back_to_none_on_non_str_value():
+    from utils.environment import Environment
+
+    state_file = os.path.join(Environment().config_directory(), "state.json")
+    with open(state_file, "w") as f:
+        json.dump({"theme": 123}, f)
+
+    assert state.get_theme() is None
