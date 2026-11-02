@@ -36,6 +36,8 @@ payload_build_parser.add_argument("-o", "--output", default=None,
 payload_build_parser.add_argument("--config", default=None,
                                    help="JSON build config: a file path or a JSON string")
 
+payload_types_parser = payload_subparsers.add_parser('types', help='list payload types available on the server')
+
 ##### Callback Parsers #####
 
 callback_parser = Cmd2ArgumentParser()
