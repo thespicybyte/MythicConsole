@@ -12,7 +12,8 @@ from cmd2 import cmd2, with_argparser, Cmd, Cmd2ArgumentParser
 from glob import glob
 from mythic import mythic
 
-from rich.console import RenderableType
+from rich.console import Group, RenderableType
+from rich.panel import Panel
 from rich.text import Text
 from textual.app import active_app
 from textual.worker import Worker
@@ -871,6 +872,17 @@ def _build_error(message: str) -> Text:
     return Text(message, style="red")
 
 
+def _theme_key_and_status_styles() -> tuple[str, str, str]:
+    """(key style, success style, error style) from the running app's active theme, so output
+    written to the console (a Rich RenderableType, not a themed Content/Static widget) still
+    tracks the theme. Falls back to plain colors when no app is running (e.g. tests)."""
+    try:
+        theme = active_app.get().current_theme
+        return f"bold {theme.primary}", theme.success, theme.error
+    except LookupError:
+        return "bold cyan", "green", "red"
+
+
 def _load_config(value: str) -> dict:
     """`--config` accepts a file path or a raw JSON string. An on-disk path wins first, since a
     bare filename (e.g. `build.json`) isn't valid JSON itself and shouldn't be misread as one."""
@@ -946,6 +958,7 @@ class MythicCommands(Cmd):
             "user list": mythic_command_parsers.user_list_parser,
             "user create": mythic_command_parsers.user_create_parser,
             "payload list": mythic_command_parsers.payload_list_parser,
+            "payload types": mythic_command_parsers.payload_types_parser,
             "payload download": mythic_command_parsers.payload_download_parser,
             "payload build": mythic_command_parsers.payload_build_parser,
             "callback export": mythic_command_parsers.callback_export_parser,
@@ -1155,6 +1168,43 @@ class MythicCommands(Cmd):
             return f"Error: {e}"
 
     mythic_command_parsers.payload_list_parser.set_defaults(func=_payload_list)
+
+    async def _payload_types(self, _args):
+        try:
+            payload_types = await PayloadTypeQueries.query_all_payload_types(self.instance.mythic)
+            key_style, success_style, error_style = _theme_key_and_status_styles()
+            cards = []
+            for payload_type in payload_types or []:
+                if payload_type.get("deleted"):
+                    continue
+
+                agent_type = payload_type.get("agent_type") or ""
+                supported_os = ", ".join(payload_type.get("supported_os") or [])
+                running = bool(payload_type.get("container_running"))
+                note = (payload_type.get("note") or "").strip()
+
+                body = Text()
+                body.append("agent type: ", style=key_style)
+                body.append(f"{agent_type}\n")
+                body.append("supported OS: ", style=key_style)
+                body.append(f"{supported_os}\n")
+                body.append("container running: ", style=key_style)
+                body.append("yes" if running else "no", style=success_style if running else error_style)
+                if note:
+                    body.append("\n\n")
+                    body.append(note)
+
+                cards.append(Panel(body, title=payload_type.get("name")))
+
+            if not cards:
+                return "No payload types found"
+
+            return Group(*cards)
+        except Exception as e:
+            logger.error(e)
+            return f"Error: {e}"
+
+    mythic_command_parsers.payload_types_parser.set_defaults(func=_payload_types)
 
     async def _payload_download(self, args):
         try:

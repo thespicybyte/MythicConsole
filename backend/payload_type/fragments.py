@@ -11,6 +11,8 @@ class PayloadTypeFragments:
               deleted
               name
               supported_os
+              note
+              container_running
             }"""
         return fragment
 
