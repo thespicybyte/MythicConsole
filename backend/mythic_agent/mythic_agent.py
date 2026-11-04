@@ -1153,7 +1153,7 @@ class MythicCommands(Cmd):
             cards = []
             for profile in sorted(profiles or [], key=lambda p: p.get("name") or ""):
                 container_running = bool(profile.get("container_running"))
-                running = bool(profile.get("running"))
+                server_running = bool(profile.get("running"))
                 is_p2p = bool(profile.get("is_p2p"))
                 description = (profile.get("description") or "").strip()
 
@@ -1164,8 +1164,8 @@ class MythicCommands(Cmd):
                 body.append("\n")
                 if not is_p2p:
                     body.append("server running: ", style=key_style)
-                    body.append("yes" if running else "no",
-                                 style=success_style if running else error_style)
+                    body.append("yes" if server_running else "no",
+                                 style=success_style if server_running else error_style)
                     body.append("\n")
                 body.append("p2p: ", style=key_style)
                 body.append("yes" if is_p2p else "no")
