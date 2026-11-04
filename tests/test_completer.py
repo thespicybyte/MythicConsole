@@ -16,7 +16,7 @@ def mythic_commands(fake_instance):
 def test_empty_line_lists_only_real_global_commands(mythic_commands):
     items = mythic_commands.get_completer_items("")
 
-    assert set(items) == {"callback", "operation", "payload", "user", "op"}
+    assert set(items) == {"callback", "operation", "payload", "user", "op", "profiles"}
 
 
 def test_empty_line_excludes_cmd2_builtins(mythic_commands):
@@ -29,7 +29,7 @@ def test_commands_property_excludes_cmd2_builtins(mythic_commands):
     # the property returns do_-prefixed names; none may be a cmd2 built-in
     names = {name.removeprefix("do_") for name in mythic_commands.commands}
 
-    assert names == {"callback", "operation", "payload", "user"}
+    assert names == {"callback", "operation", "payload", "user", "profiles"}
 
 
 async def test_empty_string_lists_top_level_commands(test_plugin_agent):
