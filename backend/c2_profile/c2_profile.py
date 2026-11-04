@@ -16,6 +16,8 @@ class C2Profile:
         self.id = c2_profile_id
         self.name = name
         self.is_p2p = False
+        self.container_running: bool = False
+        self.running: bool = False
         self.parameters: List[dict] = []
 
     def __str__(self):
@@ -28,6 +30,10 @@ class C2Profile:
             self.name = data.get("name")
         if data.get("is_p2p") is not None:
             self.is_p2p = data.get("is_p2p")
+        if data.get("container_running") is not None:
+            self.container_running = data.get("container_running")
+        if data.get("running") is not None:
+            self.running = data.get("running")
         if data.get("c2profileparameters") is not None:
             self.parameters = data.get("c2profileparameters")
 

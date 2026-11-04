@@ -952,9 +952,11 @@ class MythicCommands(Cmd):
         ]
         self._command_parsers: Dict[str, Cmd2ArgumentParser] = {
             "operation": mythic_command_parsers.operation_parser,
+            "profiles": mythic_command_parsers.profiles_parser,
         }
         self._subcommand_parsers: Dict[str, Cmd2ArgumentParser] = {
             "operation list": mythic_command_parsers.operation_list_parser,
+            "profiles list": mythic_command_parsers.profiles_list_parser,
             "user list": mythic_command_parsers.user_list_parser,
             "user create": mythic_command_parsers.user_create_parser,
             "payload list": mythic_command_parsers.payload_list_parser,
@@ -1137,6 +1139,51 @@ class MythicCommands(Cmd):
             return f"Error: {e}"
 
     mythic_command_parsers.operation_list_parser.set_defaults(func=_operation_list)
+
+    @with_argparser(mythic_command_parsers.profiles_parser)
+    def do_profiles(self, args):
+        func = getattr(args, 'func', None)
+        if func:
+            return func(self, args)
+
+    async def _profiles_list(self, _args):
+        try:
+            profiles = await C2ProfileQueries.query_all_c2_profiles(self.instance.mythic)
+            key_style, success_style, error_style = _theme_key_and_status_styles()
+            cards = []
+            for profile in sorted(profiles or [], key=lambda p: p.get("name") or ""):
+                container_running = bool(profile.get("container_running"))
+                running = bool(profile.get("running"))
+                is_p2p = bool(profile.get("is_p2p"))
+                description = (profile.get("description") or "").strip()
+
+                body = Text()
+                body.append("container running: ", style=key_style)
+                body.append("yes" if container_running else "no",
+                             style=success_style if container_running else error_style)
+                body.append("\n")
+                if not is_p2p:
+                    body.append("server running: ", style=key_style)
+                    body.append("yes" if running else "no",
+                                 style=success_style if running else error_style)
+                    body.append("\n")
+                body.append("p2p: ", style=key_style)
+                body.append("yes" if is_p2p else "no")
+                if description:
+                    body.append("\n\n")
+                    body.append(description)
+
+                cards.append(Panel(body, title=profile.get("name")))
+
+            if not cards:
+                return "No c2 profiles found"
+
+            return Group(*cards)
+        except Exception as e:
+            logger.error(e)
+            return f"Error: {e}"
+
+    mythic_command_parsers.profiles_list_parser.set_defaults(func=_profiles_list)
 
     @with_argparser(mythic_command_parsers.payload_parser)
     def do_payload(self, args):

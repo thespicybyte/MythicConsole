@@ -7,6 +7,8 @@ class C2ProfileFragments:
               name
               description
               is_p2p
+              container_running
+              running
               c2profileparameters {
                 name
                 description

@@ -38,6 +38,13 @@ payload_build_parser.add_argument("--config", default=None,
 
 payload_types_parser = payload_subparsers.add_parser('types', help='list payload types available on the server')
 
+##### C2 Profile Parsers #####
+
+profiles_parser = Cmd2ArgumentParser()
+profiles_subparsers = profiles_parser.add_subparsers(title='subcommands', help='subcommand help')
+
+profiles_list_parser = profiles_subparsers.add_parser('list', help='list c2 profiles')
+
 ##### Callback Parsers #####
 
 callback_parser = Cmd2ArgumentParser()
