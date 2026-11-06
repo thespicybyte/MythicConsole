@@ -2,18 +2,15 @@
 
 Mythic Console is a terminal user interface that can be used to interact
 with [Mythic C2](https://github.com/its-a-feature/Mythic).
-Mythic Console is not designed to replace the web interface but rather provide an alternate interface to experience for
+Mythic Console is not designed to replace the web interface but rather provide an alternate interface for
 users to interact with callbacks and operations. This application was made with [Textual](https://textual.textualize.io/).
-
-> [!NOTE]
-> This is a pre-release under in active development.
 
 # Supported Agents
 
 Any Mythic payload type works out of the box: Mythic Console generates its commands from the
 server's own command catalog, no agent-specific code required. An agent can be enhanced further
 with an installable plugin (custom commands, output rendering, scripts). See
-[customize.md](customize.md). Poseidon ships as such a plugin, in its own repo.
+[customize.md](customize.md).
 
 # Demo
 
@@ -28,7 +25,7 @@ command and file pickers, autocomplete, and live callback management.
 
 ![tasking a callback](docs/images/callback-tasking.svg)
 
-See [What's New in 2.0](docs/whats-new-2.0.md) for the full tour.
+See [What's New in 2.0](docs/whats-new-2.0.md) for more details.
 
 # Quick Start
 

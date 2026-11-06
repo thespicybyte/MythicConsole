@@ -22,8 +22,7 @@ A payload type with no curation falls back to a generic agent, so nothing is eve
 ## Curate an agent with a plugin
 
 When you want more than the generated baseline, such as a custom command, tailored output rendering, a
-confirmation prompt, or a client-side script, you ship it as an installable plugin. Poseidon now ships
-as a plugin of its own rather than living in this repo. Plugins are managed from the command line:
+confirmation prompt, or a client-side script, you ship it as an installable plugin. Plugins are managed from the command line:
 
 ```shell
 console.py install <github-url-or-path>    # install a plugin
