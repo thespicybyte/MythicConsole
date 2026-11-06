@@ -1,6 +1,6 @@
-# What's New in 2.0
+# What's New in 1.0
 
-Mythic Console 2.0 is a large release. The headline change is that **any Mythic payload type now
+Mythic Console 1.0 is a large release. The headline change is that **any Mythic payload type now
 works out of the box**: the console builds its command set from the server's own catalog, so no
 agent-specific code is required. On top of that baseline, this release adds a plugin system for
 curation, new global commands for payloads and C2 profiles, an interactive payload builder, command
@@ -13,7 +13,7 @@ This page is a short tour. For installation and configuration, see the [README](
 
 ## Any payload type, no code required
 
-The biggest change in 2.0 is how agents are supported. Mythic Console builds each agent's command set
+The biggest change in 1.0 is how agents are supported. Mythic Console builds each agent's command set
 directly from the payload type's command catalog on the server, so a payload type works the moment it
 is installed on Mythic, with no agent-specific code in this project. The generated commands carry the
 real parameter definitions from the server, including rich parameter types and dynamic choice lists.
