@@ -12,7 +12,7 @@ users to interact with callbacks and operations. This application was made with 
 
 Any Mythic payload type works out of the box: Mythic Console generates its commands from the
 server's own command catalog, no agent-specific code required. An agent can be enhanced further
-with an installable plugin (custom commands, output rendering, scripts) — see
+with an installable plugin (custom commands, output rendering, scripts). See
 [customize.md](customize.md). Poseidon ships as such a plugin, in its own repo.
 
 # Demo
@@ -88,7 +88,7 @@ On a terminal that sends `Alt` correctly, you can also use `Alt+Left` to shrink 
 # Extend Mythic Console
 
 Supporting a new agent needs zero code. Check out the [customization page](customize.md) to learn
-how to add polish as an installable plugin — a curated command, a custom renderer, a confirmation
+how to add polish as an installable plugin: a curated command, a custom renderer, a confirmation
 prompt, a client-side script, or a full hand-written agent.
 
 # Road Map

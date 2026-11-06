@@ -4,7 +4,7 @@ Mythic Console generates commands for any connected callback from the Mythic ser
 catalog, so a new agent works with zero code. Curation is optional: add polish one piece at a time,
 only where the generated behavior is not good enough. The curation you write ships as a **plugin**,
 a standalone package installed into the console, not a file you add to this repo. Poseidon is the
-fully-curated end of that spectrum — it ships as its own plugin.
+fully-curated end of that spectrum: it ships as its own plugin.
 
 ## Zero-code: connect a callback, get commands
 
@@ -19,7 +19,7 @@ return MythicAgent(payload_type_name, instance, DefaultFormatter())
 `MythicAgent.load_commands` then calls `get_agent_commands`, which queries
 `mythic.get_all_commands_for_payloadtype` for every command the payload type defines and builds an
 `AgentCommand` for each one with `AgentCommand.from_server`. `from_server` reads each command's
-`commandparameters` and builds a `Cmd2ArgumentParser` from them — booleans, numbers, arrays,
+`commandparameters` and builds a `Cmd2ArgumentParser` from them. Booleans, numbers, arrays,
 choice lists, files, and so on all map to the right argparse flag automatically. A `do_<name>`
 method is bound for you, so the command is immediately usable.
 
@@ -38,7 +38,7 @@ separately caches which commands are actually loaded on the callback
 (`MythicAgent._cache_loaded_commands`, via `CallbackQueries.get_loaded_commands`), and a parameter
 flagged `choices_are_loaded_commands` is checked against that set. That check is fail-open: if the
 loaded set isn't known, the value is allowed through. In short, a generated command may appear that
-isn't currently loaded on the callback — there's no load-gating UI in the console yet.
+isn't currently loaded on the callback. There's no load-gating UI in the console yet.
 
 ## Add polish incrementally
 
@@ -148,7 +148,7 @@ class Net(AgentCommand):
     net_connect_parser.set_defaults(func=net_connect)
 ```
 
-Note the `Task(..., callback=self._agent.tasker.callback)` constructor — build a `Task` this way,
+Note the `Task(..., callback=self._agent.tasker.callback)` constructor: build a `Task` this way,
 not with `callback_display_id=...`.
 
 ### 2. Customize how output renders
@@ -199,12 +199,12 @@ class Exit(AgentCommand):
 ### 4. Add a client-side script (ScriptCommand)
 
 A script is an `AgentCommand` whose `do_<name>` can return a renderable directly instead of a
-`Task` — useful for a client-side action that doesn't need a server round trip. `ScriptCommand` is
+`Task`, useful for a client-side action that doesn't need a server round trip. `ScriptCommand` is
 `AgentCommand` itself (`ScriptCommand = AgentCommand`); what makes a command a script is where the
 file lives.
 
 Place it at `scripts/<name>.py`. Any `ScriptCommand` subclass defined in that file is discovered
-and loaded automatically — name the class whatever reads well; it does not need to match the
+and loaded automatically. Name the class whatever reads well; it does not need to match the
 filename:
 
 ```python
@@ -256,7 +256,7 @@ class Ping(ScriptCommand):
 
 ### 5. Hand-write a full agent class (override everything)
 
-For full control, subclass `PluginAgent` (not `MythicAgent` directly — see below) and override
+For full control, subclass `PluginAgent` (not `MythicAgent` directly; see below) and override
 whatever you need:
 
 ```python
@@ -288,7 +288,7 @@ scripts, all on top of the same generated baseline.
 python console.py plugin new <name> <payload-type> [--author A] [--description D] [--dir PARENT]
 ```
 
-This generates `<PARENT>/<name>/` — a package that installs and loads with no edits and exposes the
+This generates `<PARENT>/<name>/`: a package that installs and loads with no edits and exposes the
 payload type's full generated command catalog right away:
 
 ```
@@ -306,7 +306,7 @@ myagent/
     └── example.py      # commented ScriptCommand example
 ```
 
-Install it, then build on it incrementally with the sections above — curate a command, customize a
+Install it, then build on it incrementally with the sections above: curate a command, customize a
 formatter, add a script, confirm a dangerous one, or hand-write the whole agent.
 
 Before shipping a plugin, check it:
@@ -319,7 +319,7 @@ This loads the manifest, resolves the entrypoint, and import-walks `commands/`/`
 reporting a non-zero exit for a bad manifest, an unresolvable or non-`MythicAgent` entrypoint, an
 import error in a `commands/` or `scripts/` module, or a plugin directory name that doesn't match
 the manifest's `name`. A `commands/`/`scripts/` module that imports cleanly but defines no command
-class is only an advisory — it loads nothing, but that's not an error (the scaffold's own commented
+class is only an advisory: it loads nothing, but that's not an error (the scaffold's own commented
 examples are like this).
 
 ### Reference: manifest fields and layout
@@ -342,7 +342,7 @@ A plugin is a Python package with a `manifest.json` at its root. All fields exce
 - `schema_version` must be `1`.
 - `name` must be a valid Python identifier, and must match the plugin's directory name.
 - `payload_type` is the Mythic payload type name this plugin handles.
-- `entrypoint` is `"<module>:<Class>"`; the class must subclass `MythicAgent` — use `PluginAgent`
+- `entrypoint` is `"<module>:<Class>"`; the class must subclass `MythicAgent`. Use `PluginAgent`
   (`plugins/base.py`) as that base, since it resolves the plugin's own `commands/`/`scripts/`
   directories instead of the in-repo `agents/<Name>/` layout `MythicAgent` assumes.
 - `version` is the plugin's version string.
@@ -375,14 +375,14 @@ python console.py plugin remove <name>
 or from inside the console: `plugin install <url|path>`, `plugin list`, `plugin remove <name>`.
 
 Installing or removing a plugin reloads the plugin registry immediately, but a callback you already
-selected keeps the agent it was given at selection time — reselect the callback (or select a new one
+selected keeps the agent it was given at selection time. Reselect the callback (or select a new one
 of that payload type) to pick up the change. Plugins are discovered at startup from the plugins
 directory (`${XDG_CONFIG_HOME:-~/.config}/mythicconsole/plugins`, overridable with
 `PLUGIN_DIRECTORY`); `install`/`plugin install` write there too.
 
 ## Poseidon: the fully-curated reference
 
-Poseidon no longer lives in this repo — it ships as its own plugin, installed the same way as any
+Poseidon no longer lives in this repo; it ships as its own plugin, installed the same way as any
 other plugin described above. It curates its command groups, supplies a full formatter, sets
 `verify_prompt` on dangerous commands, and adds client-side scripts. If you want to see every
 technique above used together in a real agent, read its source.
