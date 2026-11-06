@@ -19,6 +19,17 @@ with an installable plugin (custom commands, output rendering, scripts) — see
 
 https://github.com/user-attachments/assets/daace4bd-f779-4984-983c-5c38b7562d8d
 
+# Highlights
+
+Version 2.0 is a large release. Any Mythic payload type now works out of the box: the console builds
+its command set from the server's own catalog, with no agent-specific code required. It also adds a
+plugin system for curation, new `payload` and `profiles` commands, an interactive payload builder,
+command and file pickers, autocomplete, and live callback management.
+
+![tasking a callback](docs/images/callback-tasking.svg)
+
+See [What's New in 2.0](docs/whats-new-2.0.md) for the full tour.
+
 # Quick Start
 
 ## Requirements
