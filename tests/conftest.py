@@ -5,12 +5,12 @@ from pathlib import Path
 
 import pytest
 
-from backend.formatter.formatter import DefaultFormatter
-from backend.mythic_agent.mythic_agent import MythicAgent
-from backend.task.task import Task
-from plugins import registry
-from plugins.installer import install_from_path
-from plugins.registry import get_plugin_registry
+from mythic_console.backend.formatter.formatter import DefaultFormatter
+from mythic_console.backend.mythic_agent.mythic_agent import MythicAgent
+from mythic_console.backend.task.task import Task
+from mythic_console.plugins import registry
+from mythic_console.plugins.installer import install_from_path
+from mythic_console.plugins.registry import get_plugin_registry
 
 FIXTURES = Path(__file__).parent / "fixtures"
 TESTPLUGIN_DIR = FIXTURES / "plugins" / "testplugin"

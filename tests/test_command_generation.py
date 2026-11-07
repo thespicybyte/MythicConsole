@@ -2,7 +2,7 @@ import types
 
 import pytest
 
-from backend.mythic_agent.mythic_agent import AgentCommand, AgentCommandAlias, AgentCommands
+from mythic_console.backend.mythic_agent.mythic_agent import AgentCommand, AgentCommandAlias, AgentCommands
 
 
 def _param(name, param_type, required=False, default_value=None, group="Default",

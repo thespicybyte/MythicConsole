@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- Packaged for PyPI: the console now installs via `pipx install mythic-console` or
+  `uvx mythic-console` and runs as a `mythic-console` command. All first-party modules moved
+  under a `mythic_console/` package; `requirements.txt`/`requirements-dev.txt` were replaced by
+  `pyproject.toml`.
+
+### Breaking
+- Plugin import paths changed: a plugin that imports `from backend ...`, `from plugins.base ...`,
+  or other bare top-level module paths must update to the `mythic_console.*` equivalents (e.g.
+  `from mythic_console.backend ...`, `from mythic_console.plugins.base ...`). See
+  [customize.md](customize.md).
+
 ## [1.0.0-rc1] - 2026-11-06
 
 First release candidate. Earlier `0.x` builds were pre-releases; this is the first version
@@ -17,7 +29,7 @@ intended as a stable release.
   for any payload type, carrying the real parameter definitions (rich types and dynamic choice
   lists). A payload type with no curation falls back to a generic agent, so nothing is unsupported.
 - Plugin system for curation: install, list, scaffold, validate, and remove plugins from the
-  command line (`console.py install | plugin list | plugin new | plugin validate | plugin remove`).
+  command line (`mythic-console install | plugin list | plugin new | plugin validate | plugin remove`).
   Scripts are discovered by type, and a plugin patches the generated command set. Poseidon now
   ships as a plugin instead of living in this repository.
 - `payload types` command to list the payload types installed on the server.

@@ -1,13 +1,13 @@
-from pathlib import Path
+import importlib.resources
 
 from textual.app import App, ComposeResult
 from textual.binding import Binding
 from textual.screen import Screen
 
-from screens.home import Home
-from widgets.console import ConsolePanel
+from mythic_console.screens.home import Home
+from mythic_console.widgets.console import ConsolePanel
 
-CSS_PATH = Path(__file__).resolve().parent.parent / "mythic.tcss"
+CSS_PATH = str(importlib.resources.files("mythic_console") / "mythic.tcss")
 
 _RESIZE_ACTIONS = {"shrink_sidebar", "grow_sidebar"}
 

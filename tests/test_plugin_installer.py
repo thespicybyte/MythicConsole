@@ -4,8 +4,8 @@ from pathlib import Path
 
 import pytest
 
-from plugins import installer
-from plugins.installer import (
+from mythic_console.plugins import installer
+from mythic_console.plugins.installer import (
     PluginInstallError,
     install,
     install_from_github,

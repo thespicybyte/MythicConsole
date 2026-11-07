@@ -5,8 +5,8 @@ from datetime import datetime, timezone
 from textual import on
 from textual.app import App, ComposeResult
 
-from utils.callback_status import STATUS_GLYPHS, STREAMING_SENTINEL
-from widgets.callbacks import CallbackTable, build_callback_row
+from mythic_console.utils.callback_status import STATUS_GLYPHS, STREAMING_SENTINEL
+from mythic_console.widgets.callbacks import CallbackTable, build_callback_row
 
 NOW = datetime(2024, 1, 1, tzinfo=timezone.utc)
 

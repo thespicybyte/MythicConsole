@@ -1,7 +1,7 @@
 import pytest
 
-from backend.mythic_agent.mythic_agent import MythicCommands
-from backend.c2_profile.queries import C2ProfileQueries
+from mythic_console.backend.mythic_agent.mythic_agent import MythicCommands
+from mythic_console.backend.c2_profile.queries import C2ProfileQueries
 
 
 @pytest.fixture

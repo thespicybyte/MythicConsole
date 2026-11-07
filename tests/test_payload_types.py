@@ -3,10 +3,10 @@ import types
 import pytest
 from textual.app import App
 
-from backend.mythic_agent import mythic_agent
-from backend.mythic_agent.mythic_agent import MythicCommands, _theme_key_and_status_styles
-from backend.mythic_agent.mythic_command_parsers import payload_types_parser
-from backend.payload_type.queries import PayloadTypeQueries
+from mythic_console.backend.mythic_agent import mythic_agent
+from mythic_console.backend.mythic_agent.mythic_agent import MythicCommands, _theme_key_and_status_styles
+from mythic_console.backend.mythic_agent.mythic_command_parsers import payload_types_parser
+from mythic_console.backend.payload_type.queries import PayloadTypeQueries
 
 
 def test_payload_types_parser_func_is_wired():

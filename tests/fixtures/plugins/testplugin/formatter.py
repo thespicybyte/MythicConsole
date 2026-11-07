@@ -1,6 +1,6 @@
 from rich.text import Text
 
-from backend import Formatter, Task, renders
+from mythic_console.backend import Formatter, Task, renders
 
 
 class TestPluginFormatter(Formatter):

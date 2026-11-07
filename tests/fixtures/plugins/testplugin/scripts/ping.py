@@ -3,7 +3,7 @@ from typing import Dict, List
 from cmd2 import cmd2, Cmd2ArgumentParser
 from rich.console import RenderableType
 
-from backend.mythic_agent.mythic_agent import AgentCommandAlias, MythicAgent, ScriptCommand
+from mythic_console.backend.mythic_agent.mythic_agent import AgentCommandAlias, MythicAgent, ScriptCommand
 
 ping_parser = Cmd2ArgumentParser(description="client-side ping script")
 

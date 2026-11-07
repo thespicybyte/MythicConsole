@@ -4,8 +4,8 @@ import pytest
 from rich.table import Column
 from rich.text import Text
 
-from backend.formatter.formatter import DefaultFormatter, Formatter
-from backend.task.task import TaskNotCompleted
+from mythic_console.backend.formatter.formatter import DefaultFormatter, Formatter
+from mythic_console.backend.task.task import TaskNotCompleted
 
 
 def test_build_table_no_headers_hides_header():

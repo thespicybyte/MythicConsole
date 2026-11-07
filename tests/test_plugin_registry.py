@@ -1,9 +1,9 @@
 import json
 from pathlib import Path
 
-from plugins import registry
-from plugins.installer import install_from_path
-from plugins.registry import PluginRegistry, get_plugin_registry
+from mythic_console.plugins import registry
+from mythic_console.plugins.installer import install_from_path
+from mythic_console.plugins.registry import PluginRegistry, get_plugin_registry
 
 TESTPLUGIN_DIR = Path(__file__).parent / "fixtures" / "plugins" / "testplugin"
 
@@ -59,8 +59,8 @@ def test_discover_skips_a_broken_plugin_without_crashing(tmp_path):
 
 def test_discover_duplicate_payload_type_first_wins(tmp_path):
     agent_class_source = (
-        "from backend.mythic_agent.mythic_agent import MythicAgent\n"
-        "from backend.formatter.formatter import DefaultFormatter\n"
+        "from mythic_console.backend.mythic_agent.mythic_agent import MythicAgent\n"
+        "from mythic_console.backend.formatter.formatter import DefaultFormatter\n"
         "class Whatever(MythicAgent):\n"
         "    def __init__(self, instance):\n"
         "        super().__init__({name!r}, instance, DefaultFormatter())\n"

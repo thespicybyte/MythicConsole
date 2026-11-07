@@ -1,14 +1,14 @@
 import types
-from pathlib import Path
+import importlib.resources
 
 import pytest
 from textual.app import App, ComposeResult
 from textual.content import Content
 from textual.widgets import Static
 
-from widgets.session_info import _KEY_STYLE, _VALUE_STYLE, SessionInfo
+from mythic_console.widgets.session_info import _KEY_STYLE, _VALUE_STYLE, SessionInfo
 
-CSS_PATH = Path(__file__).resolve().parent.parent / "mythic.tcss"
+CSS_PATH = str(importlib.resources.files("mythic_console") / "mythic.tcss")
 
 THEMES = ["textual-dark", "textual-light", "nord"]
 

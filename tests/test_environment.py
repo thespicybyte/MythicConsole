@@ -3,7 +3,7 @@ import os
 
 import pytest
 
-from utils.environment import Environment
+from mythic_console.utils.environment import Environment
 
 
 @pytest.fixture(autouse=True)

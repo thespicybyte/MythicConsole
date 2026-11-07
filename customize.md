@@ -9,7 +9,7 @@ fully-curated end of that spectrum: it ships as its own plugin.
 ## Zero-code: connect a callback, get commands
 
 When you select a callback, the console calls `get_agent(instance, callback.payload_type_name)`
-(`agents/__init__.py`). If no plugin is installed for that payload type, you get a generated
+(`mythic_console/agents/__init__.py`). If no plugin is installed for that payload type, you get a generated
 `MythicAgent` with a `DefaultFormatter`:
 
 ```python
@@ -68,8 +68,8 @@ from typing import Dict, List
 
 from cmd2 import cmd2, Cmd2ArgumentParser
 
-from backend import Task
-from backend.mythic_agent.mythic_agent import AgentCommand, AgentCommandAlias, MythicAgent, add_default_options
+from mythic_console.backend import Task
+from mythic_console.backend.mythic_agent.mythic_agent import AgentCommand, AgentCommandAlias, MythicAgent, add_default_options
 
 net_parser = Cmd2ArgumentParser()
 net_subparsers = net_parser.add_subparsers(title='subcommands', help='subcommand help')
@@ -160,7 +160,7 @@ the tagged method by command name; any command without a tagged method still fal
 ```python
 from rich.text import Text
 
-from backend import Formatter, Task, renders
+from mythic_console.backend import Formatter, Task, renders
 
 
 class MyAgentFormatter(Formatter):
@@ -180,7 +180,7 @@ Every `AgentCommand` has a `verify_prompt` attribute (`None` by default). Set it
 instance and the console shows that modal and waits for confirmation before the task executes:
 
 ```python
-from screens.prompts import YesNoPrompt
+from mythic_console.screens.prompts import YesNoPrompt
 
 net = Net(self)
 net.verify_prompt = YesNoPrompt(question="Run this command?")
@@ -213,7 +213,7 @@ from typing import Dict, List
 from cmd2 import cmd2, Cmd2ArgumentParser
 from rich.console import RenderableType
 
-from backend.mythic_agent.mythic_agent import AgentCommandAlias, MythicAgent, ScriptCommand
+from mythic_console.backend.mythic_agent.mythic_agent import AgentCommandAlias, MythicAgent, ScriptCommand
 
 ping_parser = Cmd2ArgumentParser(description="client-side ping script")
 
@@ -260,8 +260,8 @@ For full control, subclass `PluginAgent` (not `MythicAgent` directly; see below)
 whatever you need:
 
 ```python
-from backend.mythic_agent.mythic_agent import AgentCommands
-from plugins.base import PluginAgent
+from mythic_console.backend.mythic_agent.mythic_agent import AgentCommands
+from mythic_console.plugins.base import PluginAgent
 
 from .commands.net import Net
 from .formatter import MyAgentFormatter
@@ -285,7 +285,7 @@ scripts, all on top of the same generated baseline.
 ### Scaffold a new plugin
 
 ```shell
-python console.py plugin new <name> <payload-type> [--author A] [--description D] [--dir PARENT]
+mythic-console plugin new <name> <payload-type> [--author A] [--description D] [--dir PARENT]
 ```
 
 This generates `<PARENT>/<name>/`: a package that installs and loads with no edits and exposes the
@@ -312,7 +312,7 @@ formatter, add a script, confirm a dangerous one, or hand-write the whole agent.
 Before shipping a plugin, check it:
 
 ```shell
-python console.py plugin validate <path>
+mythic-console plugin validate <path>
 ```
 
 This loads the manifest, resolves the entrypoint, and import-walks `commands/`/`scripts/`,
@@ -325,7 +325,7 @@ examples are like this).
 ### Reference: manifest fields and layout
 
 A plugin is a Python package with a `manifest.json` at its root. All fields except `author` and
-`description` are required (`plugins/manifest.py`):
+`description` are required (`mythic_console/plugins/manifest.py`):
 
 ```json
 {
@@ -343,7 +343,7 @@ A plugin is a Python package with a `manifest.json` at its root. All fields exce
 - `name` must be a valid Python identifier, and must match the plugin's directory name.
 - `payload_type` is the Mythic payload type name this plugin handles.
 - `entrypoint` is `"<module>:<Class>"`; the class must subclass `MythicAgent`. Use `PluginAgent`
-  (`plugins/base.py`) as that base, since it resolves the plugin's own `commands/`/`scripts/`
+  (`mythic_console/plugins/base.py`) as that base, since it resolves the plugin's own `commands/`/`scripts/`
   directories instead of the in-repo `agents/<Name>/` layout `MythicAgent` assumes.
 - `version` is the plugin's version string.
 
@@ -366,10 +366,10 @@ myagent/
 Install it from the shell:
 
 ```shell
-python console.py install https://github.com/<you>/<your-agent-plugin> [--branch BRANCH] [--subdir DIR]
-python console.py install /path/to/local/clone
-python console.py plugin list
-python console.py plugin remove <name>
+mythic-console install https://github.com/<you>/<your-agent-plugin> [--branch BRANCH] [--subdir DIR]
+mythic-console install /path/to/local/clone
+mythic-console plugin list
+mythic-console plugin remove <name>
 ```
 
 or from inside the console: `plugin install <url|path>`, `plugin list`, `plugin remove <name>`.
@@ -389,7 +389,7 @@ technique above used together in a real agent, read its source.
 
 ## Reference: generated parameter mapping
 
-`_add_param_argument` (`backend/mythic_agent/mythic_agent.py`) maps each Mythic command parameter
+`_add_param_argument` (`mythic_console/backend/mythic_agent/mythic_agent.py`) maps each Mythic command parameter
 type to an argparse treatment when building a generated command's parser:
 
 | Mythic parameter type                     | argparse treatment                                        |

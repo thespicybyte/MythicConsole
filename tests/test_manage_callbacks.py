@@ -3,9 +3,9 @@ import types
 from textual.app import App
 from textual.widgets import Input, Static
 
-from screens.home import Home
-from screens.manage_callbacks import _HEADER_TEXT, ManageCallbacks
-from widgets.transfer_selection import CheckSelectionList
+from mythic_console.screens.home import Home
+from mythic_console.screens.manage_callbacks import _HEADER_TEXT, ManageCallbacks
+from mythic_console.widgets.transfer_selection import CheckSelectionList
 
 DETAIL = [
     {"agent_callback_id": "uuid-active", "display_id": 1, "host": "host-a", "active": True,

@@ -2,8 +2,8 @@ from typing import Dict, List
 
 from cmd2 import cmd2, Cmd2ArgumentParser
 
-from backend import Task
-from backend.mythic_agent.mythic_agent import AgentCommand, AgentCommandAlias, MythicAgent, add_default_options
+from mythic_console.backend import Task
+from mythic_console.backend.mythic_agent.mythic_agent import AgentCommand, AgentCommandAlias, MythicAgent, add_default_options
 
 net_parser = Cmd2ArgumentParser()
 net_subparsers = net_parser.add_subparsers(title='subcommands', help='subcommand help')

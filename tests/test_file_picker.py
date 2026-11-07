@@ -1,20 +1,20 @@
 import asyncio
 import os
 import types
-from pathlib import Path
+import importlib.resources
 
 import pytest
 from textual.app import App
 from textual.screen import Screen
 from textual.widgets import DirectoryTree, TabPane
 
-from backend.task.task import Task
-from screens.home import Home
-from screens.prompts import FilePrompt
-from utils import state
-from widgets.console import ConsolePanel
+from mythic_console.backend.task.task import Task
+from mythic_console.screens.home import Home
+from mythic_console.screens.prompts import FilePrompt
+from mythic_console.utils import state
+from mythic_console.widgets.console import ConsolePanel
 
-CSS_PATH = Path(__file__).resolve().parent.parent / "mythic.tcss"
+CSS_PATH = str(importlib.resources.files("mythic_console") / "mythic.tcss")
 
 
 @pytest.fixture(autouse=True)
@@ -133,7 +133,7 @@ async def test_file_prompt_uses_the_remembered_directory(tmp_path, monkeypatch):
 
 async def test_file_prompt_falls_back_to_cwd_on_corrupt_state(tmp_path, monkeypatch):
     monkeypatch.chdir(tmp_path)
-    from utils.environment import Environment
+    from mythic_console.utils.environment import Environment
 
     config_dir = Environment().config_directory()
     with open(os.path.join(config_dir, "state.json"), "w") as f:
@@ -337,7 +337,7 @@ async def test_picker_cancel_aborts_before_execute(fake_instance, monkeypatch):
 
 async def test_picker_feeds_the_chosen_path_into_file_params_before_execute(fake_instance, monkeypatch, tmp_path):
     import mythic.mythic
-    from backend.task.queries import TaskQueries
+    from mythic_console.backend.task.queries import TaskQueries
 
     chosen = tmp_path / "payload.bin"
     chosen.write_bytes(b"data")

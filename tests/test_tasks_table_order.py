@@ -1,11 +1,11 @@
-from pathlib import Path
+import importlib.resources
 
 from textual.app import App, ComposeResult
 
-from screens.home import _sort_tasks_table
-from widgets.tasks_table import TasksTable
+from mythic_console.screens.home import _sort_tasks_table
+from mythic_console.widgets.tasks_table import TasksTable
 
-CSS_PATH = Path(__file__).resolve().parent.parent / "mythic.tcss"
+CSS_PATH = str(importlib.resources.files("mythic_console") / "mythic.tcss")
 
 
 class _Harness(App):

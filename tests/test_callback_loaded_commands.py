@@ -1,7 +1,7 @@
 import types
 
-from backend.callback.callback import Callback
-from backend.callback.queries import CallbackQueries
+from mythic_console.backend.callback.callback import Callback
+from mythic_console.backend.callback.queries import CallbackQueries
 
 
 async def test_refresh_loaded_commands_updates_set_across_calls(fake_instance, monkeypatch):

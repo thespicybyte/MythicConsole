@@ -1,6 +1,6 @@
 from rich.text import Text
 
-from backend.formatter.formatter import DefaultFormatter, Formatter, renders
+from mythic_console.backend.formatter.formatter import DefaultFormatter, Formatter, renders
 
 
 def test_plugin_formatter_is_registered_via_import(test_plugin_agent):

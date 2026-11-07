@@ -2,8 +2,8 @@ import asyncio
 
 import pytest
 
-from console import MythicConsole
-from screens.login import LoginScreen
+from mythic_console.console import MythicConsole
+from mythic_console.screens.login import LoginScreen
 
 
 @pytest.fixture(autouse=True)

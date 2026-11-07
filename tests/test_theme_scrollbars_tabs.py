@@ -1,4 +1,4 @@
-from pathlib import Path
+import importlib.resources
 
 import pytest
 from textual import events
@@ -7,13 +7,13 @@ from textual.color import Color
 from textual.containers import VerticalScroll
 from textual.widgets import Static, TabPane, Tabs
 
-import console
-from console import MythicConsole
-from widgets.calback_tabs import CallbackTabs
-from widgets.callbacks import Callbacks
-from widgets.tasks_table import TasksTable
+from mythic_console import console
+from mythic_console.console import MythicConsole
+from mythic_console.widgets.calback_tabs import CallbackTabs
+from mythic_console.widgets.callbacks import Callbacks
+from mythic_console.widgets.tasks_table import TasksTable
 
-CSS_PATH = Path(__file__).resolve().parent.parent / "mythic.tcss"
+CSS_PATH = str(importlib.resources.files("mythic_console") / "mythic.tcss")
 
 THEMES = ["textual-dark", "textual-light", "nord"]
 

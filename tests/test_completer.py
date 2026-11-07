@@ -1,6 +1,6 @@
 import pytest
 
-from backend.mythic_agent.mythic_agent import MythicCommands
+from mythic_console.backend.mythic_agent.mythic_agent import MythicCommands
 
 CMD2_BUILTINS = {
     "_eof", "_relative_run_script", "alias", "edit", "help", "history",
