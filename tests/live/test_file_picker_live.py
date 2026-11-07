@@ -9,10 +9,10 @@ Drives the backend contract the picker feeds (`task.pending_file_params` -> oper
 """
 import pytest
 
-from backend.formatter.formatter import DefaultFormatter
-from backend.mythic_agent.mythic_agent import MythicAgent
-from backend.mythic_instance.mythic_instance import MythicInstance
-from utils.environment import Environment
+from mythic_console.backend.formatter.formatter import DefaultFormatter
+from mythic_console.backend.mythic_agent.mythic_agent import MythicAgent
+from mythic_console.backend.mythic_instance.mythic_instance import MythicInstance
+from mythic_console.utils.environment import Environment
 
 pytestmark = pytest.mark.live
 
@@ -46,7 +46,7 @@ async def test_omitted_file_param_is_pending_then_picked_path_registers_and_task
     if not callback_row:
         pytest.skip("no active arachne callback on the test server")
 
-    from backend.callback.callback import Callback
+    from mythic_console.backend.callback.callback import Callback
 
     callback = Callback(instance, callback_id=callback_row["id"])
     await callback.query()

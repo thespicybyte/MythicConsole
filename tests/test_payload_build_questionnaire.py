@@ -5,15 +5,15 @@ import pytest
 from textual.app import App
 from textual.widgets import Checkbox, Input, Label, Select, TextArea
 
-from backend.mythic_agent import mythic_agent
-from backend.mythic_agent.mythic_agent import MythicCommands, _load_config
-from backend.payload_type.queries import PayloadTypeQueries
-from backend.c2_profile.queries import C2ProfileQueries
-from screens.forms import FieldSpec, ParamForm
-from screens.prompts import BACK, ChoicePrompt
-from screens.build_summary import BuildSummary
-from screens.select_commands import SelectCommands
-from widgets.transfer_selection import CheckSelectionList
+from mythic_console.backend.mythic_agent import mythic_agent
+from mythic_console.backend.mythic_agent.mythic_agent import MythicCommands, _load_config
+from mythic_console.backend.payload_type.queries import PayloadTypeQueries
+from mythic_console.backend.c2_profile.queries import C2ProfileQueries
+from mythic_console.screens.forms import FieldSpec, ParamForm
+from mythic_console.screens.prompts import BACK, ChoicePrompt
+from mythic_console.screens.build_summary import BuildSummary
+from mythic_console.screens.select_commands import SelectCommands
+from mythic_console.widgets.transfer_selection import CheckSelectionList
 
 
 # ----- shared helpers -----

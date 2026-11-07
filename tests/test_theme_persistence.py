@@ -1,7 +1,7 @@
 import pytest
 
-from console import MythicConsole
-from utils import state
+from mythic_console.console import MythicConsole
+from mythic_console.utils import state
 
 
 @pytest.fixture(autouse=True)

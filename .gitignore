@@ -7,3 +7,6 @@ venv/
 .venv/
 .pytest_cache/
 reference_plugins/
+dist/
+build/
+*.egg-info/

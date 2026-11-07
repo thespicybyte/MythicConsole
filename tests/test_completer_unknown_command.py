@@ -8,7 +8,7 @@ subcommand parser keyed by its own name hits the same None-parser pattern.
 """
 import pytest
 
-from backend.mythic_agent.mythic_agent import AgentCommand, MythicCommands
+from mythic_console.backend.mythic_agent.mythic_agent import AgentCommand, MythicCommands
 
 
 @pytest.mark.parametrize("line", [

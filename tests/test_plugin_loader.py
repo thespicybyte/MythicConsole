@@ -3,9 +3,9 @@ from pathlib import Path
 
 import pytest
 
-from backend.mythic_agent.mythic_agent import MythicAgent
-from plugins.installer import install_from_path
-from plugins.loader import PluginLoadError, load_plugin
+from mythic_console.backend.mythic_agent.mythic_agent import MythicAgent
+from mythic_console.plugins.installer import install_from_path
+from mythic_console.plugins.loader import PluginLoadError, load_plugin
 
 TESTPLUGIN_DIR = Path(__file__).parent / "fixtures" / "plugins" / "testplugin"
 

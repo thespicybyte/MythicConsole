@@ -10,8 +10,8 @@ verification method instead (see mythicconsole-80-dev-verify.md).
 """
 import pytest
 
-from console import MythicConsole
-from utils.environment import Environment
+from mythic_console.console import MythicConsole
+from mythic_console.utils.environment import Environment
 
 pytestmark = pytest.mark.live
 

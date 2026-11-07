@@ -1,6 +1,6 @@
 from textual.app import App, ComposeResult
 
-from widgets.transfer_selection import (
+from mythic_console.widgets.transfer_selection import (
     CHECKED,
     UNCHECKED,
     GlyphCheckbox,

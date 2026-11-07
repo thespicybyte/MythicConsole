@@ -3,7 +3,7 @@ import os
 
 import pytest
 
-from utils import state
+from mythic_console.utils import state
 
 
 @pytest.fixture(autouse=True)
@@ -44,7 +44,7 @@ def test_get_last_file_dir_falls_back_to_none_on_corrupt_state_file(tmp_path, mo
 
 
 def test_set_last_file_dir_preserves_other_keys(tmp_path):
-    from utils.environment import Environment
+    from mythic_console.utils.environment import Environment
 
     state_file = os.path.join(Environment().config_directory(), "state.json")
     with open(state_file, "w") as f:
@@ -103,7 +103,7 @@ def test_get_theme_falls_back_to_none_on_corrupt_state_file(tmp_path):
 
 
 def test_get_theme_falls_back_to_none_on_non_str_value():
-    from utils.environment import Environment
+    from mythic_console.utils.environment import Environment
 
     state_file = os.path.join(Environment().config_directory(), "state.json")
     with open(state_file, "w") as f:

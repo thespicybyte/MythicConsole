@@ -17,12 +17,12 @@ import pytest
 from textual.app import App
 from textual.widgets import Checkbox, Input, Label, Select, TextArea
 
-from backend.mythic_agent.mythic_agent import MythicCommands
-from backend.mythic_instance.mythic_instance import MythicInstance
-from screens.forms import ParamForm
-from screens.prompts import ChoicePrompt, YesNoPrompt
-from screens.select_commands import SelectCommands
-from utils.environment import Environment
+from mythic_console.backend.mythic_agent.mythic_agent import MythicCommands
+from mythic_console.backend.mythic_instance.mythic_instance import MythicInstance
+from mythic_console.screens.forms import ParamForm
+from mythic_console.screens.prompts import ChoicePrompt, YesNoPrompt
+from mythic_console.screens.select_commands import SelectCommands
+from mythic_console.utils.environment import Environment
 
 pytestmark = pytest.mark.live
 
@@ -155,7 +155,7 @@ async def test_profile_selection_offers_only_supported_profiles():
     if not instance.mythic.current_operation_id:
         pytest.skip("no current operation set for this account on the test server")
 
-    from backend.payload_type.queries import PayloadTypeQueries
+    from mythic_console.backend.payload_type.queries import PayloadTypeQueries
     supported = await PayloadTypeQueries.query_supported_c2_profiles(instance.mythic, "poseidon")
 
     names = {p["name"] for p in supported["profiles"]}

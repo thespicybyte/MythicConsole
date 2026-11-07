@@ -1,4 +1,4 @@
-from utils.transfer_list import compute_active_changes, move_selected
+from mythic_console.utils.transfer_list import compute_active_changes, move_selected
 
 
 def test_move_selected_moves_only_selected_and_preserves_order():

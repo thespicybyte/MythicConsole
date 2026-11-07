@@ -2,8 +2,8 @@ from pathlib import Path
 
 import pytest
 
-from plugins import cli
-from plugins.installer import install_from_path
+from mythic_console.plugins import cli
+from mythic_console.plugins.installer import install_from_path
 
 TESTPLUGIN_DIR = Path(__file__).parent / "fixtures" / "plugins" / "testplugin"
 

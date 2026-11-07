@@ -1,5 +1,5 @@
-from backend.mythic_agent.mythic_agent import AgentCommands
-from plugins.base import PluginAgent
+from mythic_console.backend.mythic_agent.mythic_agent import AgentCommands
+from mythic_console.plugins.base import PluginAgent
 
 from .commands.net import Net
 from .formatter import TestPluginFormatter

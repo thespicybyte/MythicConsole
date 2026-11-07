@@ -2,7 +2,7 @@ import json
 
 import pytest
 
-from plugins.manifest import InvalidManifest, load_manifest
+from mythic_console.plugins.manifest import InvalidManifest, load_manifest
 
 VALID = {
     "schema_version": 1,

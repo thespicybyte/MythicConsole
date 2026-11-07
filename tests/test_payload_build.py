@@ -3,17 +3,17 @@ import types
 
 import pytest
 
-from backend.mythic_agent import mythic_agent
-from backend.mythic_agent.mythic_agent import (
+from mythic_console.backend.mythic_agent import mythic_agent
+from mythic_console.backend.mythic_agent.mythic_agent import (
     MythicCommands,
     _normalize_build_parameters,
     _normalize_c2_profile_parameters,
     _normalize_c2_profiles,
 )
-from backend.mythic_agent.mythic_command_parsers import payload_build_parser
-from backend.payload.payload import Payload
-from backend.payload_type.queries import PayloadTypeQueries
-from backend.c2_profile.queries import C2ProfileQueries
+from mythic_console.backend.mythic_agent.mythic_command_parsers import payload_build_parser
+from mythic_console.backend.payload.payload import Payload
+from mythic_console.backend.payload_type.queries import PayloadTypeQueries
+from mythic_console.backend.c2_profile.queries import C2ProfileQueries
 
 
 # ----- config translation -----
@@ -303,7 +303,7 @@ async def test_query_build_parameters_shape(monkeypatch):
         captured["variables"] = variables
         return {"payloadtype": [{"buildparameters": [{"name": "mode", "parameter_type": "ChooseOne"}]}]}
 
-    import backend.payload_type.queries as payload_type_queries
+    import mythic_console.backend.payload_type.queries as payload_type_queries
     monkeypatch.setattr(payload_type_queries.mythic, "execute_custom_query", fake_execute_custom_query)
 
     result = await PayloadTypeQueries.query_build_parameters(None, "poseidon")
@@ -324,7 +324,7 @@ async def test_query_all_c2_profiles_shape(monkeypatch):
         captured["variables"] = variables
         return {"c2profile": [{"name": "websocket", "is_p2p": False, "c2profileparameters": []}]}
 
-    import backend.c2_profile.queries as c2_profile_queries
+    import mythic_console.backend.c2_profile.queries as c2_profile_queries
     monkeypatch.setattr(c2_profile_queries.mythic, "execute_custom_query", fake_execute_custom_query)
 
     result = await C2ProfileQueries.query_all_c2_profiles(None)

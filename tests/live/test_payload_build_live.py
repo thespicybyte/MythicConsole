@@ -14,10 +14,10 @@ import types
 
 import pytest
 
-from backend.mythic_agent.mythic_agent import MythicCommands
-from backend.mythic_instance.mythic_instance import MythicInstance
-from backend.payload.queries import PayloadQueries
-from utils.environment import Environment
+from mythic_console.backend.mythic_agent.mythic_agent import MythicCommands
+from mythic_console.backend.mythic_instance.mythic_instance import MythicInstance
+from mythic_console.backend.payload.queries import PayloadQueries
+from mythic_console.utils.environment import Environment
 
 pytestmark = pytest.mark.live
 

@@ -3,7 +3,7 @@ import os
 
 import pytest
 
-from utils.history import PersistentCommandHistory, load_history
+from mythic_console.utils.history import PersistentCommandHistory, load_history
 
 
 @pytest.fixture(autouse=True)

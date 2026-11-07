@@ -1,8 +1,8 @@
 import pytest
 
-from backend.callback.queries import CallbackQueries
-from backend.task.queries import TaskQueries
-from backend.task.task import Task, TaskError
+from mythic_console.backend.callback.queries import CallbackQueries
+from mythic_console.backend.task.queries import TaskQueries
+from mythic_console.backend.task.task import Task, TaskError
 
 
 def _raise_if_queried(*_args, **_kwargs):

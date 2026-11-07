@@ -3,7 +3,7 @@ from datetime import datetime, timedelta, timezone
 
 import pytest
 
-from utils.callback_status import (
+from mythic_console.utils.callback_status import (
     STREAMING_SENTINEL,
     alive_state,
     checkin_text,

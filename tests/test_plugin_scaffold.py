@@ -2,11 +2,11 @@ from pathlib import Path
 
 import pytest
 
-from plugins import cli
-from plugins.installer import install_from_path
-from plugins.loader import load_plugin
-from plugins.manifest import load_manifest
-from plugins.scaffold import ScaffoldError, scaffold
+from mythic_console.plugins import cli
+from mythic_console.plugins.installer import install_from_path
+from mythic_console.plugins.loader import load_plugin
+from mythic_console.plugins.manifest import load_manifest
+from mythic_console.plugins.scaffold import ScaffoldError, scaffold
 
 
 @pytest.fixture(autouse=True)

@@ -1,10 +1,10 @@
 import pytest
 
-from agents import UnknownAgent, get_agent
-from backend.formatter.formatter import DefaultFormatter
-from backend.mythic_agent.mythic_agent import MythicAgent
-from backend.task.task import Task, TaskError
-from plugins.base import PluginAgent
+from mythic_console.agents import UnknownAgent, get_agent
+from mythic_console.backend.formatter.formatter import DefaultFormatter
+from mythic_console.backend.mythic_agent.mythic_agent import MythicAgent
+from mythic_console.backend.task.task import Task, TaskError
+from mythic_console.plugins.base import PluginAgent
 
 
 def test_get_agent_returns_plugin_agent_when_one_is_installed(fake_instance, installed_testplugin):

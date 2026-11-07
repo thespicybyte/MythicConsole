@@ -1,5 +1,5 @@
-from backend.callback.callback import Callback
-from backend.callback.queries import CallbackQueries
+from mythic_console.backend.callback.callback import Callback
+from mythic_console.backend.callback.queries import CallbackQueries
 
 
 async def test_update_active_issues_active_update_not_locked(fake_instance, monkeypatch):

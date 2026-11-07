@@ -3,9 +3,9 @@ from pathlib import Path
 
 import pytest
 
-from plugins import cli
-from plugins.scaffold import scaffold
-from plugins.validate import validate_plugin
+from mythic_console.plugins import cli
+from mythic_console.plugins.scaffold import scaffold
+from mythic_console.plugins.validate import validate_plugin
 
 TESTPLUGIN_DIR = Path(__file__).parent / "fixtures" / "plugins" / "testplugin"
 
@@ -107,7 +107,7 @@ def test_import_error_in_scripts_module(tmp_path):
     plugin_dir.mkdir()
     (plugin_dir / "__init__.py").write_text("")
     (plugin_dir / "brokenscript.py").write_text(
-        "from plugins.base import PluginAgent\n\n"
+        "from mythic_console.plugins.base import PluginAgent\n\n"
         "class Brokenscript(PluginAgent):\n"
         "    def __init__(self, instance):\n"
         "        super().__init__('brokenscript', instance, None)\n")
@@ -128,7 +128,7 @@ def test_import_error_in_commands_module(tmp_path):
     plugin_dir.mkdir()
     (plugin_dir / "__init__.py").write_text("")
     (plugin_dir / "brokencommand.py").write_text(
-        "from plugins.base import PluginAgent\n\n"
+        "from mythic_console.plugins.base import PluginAgent\n\n"
         "class Brokencommand(PluginAgent):\n"
         "    def __init__(self, instance):\n"
         "        super().__init__('brokencommand', instance, None)\n")
@@ -162,7 +162,7 @@ def test_script_module_with_no_subclass_is_advisory_not_error(tmp_path):
     plugin_dir.mkdir()
     (plugin_dir / "__init__.py").write_text("")
     (plugin_dir / "noscriptclass.py").write_text(
-        "from plugins.base import PluginAgent\n\n"
+        "from mythic_console.plugins.base import PluginAgent\n\n"
         "class Noscriptclass(PluginAgent):\n"
         "    def __init__(self, instance):\n"
         "        super().__init__('noscriptclass', instance, None)\n")

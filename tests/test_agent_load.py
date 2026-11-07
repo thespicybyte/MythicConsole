@@ -1,5 +1,5 @@
-from backend.mythic_agent.mythic_agent import AgentCommands
-from plugins.registry import get_plugin_registry
+from mythic_console.backend.mythic_agent.mythic_agent import AgentCommands
+from mythic_console.plugins.registry import get_plugin_registry
 
 
 async def test_load_commands_populates_generated_set(fake_instance, generic_commands_fixture,

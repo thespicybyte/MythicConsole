@@ -133,7 +133,7 @@ def test_file_param_provided_uuid_is_not_pending(richtype_agent):
 
 
 def test_optional_file_param_omitted_is_not_pending():
-    from backend.mythic_agent.mythic_agent import AgentCommand
+    from mythic_console.backend.mythic_agent.mythic_agent import AgentCommand
 
     spec = {"cmd": "fetch_optional", "description": "", "commandparameters": [
         {"name": "file", "cli_name": "file", "type": "File", "required": False,
@@ -154,8 +154,8 @@ def test_optional_file_param_omitted_is_not_pending():
 
 
 async def test_task_execute_registers_a_pending_file_before_issuing(richtype_agent, tmp_path, monkeypatch):
-    from backend.task.queries import TaskQueries
-    from backend.task.task import Task
+    from mythic_console.backend.task.queries import TaskQueries
+    from mythic_console.backend.task.task import Task
     import mythic.mythic
 
     local_file = tmp_path / "payload.bin"

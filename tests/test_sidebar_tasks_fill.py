@@ -1,13 +1,13 @@
-from pathlib import Path
+import importlib.resources
 
 from textual.app import App, ComposeResult
 from textual.containers import HorizontalScroll, VerticalScroll
 from textual.widgets import DataTable, Static
 
-from widgets.callbacks import Callbacks
-from widgets.tasks_table import TasksTable
+from mythic_console.widgets.callbacks import Callbacks
+from mythic_console.widgets.tasks_table import TasksTable
 
-CSS_PATH = Path(__file__).resolve().parent.parent / "mythic.tcss"
+CSS_PATH = str(importlib.resources.files("mythic_console") / "mythic.tcss")
 
 
 class _Harness(App):

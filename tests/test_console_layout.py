@@ -1,10 +1,10 @@
-from pathlib import Path
+import importlib.resources
 
 from textual.app import App, ComposeResult
 
-from widgets.console import ConsolePanel
+from mythic_console.widgets.console import ConsolePanel
 
-CSS_PATH = Path(__file__).resolve().parent.parent / "mythic.tcss"
+CSS_PATH = str(importlib.resources.files("mythic_console") / "mythic.tcss")
 
 
 class _Harness(App):

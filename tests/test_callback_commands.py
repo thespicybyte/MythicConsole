@@ -3,10 +3,10 @@ import types
 
 import pytest
 
-from backend.mythic_agent import mythic_command_parsers
-from backend.mythic_agent.mythic_agent import MythicCommands
-from backend.callback.callback import Callback
-from backend.callback.queries import CallbackQueries
+from mythic_console.backend.mythic_agent import mythic_command_parsers
+from mythic_console.backend.mythic_agent.mythic_agent import MythicCommands
+from mythic_console.backend.callback.callback import Callback
+from mythic_console.backend.callback.queries import CallbackQueries
 
 
 @pytest.fixture

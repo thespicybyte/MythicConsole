@@ -1,4 +1,4 @@
-from backend.mythic_agent.mythic_agent import AgentCommand
+from mythic_console.backend.mythic_agent.mythic_agent import AgentCommand
 
 
 async def test_command_parser_carries_background_flag(arachne_agent):
