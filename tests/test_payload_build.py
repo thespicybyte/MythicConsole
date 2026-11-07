@@ -15,6 +15,8 @@ from mythic_console.backend.payload.payload import Payload
 from mythic_console.backend.payload_type.queries import PayloadTypeQueries
 from mythic_console.backend.c2_profile.queries import C2ProfileQueries
 
+from conftest import completer_values
+
 
 # ----- config translation -----
 
@@ -236,31 +238,29 @@ async def test_payload_build_foreground_failure_does_not_download(payload_comman
 
 def test_payload_build_positional_completes_cached_payload_types(payload_commands):
     payload_commands._payload_type_cache = ["poseidon", "arachne"]
-    items = payload_commands.get_completer_items("payload build ")
+    items = completer_values(payload_commands.get_completer_items("payload build "))
     assert "poseidon" in items
     assert "arachne" in items
-    assert "--config" in items
-    assert "-bg" in items
 
 
 def test_payload_build_positional_partial_token_still_completes_payload_types(payload_commands):
     payload_commands._payload_type_cache = ["poseidon", "arachne"]
-    items = payload_commands.get_completer_items("payload build pos")
+    items = completer_values(payload_commands.get_completer_items("payload build pos"))
     assert "poseidon" in items
 
 
-def test_payload_build_flags_only_once_payload_type_present(payload_commands):
+def test_payload_build_flags_appear_after_payload_type_on_dash(payload_commands):
     payload_commands._payload_type_cache = ["poseidon", "arachne"]
-    items = payload_commands.get_completer_items("payload build poseidon ")
+    items = completer_values(payload_commands.get_completer_items("payload build poseidon -"))
     assert "poseidon" not in items
     assert "arachne" not in items
     assert "--config" in items
-
-
-def test_payload_build_completion_degrades_to_flags_with_empty_cache(payload_commands):
-    items = payload_commands.get_completer_items("payload build ")
-    assert "--config" in items
     assert "-bg" in items
+
+
+def test_payload_build_completion_degrades_to_no_values_with_empty_cache(payload_commands):
+    items = completer_values(payload_commands.get_completer_items("payload build "))
+    assert items == set()
 
 
 # ----- cache_payload_types -----

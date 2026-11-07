@@ -3,6 +3,8 @@ import pytest
 from mythic_console.backend.mythic_agent.mythic_agent import MythicCommands
 from mythic_console.backend.c2_profile.queries import C2ProfileQueries
 
+from conftest import completer_values
+
 
 @pytest.fixture
 def mythic_commands(fake_instance):
@@ -10,13 +12,13 @@ def mythic_commands(fake_instance):
 
 
 def test_completer_lists_profiles_subcommand(mythic_commands):
-    items = mythic_commands.get_completer_items("profiles x")
+    items = completer_values(mythic_commands.get_completer_items("profiles "))
     assert "list" in items
 
 
 def test_completer_profiles_list_options(mythic_commands):
-    items = mythic_commands.get_completer_items("profiles list x")
-    assert set(items) == {"-h", "--help"}
+    items = completer_values(mythic_commands.get_completer_items("profiles list -"))
+    assert items == set()
 
 
 async def test_profiles_list_renders_one_card_per_profile(mythic_commands, monkeypatch):

@@ -17,6 +17,7 @@ from rich.panel import Panel
 from rich.text import Text
 from textual.app import active_app
 from textual.worker import Worker
+from textual_console import ArgparseCompleter, set_completer
 
 from mythic_console.backend import MythicInstance, Task, User, Operation, Payload, Callback
 from mythic_console.utils.logger import logger
@@ -953,6 +954,9 @@ class MythicCommands(Cmd):
         self._command_parsers: Dict[str, Cmd2ArgumentParser] = {
             "operation": mythic_command_parsers.operation_parser,
             "profiles": mythic_command_parsers.profiles_parser,
+            "user": mythic_command_parsers.user_parser,
+            "payload": mythic_command_parsers.payload_parser,
+            "callback": mythic_command_parsers.callback_parser,
         }
         self._subcommand_parsers: Dict[str, Cmd2ArgumentParser] = {
             "operation list": mythic_command_parsers.operation_list_parser,
@@ -966,6 +970,18 @@ class MythicCommands(Cmd):
             "callback export": mythic_command_parsers.callback_export_parser,
             "callback import": mythic_command_parsers.callback_import_parser,
         }
+
+        self._completer_parsers: Dict[str, Cmd2ArgumentParser] = dict(self._command_parsers)
+        for alias in self._aliases:
+            if not alias.subcommand:
+                self._completer_parsers[alias.name] = self._command_parsers[alias.command]
+        self._completer = ArgparseCompleter(self._completer_parsers, show_help_option=False)
+
+        payload_type_action = next(
+            action for action in mythic_command_parsers.payload_build_parser._actions
+            if action.dest == "payload_type"
+        )
+        set_completer(payload_type_action, lambda word: list(self._payload_type_cache))
 
     @property
     def commands(self) -> List[str]:
@@ -1035,48 +1051,8 @@ class MythicCommands(Cmd):
 
         return items
 
-    def get_completer_items(self, line: str) -> List[str]:
-        items = []
-        try:
-            tokens = shlex.split(line)
-        except:
-            return items
-
-        # A trailing space means the current word is empty: count it as one more
-        # (empty) token so "cmd " lists subcommands and "cmd sub " lists its options.
-        count = len(tokens) + (1 if tokens and line[-1:].isspace() else 0)
-
-        if count <= 1:
-            # items.append("help")
-            for command in self.commands:
-                items.append(command.removeprefix("do_"))
-            for alias_name in self._get_aliases_names():
-                items.append(alias_name)
-
-        elif count == 2:
-            # check if command is in aliases, if so, get subcommand from alias_name, remove prefix options from subcommand options
-            # if command is not in aliases, return command's subcommand
-            command = tokens[0]
-            alias_name = self.get_alias(command)
-            if alias_name:
-                items = self.get_subcommand_options(alias_name.command, alias_name.subcommand)
-
-            for subcommand in self._subcommand_parsers.keys():
-                if subcommand.startswith(f"{command} "):
-                    items.append(subcommand.removeprefix(f"{command} "))
-
-        elif count == 3 and tokens[0] == "payload" and tokens[1] == "build":
-            # the <payload_type> positional slot is still open
-            items = list(self._payload_type_cache)
-            items += self.get_subcommand_options("payload", "build")
-
-        else:
-            # return the subcommands options
-            command = tokens[0]
-            subcommand = tokens[1]
-            items = self.get_subcommand_options(command, subcommand)
-
-        return items
+    def get_completer_items(self, line: str):
+        return self._completer(line)
 
     @with_argparser(mythic_command_parsers.user_parser)
     def do_user(self, args):

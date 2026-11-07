@@ -8,6 +8,8 @@ from mythic_console.backend.mythic_agent.mythic_agent import MythicCommands
 from mythic_console.backend.callback.callback import Callback
 from mythic_console.backend.callback.queries import CallbackQueries
 
+from conftest import completer_values
+
 
 @pytest.fixture
 def mythic_commands(fake_instance):
@@ -46,14 +48,14 @@ def test_callback_export_and_import_parsers_omit_background_flag():
 
 
 def test_completer_lists_callback_subcommands(mythic_commands):
-    items = mythic_commands.get_completer_items("callback x")
+    items = completer_values(mythic_commands.get_completer_items("callback "))
     assert "export" in items
     assert "import" in items
 
 
 def test_completer_callback_export_options_omit_background(mythic_commands):
-    items = mythic_commands.get_completer_items("callback export x")
-    assert set(items) == {"-h", "--help"}
+    items = completer_values(mythic_commands.get_completer_items("callback export 5 -"))
+    assert items == set()
 
 
 async def test_callback_export_default_path(mythic_commands, monkeypatch, tmp_path):
