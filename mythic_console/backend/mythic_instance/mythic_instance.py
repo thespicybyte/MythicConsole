@@ -144,6 +144,22 @@ class MythicInstance:
         except asyncio.CancelledError:
             pass
 
+    async def monitor_operator_updates(self) -> AsyncGenerator[List[str], None]:
+        """
+        Monitor the operator table for any change and yield the current list of
+        non-deleted usernames on every push
+        :return: list of usernames
+        """
+        sub = """
+            subscription OperatorUpdates {
+              operator(where: {deleted: {_eq: false}}) { username }
+            }"""
+        try:
+            async for result in mythic.subscribe_custom_query(self.mythic, sub):
+                yield [o["username"] for o in result.get("operator", []) if o.get("username")]
+        except asyncio.CancelledError:
+            pass
+
     async def get_all_callbacks_detail(self) -> list[dict]:
         """
         Get all callbacks, including ones that are no longer active, for the manage-callbacks
