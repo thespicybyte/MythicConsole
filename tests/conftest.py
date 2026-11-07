@@ -5,6 +5,8 @@ from pathlib import Path
 
 import pytest
 
+from textual_console import CompletionHint
+
 from mythic_console.backend.formatter.formatter import DefaultFormatter
 from mythic_console.backend.mythic_agent.mythic_agent import MythicAgent
 from mythic_console.backend.task.task import Task
@@ -14,6 +16,11 @@ from mythic_console.plugins.registry import get_plugin_registry
 
 FIXTURES = Path(__file__).parent / "fixtures"
 TESTPLUGIN_DIR = FIXTURES / "plugins" / "testplugin"
+
+
+def completer_values(items):
+    """ArgparseCompleter result -> the set of selectable `.value`s, dropping hint rows."""
+    return {item.value for item in items if not isinstance(item, CompletionHint)}
 
 
 @pytest.fixture(autouse=True)

@@ -1,6 +1,9 @@
 import pytest
+from cmd2 import Cmd2ArgumentParser
 
 from mythic_console.backend.mythic_agent.mythic_agent import MythicCommands
+
+from conftest import completer_values
 
 CMD2_BUILTINS = {
     "_eof", "_relative_run_script", "alias", "edit", "help", "history",
@@ -16,13 +19,13 @@ def mythic_commands(fake_instance):
 def test_empty_line_lists_only_real_global_commands(mythic_commands):
     items = mythic_commands.get_completer_items("")
 
-    assert set(items) == {"callback", "operation", "payload", "user", "op", "profiles"}
+    assert completer_values(items) == {"callback", "operation", "payload", "user", "op", "profiles"}
 
 
 def test_empty_line_excludes_cmd2_builtins(mythic_commands):
     items = mythic_commands.get_completer_items("")
 
-    assert CMD2_BUILTINS.isdisjoint(items)
+    assert CMD2_BUILTINS.isdisjoint(completer_values(items))
 
 
 def test_commands_property_excludes_cmd2_builtins(mythic_commands):
@@ -30,6 +33,62 @@ def test_commands_property_excludes_cmd2_builtins(mythic_commands):
     names = {name.removeprefix("do_") for name in mythic_commands.commands}
 
     assert names == {"callback", "operation", "payload", "user", "profiles"}
+
+
+def _self_contained_parser() -> Cmd2ArgumentParser:
+    """A standalone root parser, independent of the app's real command tree, so these
+    tests do not depend on what other in-flight work adds to it."""
+    root = Cmd2ArgumentParser()
+    root.add_argument("-v", "--verbose", action="store_true")
+    subparsers = root.add_subparsers(title="subcommands")
+
+    operator_parser = subparsers.add_parser("operator")
+    operator_subparsers = operator_parser.add_subparsers(title="subcommands")
+    operator_subparsers.add_parser("add")
+    operator_subparsers.add_parser("remove")
+    operator_subparsers.add_parser("role")
+
+    create_parser = subparsers.add_parser("create")
+    create_parser.add_argument("--role", choices=["operator", "spectator"])
+    create_parser.add_argument("active", choices=["true", "false"])
+
+    return root
+
+
+@pytest.fixture
+def mythic_commands_with_test_parser(mythic_commands):
+    mythic_commands._completer_parsers["testcmd"] = _self_contained_parser()
+    return mythic_commands
+
+
+def test_completer_nested_subverb_completes_all_sub_verbs(mythic_commands_with_test_parser):
+    items = mythic_commands_with_test_parser.get_completer_items("testcmd operator ")
+
+    assert completer_values(items) == {"add", "remove", "role"}
+
+
+def test_completer_option_choice_completes_values(mythic_commands_with_test_parser):
+    items = mythic_commands_with_test_parser.get_completer_items("testcmd create --role ")
+
+    assert completer_values(items) == {"operator", "spectator"}
+
+
+def test_completer_positional_choice_completes_values(mythic_commands_with_test_parser):
+    items = mythic_commands_with_test_parser.get_completer_items("testcmd create ")
+
+    assert completer_values(items) == {"true", "false"}
+
+
+def test_completer_option_flags_complete_on_dash_for_command(mythic_commands_with_test_parser):
+    items = mythic_commands_with_test_parser.get_completer_items("testcmd -")
+
+    assert completer_values(items) == {"-v", "--verbose"}
+
+
+def test_completer_option_flags_complete_on_dash_for_subcommand(mythic_commands_with_test_parser):
+    items = mythic_commands_with_test_parser.get_completer_items("testcmd create -")
+
+    assert completer_values(items) == {"--role"}
 
 
 async def test_empty_string_lists_top_level_commands(test_plugin_agent):
