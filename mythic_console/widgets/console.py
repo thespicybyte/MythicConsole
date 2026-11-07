@@ -1,4 +1,4 @@
-from typing import List, Optional, TYPE_CHECKING
+from typing import Iterable, Optional, TYPE_CHECKING
 
 from rich.console import RenderableType
 from textual import on
@@ -6,6 +6,7 @@ from textual.app import ComposeResult
 from textual.containers import Container, Vertical
 from textual.message import Message
 from textual.widget import Widget
+from textual_autocomplete import DropdownItem
 
 from textual_console import CommandAutoComplete, ConsoleInput, ConsoleOutput
 
@@ -43,7 +44,7 @@ class ConsolePanel(Container):
     def on_mount(self) -> None:
         self.run_worker(self.mythic_commands.cache_payload_types(), exit_on_error=False)
 
-    def _completer_items(self, text: str) -> List[str]:
+    def _completer_items(self, text: str) -> Iterable[str | DropdownItem]:
         """Candidate source for CommandAutoComplete: last-word matching is handled by the
         package itself, so this just delegates to the active agent or global commands.
         A trailing space is passed through so Tab after a command (or subcommand) lists
