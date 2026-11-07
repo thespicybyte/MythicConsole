@@ -92,12 +92,51 @@ class UserQueries:
             raise Exception(error)
 
     @staticmethod
-    async def get_all_users(session: Mythic) -> List[int]:
+    async def delete_operator(session: Mythic, operator_id: int) -> dict:
+        resp = await mythic.execute_custom_query(
+            mythic=session,
+            query="""
+                mutation DeleteOperator($operator_id: Int!) {
+                  updateOperatorStatus(operator_id: $operator_id, active: false, deleted: true) {
+                    id
+                    active
+                    deleted
+                  }
+                }
+                """,
+            variables={"operator_id": operator_id},
+        )
+
+        result = resp.get("updateOperatorStatus")
+        if not result:
+            raise Exception(f"failed to delete user: {resp}")
+
+        return result
+
+    @staticmethod
+    async def get_all_usernames(session: Mythic) -> List[str]:
+        resp = await mythic.execute_custom_query(
+            mythic=session,
+            query="""
+                query AllUsernames {
+                  operator(where: {deleted: {_eq: false}}) {
+                    username
+                  }
+                }
+                """,
+        )
+
+        operators = resp.get("operator") or []
+        return [o["username"] for o in operators if o.get("username")]
+
+    @staticmethod
+    async def get_all_users(session: Mythic, include_deleted: bool = False) -> List[int]:
+        where = "" if include_deleted else "(where: {deleted: {_eq: false}})"
         resp = await mythic.execute_custom_query(
             mythic=session,
             query=f"""
                 query Query {{
-                    operator{{
+                    operator{where}{{
                         id
                     }}
                 }}

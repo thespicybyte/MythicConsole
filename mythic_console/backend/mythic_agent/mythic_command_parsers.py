@@ -10,6 +10,29 @@ user_create_parser.add_argument('username', help='username of user')
 user_create_parser.add_argument('password', help='password of user')
 
 user_list_parser = user_subparsers.add_parser('list', help='list users')
+user_list_parser.add_argument('--all', action='store_true', help='include deleted users')
+
+user_info_parser = user_subparsers.add_parser('info', help='show details for one user')
+user_info_parser.add_argument('identifier', help='user id or username')
+
+user_set_parser = user_subparsers.add_parser('set', help='change a user field')
+user_set_subparsers = user_set_parser.add_subparsers(title='field', help='field help')
+
+user_set_admin_parser = user_set_subparsers.add_parser('admin', help='grant or revoke admin')
+user_set_admin_parser.add_argument('value', choices=['true', 'false'],
+                                    help='true to grant admin, false to revoke')
+user_set_admin_parser.add_argument('identifier', help='user id or username')
+user_set_admin_parser.add_argument('--force', action='store_true', help='skip confirmation prompt')
+
+user_set_active_parser = user_set_subparsers.add_parser('active', help='enable or disable an account')
+user_set_active_parser.add_argument('value', choices=['true', 'false'],
+                                     help='true to enable, false to disable')
+user_set_active_parser.add_argument('identifier', help='user id or username')
+user_set_active_parser.add_argument('--force', action='store_true', help='skip confirmation prompt')
+
+user_delete_parser = user_subparsers.add_parser('delete', help='soft-delete a user')
+user_delete_parser.add_argument('identifier', help='user id or username')
+user_delete_parser.add_argument('--force', action='store_true', help='skip confirmation prompt')
 
 ##### Operation Parsers #####
 

@@ -23,7 +23,7 @@ from mythic_console.backend import MythicInstance, Task, User, Operation, Payloa
 from mythic_console.utils.logger import logger
 from mythic_console.utils.environment import Environment
 from mythic_console.screens.forms import ParamForm, FieldSpec, field_spec_from_param
-from mythic_console.screens.prompts import BACK, TaskPrompt, ChoicePrompt
+from mythic_console.screens.prompts import BACK, TaskPrompt, ChoicePrompt, YesNoPrompt
 from mythic_console.screens.build_summary import BuildSummary
 from mythic_console.screens.select_commands import SelectCommands
 from . import mythic_command_parsers
@@ -41,6 +41,12 @@ async def _prompt(screen):
     """Push a modal from within a command coroutine's worker and await its dismissal value.
     The only place this module reaches for the running App."""
     return await active_app.get().push_screen_wait(screen)
+
+
+def _user_from_identifier(instance: MythicInstance, identifier: str) -> User:
+    if identifier.isdigit():
+        return User(instance, user_id=int(identifier))
+    return User(instance, username=identifier)
 
 
 class MythicAgent:
@@ -943,11 +949,13 @@ class MythicCommands(Cmd):
     """Global, agent-independent console commands (operation/payload/user), a cmd2.Cmd.
     Unrelated to AgentCommands (a per-agent command collection)."""
 
+    _payload_type_cache: List[str] = []
+    _user_cache: List[str] = []
+
     def __init__(self, instance: MythicInstance):
         super().__init__()
         self.instance = instance
         self._commands: List[str] = []
-        self._payload_type_cache: List[str] = []
         self._aliases = [
             AgentCommandAlias("op", "operation"),
         ]
@@ -963,6 +971,11 @@ class MythicCommands(Cmd):
             "profiles list": mythic_command_parsers.profiles_list_parser,
             "user list": mythic_command_parsers.user_list_parser,
             "user create": mythic_command_parsers.user_create_parser,
+            "user info": mythic_command_parsers.user_info_parser,
+            "user set": mythic_command_parsers.user_set_parser,
+            "user set admin": mythic_command_parsers.user_set_admin_parser,
+            "user set active": mythic_command_parsers.user_set_active_parser,
+            "user delete": mythic_command_parsers.user_delete_parser,
             "payload list": mythic_command_parsers.payload_list_parser,
             "payload types": mythic_command_parsers.payload_types_parser,
             "payload download": mythic_command_parsers.payload_download_parser,
@@ -982,6 +995,15 @@ class MythicCommands(Cmd):
             if action.dest == "payload_type"
         )
         set_completer(payload_type_action, lambda word: list(self._payload_type_cache))
+
+        for parser in (
+            mythic_command_parsers.user_info_parser,
+            mythic_command_parsers.user_set_admin_parser,
+            mythic_command_parsers.user_set_active_parser,
+            mythic_command_parsers.user_delete_parser,
+        ):
+            identifier_action = next(a for a in parser._actions if a.dest == "identifier")
+            set_completer(identifier_action, lambda word: list(self._user_cache))
 
     @property
     def commands(self) -> List[str]:
@@ -1060,16 +1082,22 @@ class MythicCommands(Cmd):
         if func is not None:
             return func(self, args)
 
-    async def _user_list(self, _args):
+    async def _user_list(self, args):
         try:
-            user_ids = await UserQueries.get_all_users(self.instance.mythic)
+            await self.cache_users()
+            user_ids = await UserQueries.get_all_users(self.instance.mythic, include_deleted=args.all)
             user_info = []
             for user_id in sorted(user_ids):
                 user = User(self.instance, user_id=user_id)
                 await user.query()
-                user_info.append([str(user.id), user.username, user.current_operation_name or "", str(user.admin)])
+                row = [str(user.id), user.username, user.current_operation_name or "", str(user.admin)]
+                if args.all:
+                    row.append(str(user.deleted))
+                user_info.append(row)
 
             headers = ["id", "username", "active operation", "admin"]
+            if args.all:
+                headers.append("deleted")
             return DefaultFormatter().build_table(*user_info, headers=headers, title="Users")
         except Exception as e:
             logger.error(e)
@@ -1082,6 +1110,7 @@ class MythicCommands(Cmd):
             user = User(self.instance, username=args.username)
             await user.create(args.password)
             await user.query()
+            await self.cache_users()
 
             user_info = [[str(user.id), user.username, user.current_operation_name or "", str(user.admin)]]
 
@@ -1092,6 +1121,91 @@ class MythicCommands(Cmd):
             return f"Error: {e}"
 
     mythic_command_parsers.user_create_parser.set_defaults(func=_user_create)
+
+    async def _user_info(self, args) -> RenderableType:
+        try:
+            user = _user_from_identifier(self.instance, args.identifier)
+            await user.query()
+
+            rows = [
+                ["id", str(user.id)],
+                ["username", user.username],
+                ["admin", str(user.admin)],
+                ["active", str(user.active)],
+                ["deleted", str(user.deleted)],
+                ["current operation", user.current_operation_name or ""],
+                ["creation time", user.creation_time or ""],
+                ["last login", user.last_login or ""],
+            ]
+            return DefaultFormatter().build_table(*rows, headers=["field", "value"],
+                                                   title=f"User {user.username}")
+        except Exception as e:
+            logger.error(e)
+            return f"Error: {e}"
+
+    mythic_command_parsers.user_info_parser.set_defaults(func=_user_info)
+
+    async def _user_set_admin(self, args) -> RenderableType:
+        try:
+            is_admin = args.value == "true"
+            user = _user_from_identifier(self.instance, args.identifier)
+            await user.query()
+            if not is_admin and not args.force:
+                if not await _prompt(YesNoPrompt(f"Revoke admin from '{user.username}'?")):
+                    return "Cancelled"
+
+            await user.set_admin_status(is_admin)
+            await user.query()
+
+            user_info = [[str(user.id), user.username, str(user.admin)]]
+            return DefaultFormatter().build_table(*user_info, headers=["id", "username", "admin"],
+                                                   title="Users")
+        except Exception as e:
+            logger.error(e)
+            return f"Error: {e}"
+
+    mythic_command_parsers.user_set_admin_parser.set_defaults(func=_user_set_admin)
+
+    async def _user_set_active(self, args) -> RenderableType:
+        try:
+            is_active = args.value == "true"
+            user = _user_from_identifier(self.instance, args.identifier)
+            await user.query()
+            if not is_active and not args.force:
+                if not await _prompt(YesNoPrompt(f"Disable account '{user.username}'?")):
+                    return "Cancelled"
+
+            await user.set_active_status(is_active)
+            await user.query()
+
+            user_info = [[str(user.id), user.username, str(user.active)]]
+            return DefaultFormatter().build_table(*user_info, headers=["id", "username", "active"],
+                                                   title="Users")
+        except Exception as e:
+            logger.error(e)
+            return f"Error: {e}"
+
+    mythic_command_parsers.user_set_active_parser.set_defaults(func=_user_set_active)
+
+    async def _user_delete(self, args) -> RenderableType:
+        try:
+            user = _user_from_identifier(self.instance, args.identifier)
+            await user.query()
+            if not args.force and not await _prompt(YesNoPrompt(f"Delete user '{user.username}'?")):
+                return "Cancelled"
+
+            await user.delete()
+            await user.query()
+            await self.cache_users()
+
+            user_info = [[str(user.id), user.username, str(user.active), str(user.deleted)]]
+            return DefaultFormatter().build_table(*user_info, headers=["id", "username", "active", "deleted"],
+                                                   title="Users")
+        except Exception as e:
+            logger.error(e)
+            return f"Error: {e}"
+
+    mythic_command_parsers.user_delete_parser.set_defaults(func=_user_delete)
 
     @with_argparser(mythic_command_parsers.operation_parser)
     def do_operation(self, args):
@@ -1257,9 +1371,15 @@ class MythicCommands(Cmd):
             return
         try:
             payload_types = await PayloadTypeQueries.query_all_payload_types(self.instance.mythic)
-            self._payload_type_cache = [p["name"] for p in payload_types or [] if p.get("name")]
+            self._payload_type_cache[:] = [p["name"] for p in payload_types or [] if p.get("name")]
         except Exception as e:
             logger.warning(f"could not cache payload types: {e}")
+
+    async def cache_users(self):
+        try:
+            self._user_cache[:] = await UserQueries.get_all_usernames(self.instance.mythic)
+        except Exception as e:
+            logger.warning(f"could not cache users: {e}")
 
     async def _payload_build(self, args) -> RenderableType:
         try:
