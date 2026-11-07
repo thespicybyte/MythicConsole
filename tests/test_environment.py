@@ -11,7 +11,8 @@ def isolated_cwd(tmp_path, monkeypatch):
     """Every test runs in an empty tmp dir so `.env` / env vars from the real repo never leak in."""
     monkeypatch.chdir(tmp_path)
     for key in ("MYTHIC_CONSOLE_USER", "MYTHIC_CONSOLE_PASSWORD", "MYTHIC_SERVER_URL",
-                "DOWNLOAD_DIRECTORY", "LOG_DIRECTORY", "LOG_FILE", "LOG_LEVEL"):
+                "DOWNLOAD_DIRECTORY", "LOG_DIRECTORY", "LOG_FILE", "LOG_LEVEL",
+                "PLUGIN_DIRECTORY", "HISTORY_FILE", "XDG_CONFIG_HOME"):
         monkeypatch.delenv(key, raising=False)
 
 
@@ -118,3 +119,49 @@ def test_log_directory_env_creates_dir(tmp_path, monkeypatch):
     result = Environment().log_directory()
     assert result == str(target)
     assert os.path.isdir(target)
+
+
+def test_plugins_directory_default_is_xdg_config_based(tmp_path, monkeypatch):
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path / "config"))
+    result = Environment().plugins_directory()
+    assert result == str(tmp_path / "config" / "mythicconsole" / "plugins")
+    assert os.path.isdir(result)
+
+
+def test_plugins_directory_env_override_creates_dir(tmp_path, monkeypatch):
+    target = tmp_path / "plugins"
+    monkeypatch.setenv("PLUGIN_DIRECTORY", str(target))
+    result = Environment().plugins_directory()
+    assert result == str(target)
+    assert os.path.isdir(target)
+
+
+def test_plugins_directory_dotenv_override(tmp_path):
+    target = tmp_path / "from_dotenv_plugins"
+    (tmp_path / ".env").write_text(f"PLUGIN_DIRECTORY={target}\n")
+    result = Environment().plugins_directory()
+    assert result == str(target)
+    assert os.path.isdir(target)
+
+
+def test_history_file_default_is_in_config_directory(tmp_path, monkeypatch):
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path / "config"))
+    result = Environment().history_file()
+    assert result == str(tmp_path / "config" / "mythicconsole" / "history.json")
+
+
+def test_history_file_env_override(tmp_path, monkeypatch):
+    target = tmp_path / "custom_history.json"
+    monkeypatch.setenv("HISTORY_FILE", str(target))
+    assert Environment().history_file() == str(target)
+
+
+def test_history_file_env_override_expands_user(monkeypatch):
+    monkeypatch.setenv("HISTORY_FILE", "~/history.json")
+    assert Environment().history_file() == os.path.expanduser("~/history.json")
+
+
+def test_history_file_dotenv_override(tmp_path):
+    target = tmp_path / "from_dotenv_history.json"
+    (tmp_path / ".env").write_text(f"HISTORY_FILE={target}\n")
+    assert Environment().history_file() == str(target)

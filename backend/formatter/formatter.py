@@ -1,6 +1,6 @@
 import base64
 import json
-from abc import ABC, abstractmethod
+from abc import ABC
 from typing import Optional, List
 
 from rich.console import Console, RenderableType
@@ -11,11 +11,29 @@ from rich.text import Text
 from ..task.task import Task, TaskNotCompleted
 
 
+def renders(*command_names):
+    """Tag a render method with the command name(s) it handles."""
+    def decorator(func):
+        func._renders_for = command_names
+        return func
+    return decorator
+
+
 class Formatter(ABC):
+    _renderers: dict[str, str] = {}
+
     def __init__(self):
         self.console = Console()
 
-    @abstractmethod
+    def __init_subclass__(cls, **kwargs):
+        super().__init_subclass__(**kwargs)
+        registry: dict[str, str] = {}
+        for klass in reversed(cls.__mro__):
+            for attr_name, member in vars(klass).items():
+                for command in getattr(member, "_renders_for", ()):
+                    registry[command] = attr_name
+        cls._renderers = registry
+
     async def format_output(self, task: Task) -> Optional["RenderableType"]:
         """
         Wrapper around all custom formatters for the agent
@@ -23,7 +41,10 @@ class Formatter(ABC):
         :param task: Task object to have output formatted
         :rtype: Any rich renderable value
         """
-        pass
+        renderer_name = self._renderers.get(task.command_name)
+        if renderer_name is None:
+            return await self.format_plaintext(task)
+        return await getattr(self, renderer_name)(task)
 
     def set_console(self, console: Console):
         """
@@ -120,5 +141,4 @@ class Formatter(ABC):
 
 
 class DefaultFormatter(Formatter):
-    async def format_output(self, task: Task) -> Optional["RenderableType"]:
-        return ""
+    pass

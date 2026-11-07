@@ -1,0 +1,349 @@
+[
+  {
+    "cmd": "stash",
+    "description": "Upload a local file to the agent",
+    "help_cmd": "stash -file file -label label",
+    "attributes": {
+      "builtin": false,
+      "load_only": false,
+      "supported_os": [],
+      "suggested_command": true,
+      "filter_by_build_parameter": {}
+    },
+    "supported_ui_features": [],
+    "commandparameters": [
+      {
+        "name": "file",
+        "cli_name": "file",
+        "type": "File",
+        "required": true,
+        "default_value": "",
+        "description": "File to upload",
+        "parameter_group_name": "Default",
+        "ui_position": 0,
+        "choices": [],
+        "choices_are_all_commands": false,
+        "choices_are_loaded_commands": false,
+        "dynamic_query_function": ""
+      },
+      {
+        "name": "label",
+        "cli_name": "label",
+        "type": "String",
+        "required": false,
+        "default_value": "",
+        "description": "Label for the upload",
+        "parameter_group_name": "Default",
+        "ui_position": 1,
+        "choices": [],
+        "choices_are_all_commands": false,
+        "choices_are_loaded_commands": false,
+        "dynamic_query_function": ""
+      }
+    ]
+  },
+  {
+    "cmd": "creds",
+    "description": "Store a credential for later use",
+    "help_cmd": "creds -cred cred",
+    "attributes": {
+      "builtin": false,
+      "load_only": false,
+      "supported_os": [],
+      "suggested_command": true,
+      "filter_by_build_parameter": {}
+    },
+    "supported_ui_features": [],
+    "commandparameters": [
+      {
+        "name": "cred",
+        "cli_name": "cred",
+        "type": "CredentialJson",
+        "required": true,
+        "default_value": "",
+        "description": "Credential material",
+        "parameter_group_name": "Default",
+        "ui_position": 0,
+        "choices": [],
+        "choices_are_all_commands": false,
+        "choices_are_loaded_commands": false,
+        "dynamic_query_function": ""
+      }
+    ]
+  },
+  {
+    "cmd": "link",
+    "description": "Connect to a new agent over a P2P profile",
+    "help_cmd": "link -target target",
+    "attributes": {
+      "builtin": false,
+      "load_only": false,
+      "supported_os": [],
+      "suggested_command": true,
+      "filter_by_build_parameter": {}
+    },
+    "supported_ui_features": [],
+    "commandparameters": [
+      {
+        "name": "target",
+        "cli_name": "target",
+        "type": "AgentConnect",
+        "required": true,
+        "default_value": "",
+        "description": "Connection details",
+        "parameter_group_name": "Default",
+        "ui_position": 0,
+        "choices": [],
+        "choices_are_all_commands": false,
+        "choices_are_loaded_commands": false,
+        "dynamic_query_function": ""
+      }
+    ]
+  },
+  {
+    "cmd": "p2p_connect",
+    "description": "Connect to an existing P2P link for this callback",
+    "help_cmd": "p2p_connect -peer peer",
+    "attributes": {
+      "builtin": false,
+      "load_only": false,
+      "supported_os": [],
+      "suggested_command": true,
+      "filter_by_build_parameter": {}
+    },
+    "supported_ui_features": [],
+    "commandparameters": [
+      {
+        "name": "peer",
+        "cli_name": "peer",
+        "type": "LinkInfo",
+        "required": true,
+        "default_value": "",
+        "description": "Peer link details",
+        "parameter_group_name": "Default",
+        "ui_position": 0,
+        "choices": [],
+        "choices_are_all_commands": false,
+        "choices_are_loaded_commands": false,
+        "dynamic_query_function": ""
+      }
+    ]
+  },
+  {
+    "cmd": "relay",
+    "description": "Push a payload to the target for later execution",
+    "help_cmd": "relay -payload payload",
+    "attributes": {
+      "builtin": false,
+      "load_only": false,
+      "supported_os": [],
+      "suggested_command": true,
+      "filter_by_build_parameter": {}
+    },
+    "supported_ui_features": [],
+    "commandparameters": [
+      {
+        "name": "payload",
+        "cli_name": "payload",
+        "type": "PayloadList",
+        "required": true,
+        "default_value": "",
+        "description": "Payload to relay",
+        "parameter_group_name": "Default",
+        "ui_position": 0,
+        "choices": [],
+        "choices_are_all_commands": false,
+        "choices_are_loaded_commands": false,
+        "dynamic_query_function": ""
+      }
+    ]
+  },
+  {
+    "cmd": "tag",
+    "description": "Attach typed metadata to the callback",
+    "help_cmd": "tag -items items",
+    "attributes": {
+      "builtin": false,
+      "load_only": false,
+      "supported_os": [],
+      "suggested_command": true,
+      "filter_by_build_parameter": {}
+    },
+    "supported_ui_features": [],
+    "commandparameters": [
+      {
+        "name": "items",
+        "cli_name": "items",
+        "type": "TypedArray",
+        "required": true,
+        "default_value": "",
+        "description": "Typed metadata items",
+        "parameter_group_name": "Default",
+        "ui_position": 0,
+        "choices": ["string", "int", "bool"],
+        "choices_are_all_commands": false,
+        "choices_are_loaded_commands": false,
+        "dynamic_query_function": ""
+      }
+    ]
+  },
+  {
+    "cmd": "run",
+    "description": "Run any command known to this agent by name",
+    "help_cmd": "run -target_cmd target_cmd",
+    "attributes": {
+      "builtin": false,
+      "load_only": false,
+      "supported_os": [],
+      "suggested_command": true,
+      "filter_by_build_parameter": {}
+    },
+    "supported_ui_features": [],
+    "commandparameters": [
+      {
+        "name": "target_cmd",
+        "cli_name": "target_cmd",
+        "type": "ChooseOne",
+        "required": true,
+        "default_value": "",
+        "description": "Command to run",
+        "parameter_group_name": "Default",
+        "ui_position": 0,
+        "choices": [],
+        "choices_are_all_commands": true,
+        "choices_are_loaded_commands": false,
+        "dynamic_query_function": ""
+      }
+    ]
+  },
+  {
+    "cmd": "unload",
+    "description": "Unload a command that is loaded on this callback",
+    "help_cmd": "unload -loaded_cmd loaded_cmd",
+    "attributes": {
+      "builtin": false,
+      "load_only": false,
+      "supported_os": [],
+      "suggested_command": true,
+      "filter_by_build_parameter": {}
+    },
+    "supported_ui_features": [],
+    "commandparameters": [
+      {
+        "name": "loaded_cmd",
+        "cli_name": "loaded_cmd",
+        "type": "ChooseOne",
+        "required": true,
+        "default_value": "",
+        "description": "Command to unload",
+        "parameter_group_name": "Default",
+        "ui_position": 0,
+        "choices": [],
+        "choices_are_all_commands": false,
+        "choices_are_loaded_commands": true,
+        "dynamic_query_function": ""
+      }
+    ]
+  },
+  {
+    "cmd": "probe",
+    "description": "Probe a target offered by the agent at runtime",
+    "help_cmd": "probe -target target",
+    "attributes": {
+      "builtin": false,
+      "load_only": false,
+      "supported_os": [],
+      "suggested_command": true,
+      "filter_by_build_parameter": {}
+    },
+    "supported_ui_features": [],
+    "commandparameters": [
+      {
+        "name": "target",
+        "cli_name": "target",
+        "type": "ChooseOne",
+        "required": true,
+        "default_value": "",
+        "description": "Probe target",
+        "parameter_group_name": "Default",
+        "ui_position": 0,
+        "choices": [],
+        "choices_are_all_commands": false,
+        "choices_are_loaded_commands": false,
+        "dynamic_query_function": "get_probe_targets"
+      }
+    ]
+  },
+  {
+    "cmd": "mode",
+    "description": "Set the agent's operating mode",
+    "help_cmd": "mode -level level",
+    "attributes": {
+      "builtin": false,
+      "load_only": false,
+      "supported_os": [],
+      "suggested_command": true,
+      "filter_by_build_parameter": {}
+    },
+    "supported_ui_features": [],
+    "commandparameters": [
+      {
+        "name": "level",
+        "cli_name": "level",
+        "type": "ChooseOne",
+        "required": true,
+        "default_value": "low",
+        "description": "Operating mode",
+        "parameter_group_name": "Default",
+        "ui_position": 0,
+        "choices": ["low", "medium", "high"],
+        "choices_are_all_commands": false,
+        "choices_are_loaded_commands": false,
+        "dynamic_query_function": ""
+      }
+    ]
+  },
+  {
+    "cmd": "deliver",
+    "description": "Deliver a file either by push or pull, exercising File/PayloadList across groups",
+    "help_cmd": "deliver [push|pull]",
+    "attributes": {
+      "builtin": false,
+      "load_only": false,
+      "supported_os": [],
+      "suggested_command": true,
+      "filter_by_build_parameter": {}
+    },
+    "supported_ui_features": [],
+    "commandparameters": [
+      {
+        "name": "target",
+        "cli_name": "target",
+        "type": "File",
+        "required": true,
+        "default_value": "",
+        "description": "Local file to push",
+        "parameter_group_name": "Push",
+        "ui_position": 0,
+        "choices": [],
+        "choices_are_all_commands": false,
+        "choices_are_loaded_commands": false,
+        "dynamic_query_function": ""
+      },
+      {
+        "name": "target",
+        "cli_name": "target",
+        "type": "PayloadList",
+        "required": true,
+        "default_value": "",
+        "description": "Payload to pull",
+        "parameter_group_name": "Pull",
+        "ui_position": 0,
+        "choices": [],
+        "choices_are_all_commands": false,
+        "choices_are_loaded_commands": false,
+        "dynamic_query_function": ""
+      }
+    ]
+  }
+]

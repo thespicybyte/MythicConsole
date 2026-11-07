@@ -1,7 +1,8 @@
 import argparse
 import base64
 import json
-from typing import Optional, AsyncGenerator
+import os
+from typing import Dict, Optional, AsyncGenerator, TYPE_CHECKING
 
 import mythic.mythic
 
@@ -12,6 +13,9 @@ from screens.prompts import TaskPrompt
 from .queries import TaskQueries
 from ..response.response import Response
 from ..response.queries import ResponseQueries
+
+if TYPE_CHECKING:
+    from ..callback.callback import Callback
 
 
 class TaskError(Exception):
@@ -24,7 +28,9 @@ class TaskNotCompleted(Exception):
 
 class Task:
     def __init__(self, instance: MythicInstance, task_id: int = None, task_uuid: str = None,
-                 callback_display_id: int = None, command: str = None, args: str | dict = ""):
+                 callback: "Callback" = None, callback_display_id: int = None, command: str = None,
+                 args: str | dict = ""):
+        callback_display_id = callback_display_id or (callback.display_id if callback else None)
         if (not task_id and not task_uuid) and (not command and not callback_display_id):
             raise Exception("task id or uuid or command and callback display id required")
 
@@ -49,12 +55,15 @@ class Task:
         self.username: Optional[str] = None
         self.hostname: Optional[str] = None
         self.callback_id: Optional[int] = None
+        self.callback: Optional["Callback"] = callback
         self.callback_display_id = callback_display_id
         self.callback_uuid: Optional[str] = None
         self.payload_type_name: Optional[str] = None
         self.background = False
         self.verify_prompt: Optional[TaskPrompt] = None
         self.console_args: Optional[argparse.Namespace] = None
+        self.file_params: Dict[str, str] = {}
+        self.pending_file_params: Dict[str, str] = {}
 
     def __eq__(self, other):
         if isinstance(other, Task):
@@ -69,6 +78,14 @@ class Task:
             value = f"{value} {self.params}"
 
         return value
+
+    @property
+    def display_status(self) -> str:
+        if not self.status:
+            return ""
+        if "error" in self.status.lower():
+            return "error"
+        return self.status
 
     def _update(self, data: dict):
         if data.get("id"):
@@ -227,6 +244,18 @@ class Task:
             raise ValueError("callback display id not set")
 
         try:
+            for dest, local_path in self.file_params.items():
+                with open(local_path, 'rb') as f:
+                    data = f.read()
+                file_id = await mythic.mythic.register_file(self.mythic, os.path.basename(local_path), data)
+                if not file_id:
+                    raise Exception(f"failed to register file for '{dest}': {local_path}")
+                self.args[dest] = file_id
+
+            if self.callback is not None and self.callback.loaded_commands is not None \
+                    and self.command_name not in self.callback.loaded_commands:
+                raise TaskError(f"command '{self.command_name}' is not loaded on this callback")
+
             task_id = await TaskQueries.execute(self.mythic, self.command_name, self.args, self.callback_display_id)
             if not task_id:
                 return
@@ -234,6 +263,8 @@ class Task:
             self.id = task_id
             await self.query()
 
+        except TaskError:
+            raise
         except Exception as e:
             raise TaskError(e)
 

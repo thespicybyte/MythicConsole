@@ -1,6 +1,7 @@
 import asyncio
 import io
 import sys
+from datetime import datetime, timezone
 from enum import Enum
 from typing import Optional, Coroutine
 
@@ -27,9 +28,12 @@ from agents import get_agent
 from backend import Callback, MythicInstance, User, Operation, Task, MythicAgent, FormatterNotAvailable
 from backend.cmd.mythic_cmd import MythicCmd
 from backend.task.task import TaskError
+from screens.manage_callbacks import ManageCallbacks
+from screens.prompts import FilePrompt
+from utils.callback_status import count_active
 from utils.logger import logger
 from widgets.calback_tabs import CallbackTabs
-from widgets.callbacks import Callbacks, CallbackTable
+from widgets.callbacks import Callbacks, CallbackTable, build_callback_row
 from widgets.console import ConsolePanel
 from widgets.messages import TabClosed, UpdateCurrentCallback
 from widgets.session_info import SessionInfo
@@ -39,13 +43,18 @@ from widgets.tasks_table import TasksTable, ReplayTask
 cmd2.rich_utils.ALLOW_STYLE = cmd2.rich_utils.AllowStyle.NEVER
 
 
+def _sort_tasks_table(task_table: DataTable) -> None:
+    """Keep the Tasks table ordered by numeric task ID, newest first."""
+    task_table.sort("id", key=lambda task_id: int(task_id), reverse=True)
+
+
 class ViewMode(Enum):
     HOME = 1
     CALLBACK = 2
 
 
 class Sidebar(Container):
-    view_mode = reactive(ViewMode.HOME, recompose=True)
+    view_mode = reactive(ViewMode.HOME)
 
     def __init__(self, instance: MythicInstance, *children: Widget):
         self.instance = instance
@@ -127,6 +136,7 @@ class Home(Screen):
         self.cmd = MythicCmd(instance)
         # commands run one at a time, in order, via _run_cmd_queue
         self._cmd_queue: asyncio.Queue[str] = asyncio.Queue()
+        self.known_callbacks: dict[str, bool] = {}
         super().__init__()
         self.displayed_tabs["Mythic"] = TabPane("Mythic", ConsolePanel(instance=instance), id="home")
 
@@ -136,19 +146,91 @@ class Home(Screen):
         Binding(key="ctrl+pagedown", action="previous_tab", description="previous tab", key_display="^pagedown"),
         Binding(key="ctrl+pageup", action="next_tab", description="next tab", key_display="^pageup"),
         Binding(key="ctrl+q", action="close_tab", description="close tab", key_display="^q"),
+        Binding(key="ctrl+shift+comma", action="shrink_sidebar", description="shrink sidebar", key_display="<"),
+        Binding(key="ctrl+shift+full_stop", action="grow_sidebar", description="grow sidebar", key_display=">"),
         Binding(key="alt+left", action="shrink_sidebar", description="shrink sidebar", show=False),
         Binding(key="alt+right", action="grow_sidebar", description="grow sidebar", show=False),
         Binding(key="ctrl+q", action="close_tab", description="close tab", key_display="^q"),
         Binding(key="ctrl+z", action="background_current_task", description="background", key_display="^z"),
+        Binding(key="m", action="manage_callbacks", description="manage callbacks", key_display="m"),
     ]
 
     async def _on_mount(self, _event: events.Mount) -> None:
         self.monitor_callbacks()
         worker = self._get_active_callbacks()
         await worker.wait()
+        worker = self._seed_known_callbacks()
+        await worker.wait()
+        self._monitor_callback_updates()
+        self.set_interval(1.0, self._refresh_live_cells)
         self._get_and_monitor_tasks()
         self._monitor_tasks()
         self._run_cmd_queue()
+
+    def _refresh_live_cells(self) -> None:
+        try:
+            table = self.query_one("#callback_table", CallbackTable)
+        except NoMatches:
+            return
+        table.refresh_live_cells(self.active_callbacks)
+
+    def _refresh_callbacks_title(self) -> None:
+        active, total = count_active(self.known_callbacks)
+        try:
+            self.query_one(Callbacks).border_title = f"Callbacks ({active}/{total})"
+        except NoMatches:
+            pass
+
+    @work()
+    async def _seed_known_callbacks(self) -> None:
+        detail = await self.instance.get_all_callbacks_detail()
+        for row in detail:
+            uuid = row.get("agent_callback_id")
+            if not uuid:
+                continue
+            self.known_callbacks[uuid] = bool(row.get("active"))
+        self._refresh_callbacks_title()
+
+    @work()
+    async def _monitor_callback_updates(self) -> None:
+        """Reconcile the table and known_callbacks on every callback_stream update."""
+        try:
+            table = self.query_one("#callback_table", CallbackTable)
+        except NoMatches:
+            return
+
+        async for row in self.instance.monitor_callback_updates():
+            uuid = row.get("agent_callback_id")
+            if not uuid:
+                continue
+
+            cb = self.active_callbacks.get(uuid)
+            if not cb:
+                cb = Callback(self.instance, callback_uuid=uuid)
+                await cb.query()
+                self.active_callbacks[uuid] = cb
+
+            cb.apply_stream_update(row)
+            self.known_callbacks[uuid] = cb.active
+            table.reconcile_callback(cb, self.current_tab_id)
+            self._refresh_callbacks_title()
+
+    def action_manage_callbacks(self) -> None:
+        self.run_worker(self._manage_callbacks())
+
+    async def _manage_callbacks(self) -> None:
+        changes = await self.app.push_screen_wait(ManageCallbacks(self.instance))
+        if not changes:
+            return
+
+        await asyncio.gather(*(
+            Callback(self.instance, callback_uuid=uuid).update_active(is_active)
+            for uuid, is_active in changes.items()
+        ))
+
+    @on(CallbackTable.ManageCallbacksRequested)
+    def _manage_callbacks_requested(self, _message: CallbackTable.ManageCallbacksRequested) -> None:
+        self.run_worker(self._manage_callbacks())
 
     @on(TabClosed)
     def tab_closed(self, message: TabClosed):
@@ -190,12 +272,12 @@ class Home(Screen):
 
     @work()
     async def _get_active_callbacks(self):
-        callback_table = self.query_one("#callback_table", DataTable)
+        callback_table = self.query_one("#callback_table", CallbackTable)
         callback_uuids = await self.instance.get_active_callbacks()
         for callback_uuid in callback_uuids:
             cb = Callback(self.instance, callback_uuid=callback_uuid)
             await cb.query()
-            callback_table.add_row(cb.display_id, cb.hostname, cb.payload_type_name, cb.uuid, key=cb.uuid)
+            callback_table.add_row(*build_callback_row(cb, datetime.now(timezone.utc)), key=cb.uuid)
             if cb.uuid not in self.active_callbacks.keys():
                 self.active_callbacks[cb.uuid] = cb
 
@@ -233,14 +315,16 @@ class Home(Screen):
 
     @work()
     async def monitor_callbacks(self):
-        callback_table = self.query_one("#callback_table", DataTable)
+        callback_table = self.query_one("#callback_table", CallbackTable)
         async for uuid in self.instance.monitor_new_callbacks():
             if uuid in self.active_callbacks.keys():
                 continue
             cb = Callback(self.instance, callback_uuid=uuid)
             await cb.query()
-            callback_table.add_row(cb.display_id, cb.hostname, cb.payload_type_name, cb.uuid, key=cb.uuid)
+            callback_table.add_row(*build_callback_row(cb, datetime.now(timezone.utc)), key=cb.uuid)
             self.active_callbacks[cb.uuid] = cb
+            self.known_callbacks[cb.uuid] = cb.active
+            self._refresh_callbacks_title()
 
     async def _update_task(self, task: Task):
         tasked_callback = self.active_callbacks.get(task.callback_uuid)
@@ -248,6 +332,9 @@ class Home(Screen):
         if not tasked_callback:
             logger.warning(f"could not add task to task table: callback {task.callback_display_id} not found")
             return
+
+        if task.command_name == "load" and task.status == "success" and tasked_callback:
+            await tasked_callback.refresh_loaded_commands()
 
         if self.current_callback:
             # add task to task table if active
@@ -261,15 +348,16 @@ class Home(Screen):
                     task_table = None
                 if task_table is not None:
                     try:
-                        task_table.update_cell(row_key=task.uuid, column_key="status", value=task.status)
+                        task_table.update_cell(row_key=task.uuid, column_key="status", value=task.display_status)
                     except CellDoesNotExist:
                         # a fast task can be updated here before the new-task
                         # row has been added; add it now instead of dropping it
                         try:
-                            task_table.add_row(task.id, task.username, task.status, task.command_name, task.params,
+                            task_table.add_row(task.id, task.username, task.display_status, task.command_name, task.params,
                                                 key=task.uuid)
                         except DuplicateKey:
                             pass
+                        _sort_tasks_table(task_table)
 
         if task not in tasked_callback.tasks:
             tasked_callback.tasks.append(task)
@@ -335,6 +423,14 @@ class Home(Screen):
 
             worker = None
             if isinstance(resp, Task):
+                if resp.pending_file_params:
+                    for dest, label in resp.pending_file_params.items():
+                        path = await self.app.push_screen_wait(FilePrompt(label))
+                        if not path:
+                            logger.debug("operator cancelled file selection")
+                            return
+                        resp.file_params[dest] = path
+
                 if resp.verify_prompt:
                     if not await self.app.push_screen_wait(resp.verify_prompt):
                         logger.debug("user bailed on task")
@@ -393,7 +489,7 @@ class Home(Screen):
         except WorkerFailed as worker_error:
             if isinstance(worker_error.error, TaskError):
                 if console_panel:
-                    console_panel.write_string(f"Task Failed: {worker_error.error}")
+                    console_panel.write_string(Text(f"Task Failed: {worker_error.error}", style="red"))
             logger.exception(worker_error.error)
         except FormatterNotAvailable as e:
             if console_panel:
@@ -426,13 +522,13 @@ class Home(Screen):
 
         if current_agent:
             command_table.title = f"{current_agent.name.capitalize()} Commands"
-            for command in current_agent.commands:
+            for command in current_agent.surfaced_commands():
                 command_table.add_row(command.name, command.description)
 
             console_panel.write_string(command_table)
 
             alias_table.title = f"{current_agent.name.capitalize()} Aliases"
-            for alias in sorted(current_agent.aliases, key=lambda a: a.name):
+            for alias in sorted(current_agent.surfaced_aliases(), key=lambda a: a.name):
                 target = f"{alias.command} {alias.subcommand}"
                 if alias.options_prefix:
                     target += f" {alias.options_prefix}"
@@ -446,6 +542,7 @@ class Home(Screen):
         command_table.add_row("operation", "View, change, and create operations")
         command_table.add_row("payload", "Create, download, show payloads")
         command_table.add_row("user", "View/modify operators/spectators")
+        command_table.add_row("callback", "Export/import a callback config")
         console_panel.write_string(command_table)
 
     @on(TasksTable.NewTask)
@@ -467,10 +564,11 @@ class Home(Screen):
                 # sidebar's CALLBACK view, so tasks_table may not be mounted
                 return
             try:
-                task_table.add_row(task.id, task.username, task.status, task.command_name, task.params,
+                task_table.add_row(task.id, task.username, task.display_status, task.command_name, task.params,
                                    key=task.uuid)
             except DuplicateKey:
                 pass
+            _sort_tasks_table(task_table)
 
     @on(CallbackTable.RowUpdated)
     async def _row_updated(self, message: CallbackTable.RowUpdated):
@@ -532,6 +630,9 @@ class Home(Screen):
         agent = get_agent(self.instance, callback.payload_type_name)
         self.current_agent = agent
         self.current_agent.tasker.set_callback(self.current_callback)
+        if self.current_callback.console_panel.agent:
+            self.current_callback.console_panel.agent.tasker.set_callback(self.current_callback)
+        await self.current_agent.load_commands()
         self.cmd.current_agent = self.current_agent
         self.cmd.load_and_register_agent_commands()
 
@@ -605,9 +706,10 @@ class Home(Screen):
         task_table.clear()
         for t in callback.tasks:
             try:
-                task_table.add_row(t.id, t.username, t.status, t.command_name, t.params, key=t.uuid)
+                task_table.add_row(t.id, t.username, t.display_status, t.command_name, t.params, key=t.uuid)
             except DuplicateKey:
                 continue
+        _sort_tasks_table(task_table)
         task_table.loading = False
 
     def action_close_tab(self):

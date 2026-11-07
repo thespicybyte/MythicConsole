@@ -42,10 +42,13 @@ class Callback:
         self.extra_info: Optional[str] = None
         self.sleep_info: Optional[str] = None
         self.timestamp: Optional[str] = None
+        self.dead: bool = False
+        self.current_time: Optional[str] = None
         self.payload_type_name: Optional[str] = None
         self.payload_type_uuid: Optional[str] = None
         self.operation_name: Optional[str] = None
         self.tasks: List[Task] = []
+        self.loaded_commands: Optional[set[str]] = None
         self.config_path = config
         self.console_panel: ConsolePanel = ConsolePanel(instance=self.instance)
 
@@ -79,7 +82,7 @@ class Callback:
             self.description = data.get("description")
         if data.get("operator_id"):
             self.operator_id = data.get("operator_id")
-        if data.get("active"):
+        if "active" in data and data.get("active") is not None:
             self.active = data.get("active")
         if data.get("registered_payload_id"):
             self.registered_payload_id = data.get("registered_payload_id")
@@ -103,6 +106,10 @@ class Callback:
             self.sleep_info = data.get("sleep_info")
         if data.get("timestamp"):
             self.timestamp = data.get("timestamp")
+        if "dead" in data and data.get("dead") is not None:
+            self.dead = data.get("dead")
+        if data.get("current_time"):
+            self.current_time = data.get("current_time")
         if data.get("operation"):
             operation = data.get("operation")
             if operation.get("id"):
@@ -119,6 +126,13 @@ class Callback:
                 payload_type = payload.get("payloadtype")
                 if payload_type.get("name"):
                     self.payload_type_name = payload_type.get("name")
+
+    async def refresh_loaded_commands(self) -> None:
+        display_id = await self.get_display_id()
+        if not display_id:
+            return
+        loaded = await CallbackQueries.get_loaded_commands(self.mythic, display_id)
+        self.loaded_commands = set(loaded)
 
     async def get_display_id(self) -> int:
         if self.display_id:
@@ -143,14 +157,18 @@ class Callback:
                 resp = await CallbackQueries.query_by_uuid(self.mythic, self.uuid)
 
             self._update(resp)
-            self.console_panel.set_agent(self.payload_type_name)
+            await self.console_panel.set_agent(self.payload_type_name)
         except Exception as e:
             logger.exception(e)
             raise
 
+    def apply_stream_update(self, data: dict) -> None:
+        """Merge a `callback_stream` row (partial fields) onto this already-tracked callback."""
+        self._update(data)
+
     async def update_active(self, is_active: bool):
         display_id = await self.get_display_id()
-        await CallbackQueries.update_locked(self.mythic, display_id, is_active)
+        await CallbackQueries.update_active(self.mythic, display_id, is_active)
 
     async def update_locked(self, is_locked: bool):
         display_id = await self.get_display_id()
@@ -172,7 +190,7 @@ class Callback:
             if not task_id:
                 continue
 
-            task = Task(self.instance, task_id=task_id)
+            task = Task(self.instance, task_id=task_id, callback=self)
             await task.query()
             self.tasks.append(task)
 

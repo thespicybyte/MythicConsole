@@ -1,16 +1,23 @@
+import sys
 from enum import Enum
 from typing import List, Optional
 
 import asyncio
-from textual import on
+from textual import events, on
 from textual.app import App, ComposeResult
 from textual.command import CommandPalette
+from textual.errors import NoWidget
 from textual.reactive import var
+from textual.timer import Timer
+from textual.widget import Widget
 from textual.widgets import Header, Footer
 
 from backend import MythicInstance
+from backend.payload_type.queries import PayloadTypeQueries
+from plugins import get_plugin_registry, load_installed_plugins
 from screens.home import Home
 from screens.login import LoginScreen
+from utils import state
 from utils.logger import logger
 
 
@@ -26,6 +33,11 @@ class State(Enum):
     Main = 4,
     Interactive = 5,
     ExtendedInteractive = 6,
+
+
+VERTICAL_SCROLL_EVENTS = (events.MouseScrollDown, events.MouseScrollUp)
+HORIZONTAL_SCROLL_EVENTS = (events.MouseScrollLeft, events.MouseScrollRight)
+SCROLLBAR_HIDE_DELAY = 1.0
 
 
 class MythicConsole(App, inherit_bindings=False):
@@ -44,6 +56,38 @@ class MythicConsole(App, inherit_bindings=False):
         self.state = State.Login
         self._theme_preview_active = False
         self._theme_before_preview: Optional[str] = None
+        self._scrollbar_hide_timers: dict[Widget, Timer] = {}
+
+    async def on_event(self, event: events.Event) -> None:
+        if isinstance(event, VERTICAL_SCROLL_EVENTS + HORIZONTAL_SCROLL_EVENTS) and not event.is_forwarded:
+            self._reveal_scrollbars(event)
+        await super().on_event(event)
+
+    def _reveal_scrollbars(self, event: events.MouseEvent) -> None:
+        """Show the scrollbars of the widget being wheel-scrolled until scrolling stops."""
+        try:
+            widget, _ = self.screen.get_widget_at(event.screen_x, event.screen_y)
+        except NoWidget:
+            return
+
+        horizontal = isinstance(event, HORIZONTAL_SCROLL_EVENTS) or event.ctrl or event.shift
+        for node in widget.ancestors_with_self:
+            if not isinstance(node, Widget):
+                break
+            if node.allow_horizontal_scroll if horizontal else node.allow_vertical_scroll:
+                node.add_class("-scrolling")
+                timer = self._scrollbar_hide_timers.get(node)
+                if timer is not None:
+                    timer.reset()
+                else:
+                    self._scrollbar_hide_timers[node] = self.set_timer(
+                        SCROLLBAR_HIDE_DELAY, lambda: self._hide_scrollbars(node)
+                    )
+                return
+
+    def _hide_scrollbars(self, widget: Widget) -> None:
+        self._scrollbar_hide_timers.pop(widget, None)
+        widget.remove_class("-scrolling")
 
     def search_themes(self) -> None:
         self._theme_before_preview = self.theme
@@ -69,7 +113,9 @@ class MythicConsole(App, inherit_bindings=False):
         if not self._theme_preview_active:
             return
         self._theme_preview_active = False
-        if not event.option_selected and self._theme_before_preview is not None:
+        if event.option_selected:
+            state.set_theme(self.theme)
+        elif self._theme_before_preview is not None:
             self.theme = self._theme_before_preview
 
     def copy_to_clipboard(self, text: str) -> None:
@@ -82,6 +128,10 @@ class MythicConsole(App, inherit_bindings=False):
 
     def on_mount(self):
         logger.debug("starting console")
+        load_installed_plugins()
+        saved_theme = state.get_theme()
+        if saved_theme and saved_theme in self.available_themes:
+            self.theme = saved_theme
         self.push_screen(LoginScreen(), callback=self.handle_login_response)
 
     def compose(self) -> ComposeResult:
@@ -103,13 +153,31 @@ class MythicConsole(App, inherit_bindings=False):
         if loop:
             self.instance.loop = loop
         self.authenticated = True
+        self.run_worker(self._log_plugin_vs_generated_payload_types(), exit_on_error=False)
+
+    async def _log_plugin_vs_generated_payload_types(self):
+        try:
+            payload_types = await PayloadTypeQueries.query_all_payload_types(self.instance.mythic)
+        except Exception as e:
+            logger.warning(f"could not query payload types for plugin reconciliation: {e}")
+            return
+
+        registry = get_plugin_registry()
+        for payload_type in payload_types or []:
+            name = payload_type.get("name")
+            if not name:
+                continue
+            if registry.agent_class_for(name) is not None:
+                logger.info(f"payload type '{name}': plugin-backed")
+            else:
+                logger.info(f"payload type '{name}': generated (no plugin installed)")
 
     def action_logout(self):
         self.authenticated = False
         self.instance = None
 
-        logger.debug(app.workers)
-        for worker in app.workers:
+        logger.debug(self.workers)
+        for worker in self.workers:
             worker.cancel()
 
         while len(self.screen_stack) > 1:
@@ -119,6 +187,15 @@ class MythicConsole(App, inherit_bindings=False):
         self.push_screen(LoginScreen(), callback=self.handle_login_response)
 
 
-if __name__ == '__main__':
+def main():
+    argv = sys.argv[1:]
+    if argv and argv[0] in ("install", "plugin"):
+        from plugins.cli import run as run_plugin_cli
+        sys.exit(run_plugin_cli(argv))
+
     app = MythicConsole()
     app.run()
+
+
+if __name__ == '__main__':
+    main()

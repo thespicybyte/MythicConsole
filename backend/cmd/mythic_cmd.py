@@ -1,12 +1,70 @@
 import sys
 from typing import Optional, List, Union, Coroutine
 
-from cmd2 import Cmd, Statement
+from cmd2 import Cmd, Statement, with_argparser, Cmd2ArgumentParser
 
-import utils
 from backend import MythicAgent, MythicInstance
 from backend.mythic_agent.mythic_agent import MythicCommands
+from plugins.installer import PluginInstallError, install, list_installed, remove
+from plugins.registry import get_plugin_registry
+from utils.environment import Environment
 from utils.logger import logger
+
+plugin_parser = Cmd2ArgumentParser()
+plugin_subparsers = plugin_parser.add_subparsers(title='subcommands', help='subcommand help')
+
+plugin_install_parser = plugin_subparsers.add_parser(
+    'install', help='install a plugin from a GitHub URL or local folder')
+plugin_install_parser.add_argument('source', help='GitHub URL or local folder path')
+plugin_install_parser.add_argument('--branch', default=None,
+                                   help='git branch to clone (GitHub source only)')
+plugin_install_parser.add_argument('--subdir', default=None,
+                                   help='subdirectory within the repo holding the plugin (GitHub source only)')
+
+plugin_list_parser = plugin_subparsers.add_parser('list', help='list installed plugins')
+
+plugin_remove_parser = plugin_subparsers.add_parser('remove', help='remove an installed plugin')
+plugin_remove_parser.add_argument('name', help='plugin name to remove')
+
+
+async def _plugin_install(self, args):
+    try:
+        manifest = install(args.source, Environment().plugins_directory(),
+                           branch=args.branch, subdir=args.subdir)
+    except PluginInstallError as e:
+        return f"[-] install failed: {e}"
+
+    get_plugin_registry().reload()
+    return (f"[+] installed '{manifest.name}' (payload type: {manifest.payload_type}) — "
+            f"reselect a callback of that payload type to use it")
+
+
+plugin_install_parser.set_defaults(func=_plugin_install)
+
+
+async def _plugin_list(self, _args):
+    manifests = list_installed(Environment().plugins_directory())
+    if not manifests:
+        return "no plugins installed"
+
+    lines = [f"{m.name}\t{m.payload_type}\t{m.version}" for m in manifests]
+    return "\n".join(lines)
+
+
+plugin_list_parser.set_defaults(func=_plugin_list)
+
+
+async def _plugin_remove(self, args):
+    try:
+        remove(args.name, Environment().plugins_directory())
+    except PluginInstallError as e:
+        return f"[-] remove failed: {e}"
+
+    get_plugin_registry().reload()
+    return f"[+] removed '{args.name}'"
+
+
+plugin_remove_parser.set_defaults(func=_plugin_remove)
 
 
 class MythicCmd(Cmd):
@@ -24,6 +82,14 @@ class MythicCmd(Cmd):
     @current_agent.setter
     def current_agent(self, new_agent: MythicAgent):
         self._current_agent = new_agent
+
+    @with_argparser(plugin_parser)
+    def do_plugin(self, args):
+        """Manage installed agent plugins. Defined directly on MythicCmd (not loaded/unloaded with
+        agent commands) so it is always reachable, regardless of which callback is selected."""
+        func = getattr(args, 'func', None)
+        if func is not None:
+            return func(self, args)
 
     def unload_agent_commands(self):
         for loaded_command in self._loaded_commands:
@@ -71,11 +137,8 @@ class MythicCmd(Cmd):
         if not self.current_agent:
             return
 
-        command_classes = self.current_agent.get_command_classes()
-
-        for command in command_classes:
-            command_class = command.__class__
-            command_name = utils.camel_to_snake(command_class.__name__).lower()
+        for command in self.current_agent.commands:
+            command_name = command.name
 
             method_name = f"do_{command_name}"
 

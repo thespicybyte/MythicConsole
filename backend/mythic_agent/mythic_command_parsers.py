@@ -28,3 +28,33 @@ payload_list_parser = payload_subparsers.add_parser('list', help='list payloads'
 payload_download_parser = payload_subparsers.add_parser('download', help='download a payload')
 payload_download_parser.add_argument("id", type=int, help="payload id to download")
 payload_download_parser.add_argument("path", nargs="+", help="local path to save payload to")
+
+payload_build_parser = payload_subparsers.add_parser('build', help='build and download a payload from a JSON config')
+payload_build_parser.add_argument("payload_type", help="payload type to build (see `payload list`/server catalog)")
+payload_build_parser.add_argument("-o", "--output", default=None,
+                                   help="local path to save the built payload (default: temp file)")
+payload_build_parser.add_argument("--config", default=None,
+                                   help="JSON build config: a file path or a JSON string")
+
+payload_types_parser = payload_subparsers.add_parser('types', help='list payload types available on the server')
+
+##### C2 Profile Parsers #####
+
+profiles_parser = Cmd2ArgumentParser()
+profiles_subparsers = profiles_parser.add_subparsers(title='subcommands', help='subcommand help')
+
+profiles_list_parser = profiles_subparsers.add_parser('list', help='list c2 profiles')
+
+##### Callback Parsers #####
+
+callback_parser = Cmd2ArgumentParser()
+callback_subparsers = callback_parser.add_subparsers(title='subcommands', help='subcommand help')
+
+callback_export_parser = callback_subparsers.add_parser('export', help='export a callback config to a file')
+callback_export_parser.add_argument("id", type=int, help="callback id to export")
+callback_export_parser.add_argument("path", nargs="*",
+                                    help="local path to save config to "
+                                         "(default: DOWNLOAD_DIRECTORY/callback_<id>_export.json)")
+
+callback_import_parser = callback_subparsers.add_parser('import', help='import a callback config from a file')
+callback_import_parser.add_argument("path", nargs="+", help="local path to the config file to import")

@@ -10,6 +10,7 @@ from textual.widget import Widget
 from textual_console import CommandAutoComplete, ConsoleInput, ConsoleOutput
 
 from backend import MythicInstance
+from utils.history import load_history
 
 if TYPE_CHECKING:
     from backend import MythicAgent
@@ -29,7 +30,7 @@ class ConsolePanel(Container):
         self.agent: Optional["MythicAgent"] = None
         self.mythic_commands = MythicCommands(instance)
         self.console_output = ConsoleOutput()
-        self.console_input = ConsoleInput(prompt="> ", id="prompt")
+        self.console_input = ConsoleInput(prompt="> ", id="prompt", history=load_history())
         self.auto = CommandAutoComplete(self.console_input, candidates=self._completer_items)
 
     def compose(self) -> ComposeResult:
@@ -39,12 +40,16 @@ class ConsolePanel(Container):
                 yield self.console_input
                 yield self.auto
 
+    def on_mount(self) -> None:
+        self.run_worker(self.mythic_commands.cache_payload_types(), exit_on_error=False)
+
     def _completer_items(self, text: str) -> List[str]:
         """Candidate source for CommandAutoComplete: last-word matching is handled by the
         package itself, so this just delegates to the active agent or global commands.
-        Empty text is intentionally passed through so Tab on a blank line lists the
-        top-level commands."""
-        if text.endswith(" ") or text.endswith('"'):
+        A trailing space is passed through so Tab after a command (or subcommand) lists
+        its subcommands/options; empty text lists the top-level commands. An unclosed
+        quote yields nothing."""
+        if text.endswith('"'):
             return []
 
         source = self.agent or self.mythic_commands
@@ -57,7 +62,7 @@ class ConsolePanel(Container):
         """
         self.console_output.write(data)
 
-    def set_agent(self, payload_type: str):
+    async def set_agent(self, payload_type: str):
         from agents import get_agent
 
         if not payload_type:
@@ -67,6 +72,7 @@ class ConsolePanel(Container):
             return
 
         self.agent = get_agent(self.instance, payload_type)
+        await self.agent.load_commands()
 
     @on(ConsoleInput.Submitted)
     def _input_submitted(self, event: ConsoleInput.Submitted) -> None:

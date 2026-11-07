@@ -6,3 +6,4 @@ venv/
 .herdr/
 .venv/
 .pytest_cache/
+reference_plugins/

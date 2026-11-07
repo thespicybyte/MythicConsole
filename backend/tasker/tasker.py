@@ -57,7 +57,7 @@ class Tasker:
         task_id = resp.get("id")
         if not task_id:
             raise Exception(f"error issuing task: {resp}")
-        task = Task(self.instance, task_id=task_id)
+        task = Task(self.instance, task_id=task_id, callback=self.callback)
 
         if wait:
             await task.wait_for_completion(timeout=timeout)
