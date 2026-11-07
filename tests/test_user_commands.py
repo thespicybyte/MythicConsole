@@ -301,7 +301,8 @@ async def test_user_info_not_found_returns_clean_error(mythic_commands, monkeypa
 
     result = await mythic_commands._user_info(_Args(identifier="ghost"))
 
-    assert result.startswith("Error:")
+    assert result.plain.startswith("Error:")
+    assert result.style == "red"
 
 
 async def test_user_set_admin_true_does_not_prompt(mythic_commands, monkeypatch):
@@ -411,7 +412,8 @@ async def test_user_set_admin_false_cancelled_skips_mutation(mythic_commands, mo
     result = await mythic_commands._user_set_admin(_Args(value="false", identifier="bob", force=False))
 
     assert calls == []
-    assert result == "Cancelled"
+    assert result.plain == "Cancelled"
+    assert result.style == "yellow"
 
 
 async def test_user_set_admin_by_id(mythic_commands, monkeypatch):
@@ -546,7 +548,7 @@ async def test_user_set_active_false_cancelled_skips_mutation(mythic_commands, m
     result = await mythic_commands._user_set_active(_Args(value="false", identifier="bob", force=False))
 
     assert calls == []
-    assert result == "Cancelled"
+    assert result.plain == "Cancelled"
 
 
 async def test_user_set_active_by_id(mythic_commands, monkeypatch):
@@ -663,7 +665,7 @@ async def test_user_delete_cancelled_skips_mutation(mythic_commands, monkeypatch
     result = await mythic_commands._user_delete(_Args(identifier="bob", force=False))
 
     assert calls == []
-    assert result == "Cancelled"
+    assert result.plain == "Cancelled"
 
 
 async def test_user_delete_by_id(mythic_commands, monkeypatch):
@@ -710,7 +712,7 @@ async def test_user_delete_not_found_returns_clean_error(mythic_commands, monkey
 
     result = await mythic_commands._user_delete(_Args(identifier="ghost", force=False))
 
-    assert result.startswith("Error:")
+    assert result.plain.startswith("Error:")
     assert calls == []
 
 

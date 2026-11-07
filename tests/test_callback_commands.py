@@ -71,7 +71,8 @@ async def test_callback_export_default_path(mythic_commands, monkeypatch, tmp_pa
     result = await mythic_commands._callback_export(args)
 
     expected_path = str(tmp_path / "callback_5_export.json")
-    assert result == f"[+] Callback 5 config exported to {expected_path}"
+    assert result.plain == f"[+] Callback 5 config exported to {expected_path}"
+    assert result.style == "green"
     assert recorded["path"] == expected_path
 
 
@@ -85,7 +86,7 @@ async def test_callback_export_explicit_path(mythic_commands, monkeypatch, tmp_p
     args = types.SimpleNamespace(id=5, path=[explicit_path])
     result = await mythic_commands._callback_export(args)
 
-    assert result == f"[+] Callback 5 config exported to {explicit_path}"
+    assert result.plain == f"[+] Callback 5 config exported to {explicit_path}"
 
 
 async def test_callback_export_handles_errors(mythic_commands, monkeypatch, tmp_path):
@@ -97,7 +98,8 @@ async def test_callback_export_handles_errors(mythic_commands, monkeypatch, tmp_
     args = types.SimpleNamespace(id=5, path=[str(tmp_path / "x.json")])
     result = await mythic_commands._callback_export(args)
 
-    assert result == "[-] Error: boom"
+    assert result.plain == "[-] Error: boom"
+    assert result.style == "red"
 
 
 async def test_callback_import_missing_file(mythic_commands, tmp_path):
@@ -106,7 +108,7 @@ async def test_callback_import_missing_file(mythic_commands, tmp_path):
 
     result = await mythic_commands._callback_import(args)
 
-    assert result == f"[-] Error: file not found: {missing_path}"
+    assert result.plain == f"[-] Error: file not found: {missing_path}"
 
 
 async def test_callback_import_malformed_json(mythic_commands, tmp_path):
@@ -116,7 +118,7 @@ async def test_callback_import_malformed_json(mythic_commands, tmp_path):
     args = types.SimpleNamespace(path=[str(config_path)])
     result = await mythic_commands._callback_import(args)
 
-    assert result.startswith(f"[-] Error: invalid config JSON in {config_path}:")
+    assert result.plain.startswith(f"[-] Error: invalid config JSON in {config_path}:")
 
 
 async def test_callback_import_success_does_not_requery(mythic_commands, monkeypatch, tmp_path):
@@ -133,7 +135,7 @@ async def test_callback_import_success_does_not_requery(mythic_commands, monkeyp
     args = types.SimpleNamespace(path=[str(config_path)])
     result = await mythic_commands._callback_import(args)
 
-    assert result == f"[+] Callback config imported from {config_path}"
+    assert result.plain == f"[+] Callback config imported from {config_path}"
     assert recorded["config"] == {"callback": {"id": 999}}
 
 
@@ -149,4 +151,4 @@ async def test_callback_import_handles_mutation_errors(mythic_commands, monkeypa
     args = types.SimpleNamespace(path=[str(config_path)])
     result = await mythic_commands._callback_import(args)
 
-    assert result == "[-] Error: server rejected import"
+    assert result.plain == "[-] Error: server rejected import"

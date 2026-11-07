@@ -1138,15 +1138,16 @@ async def test_successful_build_output_is_green_with_quick_build(payload_command
         _args(config=json.dumps({"selected_os": "Linux", "filename": "payload.bin"})))
 
     styles = {span.style for span in resp.spans}
-    assert "green" in styles and "dim" in styles
+    assert resp.style == "green"
+    assert "dim" in styles
     assert "Payload built and saved" in str(resp)
     assert "quick build: payload build poseidon --config" in str(resp)
 
 
-async def test_cancelled_build_output_is_red(payload_commands, monkeypatch):
+async def test_cancelled_build_output_is_yellow(payload_commands, monkeypatch):
     await _bare_questionnaire_setup(monkeypatch)
     _queue_prompt(monkeypatch, [(ParamForm, None)])
 
     resp = await payload_commands._payload_build(_args(config="{}"))
     assert str(resp) == "[-] build cancelled"
-    assert resp.style == "red"
+    assert resp.style == "yellow"
