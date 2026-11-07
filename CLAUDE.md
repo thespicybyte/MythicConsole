@@ -129,3 +129,12 @@ before a dangerous command (e.g. `exit`) runs.
   defined under `scripts/` is picked up automatically, independent of filename. Commands are
   generated from the server catalog, not file-loaded; a plugin curates them by patching
   `get_agent_commands`'s result.
+- Console outcome messages carry severity color through one shared helper,
+  `mythic_console/utils/severity.py`: `success()` (green), `warning()` (yellow), `error()` (red)
+  return a theme-colored Rich `Text`. Colors come from the active Textual theme's
+  `success`/`warning`/`error` (read lazily via `active_app`), falling back to the named colors
+  when no app is running (tests). A handler/command that reports an outcome returns one of these
+  instead of a bare string or a hardcoded `style="red"`. Failures are `error`, completed actions
+  are `success`, operator-aborted actions are `warning`; neutral empty-result lines ("No X
+  found") stay unstyled, and data tables / raw agent output (`build_table`, `format_plaintext`)
+  are not severity messages.

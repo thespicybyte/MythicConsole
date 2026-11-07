@@ -9,6 +9,7 @@ from mythic_console.plugins.installer import PluginInstallError, install, list_i
 from mythic_console.plugins.registry import get_plugin_registry
 from mythic_console.utils.environment import Environment
 from mythic_console.utils.logger import logger
+from mythic_console.utils.severity import error, success
 
 plugin_parser = Cmd2ArgumentParser()
 plugin_subparsers = plugin_parser.add_subparsers(title='subcommands', help='subcommand help')
@@ -32,11 +33,11 @@ async def _plugin_install(self, args):
         manifest = install(args.source, Environment().plugins_directory(),
                            branch=args.branch, subdir=args.subdir)
     except PluginInstallError as e:
-        return f"[-] install failed: {e}"
+        return error(f"[-] install failed: {e}")
 
     get_plugin_registry().reload()
-    return (f"[+] installed '{manifest.name}' (payload type: {manifest.payload_type}) — "
-            f"reselect a callback of that payload type to use it")
+    return success(f"[+] installed '{manifest.name}' (payload type: {manifest.payload_type}) — "
+                   f"reselect a callback of that payload type to use it")
 
 
 plugin_install_parser.set_defaults(func=_plugin_install)
@@ -58,10 +59,10 @@ async def _plugin_remove(self, args):
     try:
         remove(args.name, Environment().plugins_directory())
     except PluginInstallError as e:
-        return f"[-] remove failed: {e}"
+        return error(f"[-] remove failed: {e}")
 
     get_plugin_registry().reload()
-    return f"[+] removed '{args.name}'"
+    return success(f"[+] removed '{args.name}'")
 
 
 plugin_remove_parser.set_defaults(func=_plugin_remove)
