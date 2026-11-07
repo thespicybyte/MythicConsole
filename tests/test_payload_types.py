@@ -105,4 +105,5 @@ async def test_payload_types_error_returns_error_string(payload_commands, monkey
 
     resp = await payload_commands._payload_types(None)
 
-    assert resp == "Error: network error"
+    assert resp.plain == "Error: network error"
+    assert resp.style == "red"

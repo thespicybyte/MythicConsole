@@ -31,6 +31,7 @@ from mythic_console.backend.task.task import TaskError
 from mythic_console.screens.manage_callbacks import ManageCallbacks
 from mythic_console.screens.prompts import FilePrompt
 from mythic_console.utils.callback_status import count_active
+from mythic_console.utils.severity import error
 from mythic_console.utils.logger import logger
 from mythic_console.widgets.calback_tabs import CallbackTabs
 from mythic_console.widgets.callbacks import Callbacks, CallbackTable, build_callback_row
@@ -507,7 +508,7 @@ class Home(Screen):
         except WorkerFailed as worker_error:
             if isinstance(worker_error.error, TaskError):
                 if console_panel:
-                    console_panel.write_string(Text(f"Task Failed: {worker_error.error}", style="red"))
+                    console_panel.write_string(error(f"Task Failed: {worker_error.error}"))
             logger.exception(worker_error.error)
         except FormatterNotAvailable as e:
             if console_panel:
@@ -517,7 +518,7 @@ class Home(Screen):
             pass
         except Exception as e:
             if console_panel:
-                console_panel.write_string(f"Unhandled exception: {e}")
+                console_panel.write_string(error(f"Unhandled exception: {e}"))
             logger.exception(e)
         finally:
             # always restore the real streams, not just on Cmd2ArgparseError

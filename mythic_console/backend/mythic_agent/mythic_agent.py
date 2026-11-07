@@ -22,6 +22,7 @@ from textual_console import ArgparseCompleter, set_completer
 from mythic_console.backend import MythicInstance, Task, User, Operation, Payload, Callback
 from mythic_console.utils.logger import logger
 from mythic_console.utils.environment import Environment
+from mythic_console.utils.severity import Severity, severity_style, success, warning, error
 from mythic_console.screens.forms import ParamForm, FieldSpec, field_spec_from_param
 from mythic_console.screens.prompts import BACK, TaskPrompt, ChoicePrompt, YesNoPrompt
 from mythic_console.screens.build_summary import BuildSummary
@@ -866,17 +867,16 @@ def _quick_build_command(payload_type_name: str, config: dict) -> str:
 
 
 def _build_ok(message: str, payload_type_name: str, config: dict) -> Text:
-    """A green success message followed by a dim, reusable quick-build line."""
-    out = Text()
-    out.append(message, style="green")
+    """A success message followed by a dim, reusable quick-build line."""
+    out = success(message)
     out.append("\n")
     out.append(f"[*] quick build: {_quick_build_command(payload_type_name, config)}", style="dim")
     return out
 
 
 def _build_error(message: str) -> Text:
-    """A red failure/cancel message."""
-    return Text(message, style="red")
+    """An error/cancel message."""
+    return error(message)
 
 
 def _theme_key_and_status_styles() -> tuple[str, str, str]:
@@ -884,10 +884,10 @@ def _theme_key_and_status_styles() -> tuple[str, str, str]:
     written to the console (a Rich RenderableType, not a themed Content/Static widget) still
     tracks the theme. Falls back to plain colors when no app is running (e.g. tests)."""
     try:
-        theme = active_app.get().current_theme
-        return f"bold {theme.primary}", theme.success, theme.error
+        key_style = f"bold {active_app.get().current_theme.primary}"
     except LookupError:
-        return "bold cyan", "green", "red"
+        key_style = "bold cyan"
+    return key_style, severity_style(Severity.SUCCESS), severity_style(Severity.ERROR)
 
 
 def _load_config(value: str) -> dict:
@@ -1101,7 +1101,7 @@ class MythicCommands(Cmd):
             return DefaultFormatter().build_table(*user_info, headers=headers, title="Users")
         except Exception as e:
             logger.error(e)
-            return f"Error: {e}"
+            return error(f"Error: {e}")
 
     mythic_command_parsers.user_list_parser.set_defaults(func=_user_list)
 
@@ -1117,7 +1117,7 @@ class MythicCommands(Cmd):
             return DefaultFormatter().build_table(*user_info, headers=headers, title="Users")
         except Exception as e:
             logger.error(e)
-            return f"Error: {e}"
+            return error(f"Error: {e}")
 
     mythic_command_parsers.user_create_parser.set_defaults(func=_user_create)
 
@@ -1140,7 +1140,7 @@ class MythicCommands(Cmd):
                                                    title=f"User {user.username}")
         except Exception as e:
             logger.error(e)
-            return f"Error: {e}"
+            return error(f"Error: {e}")
 
     mythic_command_parsers.user_info_parser.set_defaults(func=_user_info)
 
@@ -1151,7 +1151,7 @@ class MythicCommands(Cmd):
             await user.query()
             if not is_admin and not args.force:
                 if not await _prompt(YesNoPrompt(f"Revoke admin from '{user.username}'?")):
-                    return "Cancelled"
+                    return warning("Cancelled")
 
             await user.set_admin_status(is_admin)
             await user.query()
@@ -1161,7 +1161,7 @@ class MythicCommands(Cmd):
                                                    title="Users")
         except Exception as e:
             logger.error(e)
-            return f"Error: {e}"
+            return error(f"Error: {e}")
 
     mythic_command_parsers.user_set_admin_parser.set_defaults(func=_user_set_admin)
 
@@ -1172,7 +1172,7 @@ class MythicCommands(Cmd):
             await user.query()
             if not is_active and not args.force:
                 if not await _prompt(YesNoPrompt(f"Disable account '{user.username}'?")):
-                    return "Cancelled"
+                    return warning("Cancelled")
 
             await user.set_active_status(is_active)
             await user.query()
@@ -1182,7 +1182,7 @@ class MythicCommands(Cmd):
                                                    title="Users")
         except Exception as e:
             logger.error(e)
-            return f"Error: {e}"
+            return error(f"Error: {e}")
 
     mythic_command_parsers.user_set_active_parser.set_defaults(func=_user_set_active)
 
@@ -1191,7 +1191,7 @@ class MythicCommands(Cmd):
             user = _user_from_identifier(self.instance, args.identifier)
             await user.query()
             if not args.force and not await _prompt(YesNoPrompt(f"Delete user '{user.username}'?")):
-                return "Cancelled"
+                return warning("Cancelled")
 
             await user.delete()
             await user.query()
@@ -1201,7 +1201,7 @@ class MythicCommands(Cmd):
                                                    title="Users")
         except Exception as e:
             logger.error(e)
-            return f"Error: {e}"
+            return error(f"Error: {e}")
 
     mythic_command_parsers.user_delete_parser.set_defaults(func=_user_delete)
 
@@ -1224,7 +1224,7 @@ class MythicCommands(Cmd):
             return DefaultFormatter().build_table(*operation_info, headers=headers, title="Operations")
         except Exception as e:
             logger.error(e)
-            return f"Error: {e}"
+            return error(f"Error: {e}")
 
     mythic_command_parsers.operation_list_parser.set_defaults(func=_operation_list)
 
@@ -1269,7 +1269,7 @@ class MythicCommands(Cmd):
             return Group(*cards)
         except Exception as e:
             logger.error(e)
-            return f"Error: {e}"
+            return error(f"Error: {e}")
 
     mythic_command_parsers.profiles_list_parser.set_defaults(func=_profiles_list)
 
@@ -1282,7 +1282,7 @@ class MythicCommands(Cmd):
     async def _payload_list(self, _args):
         try:
             if not self.instance.mythic.current_operation_id:
-                return "Error: Operation not set"
+                return error("Error: Operation not set")
 
             payload_ids = await PayloadQueries.get_all_payloads(self.instance.mythic,
                                                                 self.instance.mythic.current_operation_id)
@@ -1300,7 +1300,7 @@ class MythicCommands(Cmd):
             return DefaultFormatter().build_table(*payload_info, headers=headers, title="Payloads")
         except Exception as e:
             logger.error(e)
-            return f"Error: {e}"
+            return error(f"Error: {e}")
 
     mythic_command_parsers.payload_list_parser.set_defaults(func=_payload_list)
 
@@ -1337,7 +1337,7 @@ class MythicCommands(Cmd):
             return Group(*cards)
         except Exception as e:
             logger.error(e)
-            return f"Error: {e}"
+            return error(f"Error: {e}")
 
     mythic_command_parsers.payload_types_parser.set_defaults(func=_payload_types)
 
@@ -1352,11 +1352,11 @@ class MythicCommands(Cmd):
             payload = Payload(self.instance, payload_id=args.id)
             await payload.query()
             await payload.download(path)
-            return f"[+] Payload {args.id} saved to {path}"
+            return success(f"[+] Payload {args.id} saved to {path}")
 
         except Exception as e:
             logger.error(e)
-            return f"[-] Error: {e}"
+            return error(f"[-] Error: {e}")
 
     mythic_command_parsers.payload_download_parser.set_defaults(func=_payload_download)
 
@@ -1403,7 +1403,7 @@ class MythicCommands(Cmd):
             if not _config_is_complete(config):
                 config = await self._payload_build_questionnaire(payload_type_name, config)
                 if config is None:
-                    return _build_error("[-] build cancelled")
+                    return warning("[-] build cancelled")
 
             return await self._run_build(args, payload_type_name, config)
         except Exception as e:
@@ -1683,10 +1683,10 @@ class MythicCommands(Cmd):
 
             callback = Callback(self.instance, callback_id=args.id)
             await callback.export(str(path))
-            return f"[+] Callback {args.id} config exported to {path}"
+            return success(f"[+] Callback {args.id} config exported to {path}")
         except Exception as e:
             logger.error(e)
-            return f"[-] Error: {e}"
+            return error(f"[-] Error: {e}")
 
     mythic_command_parsers.callback_export_parser.set_defaults(func=_callback_export)
 
@@ -1694,18 +1694,18 @@ class MythicCommands(Cmd):
         try:
             path = " ".join(args.path)
             if not os.path.isfile(path):
-                return f"[-] Error: file not found: {path}"
+                return error(f"[-] Error: file not found: {path}")
 
             with open(path, "r") as f:
                 config_json = json.loads(f.read())
 
             await CallbackQueries.import_callback(self.instance.mythic, config_json)
-            return f"[+] Callback config imported from {path}"
+            return success(f"[+] Callback config imported from {path}")
         except json.JSONDecodeError as e:
             logger.error(e)
-            return f"[-] Error: invalid config JSON in {path}: {e}"
+            return error(f"[-] Error: invalid config JSON in {path}: {e}")
         except Exception as e:
             logger.error(e)
-            return f"[-] Error: {e}"
+            return error(f"[-] Error: {e}")
 
     mythic_command_parsers.callback_import_parser.set_defaults(func=_callback_import)

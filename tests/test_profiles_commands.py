@@ -76,4 +76,5 @@ async def test_profiles_list_handles_errors(mythic_commands, monkeypatch):
 
     result = await mythic_commands._profiles_list(None)
 
-    assert result == "Error: boom"
+    assert result.plain == "Error: boom"
+    assert result.style == "red"
