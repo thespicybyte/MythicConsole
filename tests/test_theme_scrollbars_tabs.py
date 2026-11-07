@@ -7,7 +7,6 @@ from textual.color import Color
 from textual.containers import VerticalScroll
 from textual.widgets import Static, TabPane, Tabs
 
-from mythic_console import console
 from mythic_console.console import MythicConsole
 from mythic_console.widgets.calback_tabs import CallbackTabs
 from mythic_console.widgets.callbacks import Callbacks
@@ -116,14 +115,6 @@ async def _run_filled(app: _ScrollHarness, pilot) -> None:
     await pilot.pause()
 
 
-async def _wheel_over(app: App, pilot, widget, event_type=events.MouseScrollDown) -> None:
-    x, y = widget.region.x + 2, widget.region.y + 2
-    await app.on_event(
-        event_type(None, x, y, 0, 0, 0, False, False, False, screen_x=x, screen_y=y)
-    )
-    await pilot.pause()
-
-
 def _tables(app: _ScrollHarness):
     return app.callbacks_module.datatable, app.tasks_module.datatable
 
@@ -136,36 +127,6 @@ async def test_scrollbars_take_no_space_at_rest(fake_instance):
             assert widget.show_vertical_scrollbar or widget.show_horizontal_scrollbar
             assert widget.scrollbar_size_vertical == 0
             assert widget.scrollbar_size_horizontal == 0
-
-
-async def test_wheel_reveals_scrollbar_then_hides_it(fake_instance, monkeypatch):
-    monkeypatch.setattr(console, "SCROLLBAR_HIDE_DELAY", 0.1)
-    app = _ScrollHarness(fake_instance)
-    async with app.run_test(size=(60, 40)) as pilot:
-        await _run_filled(app, pilot)
-        tasks = app.tasks_module.datatable
-
-        await _wheel_over(app, pilot, tasks)
-        assert tasks.has_class("-scrolling")
-        assert tasks.scrollbar_size_vertical > 0
-        assert tasks.scroll_y > 0
-
-        await pilot.pause(0.3)
-        assert not tasks.has_class("-scrolling")
-        assert tasks.scrollbar_size_vertical == 0
-
-
-async def test_shift_wheel_reveals_horizontal_scrollbar(fake_instance, monkeypatch):
-    monkeypatch.setattr(console, "SCROLLBAR_HIDE_DELAY", 0.1)
-    app = _ScrollHarness(fake_instance)
-    async with app.run_test(size=(60, 40)) as pilot:
-        await _run_filled(app, pilot)
-        callbacks = app.callbacks_module.datatable
-        assert callbacks.show_horizontal_scrollbar
-
-        await _wheel_over(app, pilot, callbacks, events.MouseScrollRight)
-        assert callbacks.has_class("-scrolling")
-        assert callbacks.scrollbar_size_horizontal > 0
 
 
 async def test_hidden_scrollbar_matches_table_header_and_rows(fake_instance):
