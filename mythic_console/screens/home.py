@@ -153,6 +153,7 @@ class Home(Screen):
         Binding(key="ctrl+q", action="close_tab", description="close tab", key_display="^q"),
         Binding(key="ctrl+z", action="background_current_task", description="background", key_display="^z"),
         Binding(key="m", action="manage_callbacks", description="manage callbacks", key_display="m"),
+        Binding(key="ctrl+shift+a", action="toggle_autoscroll", description="toggle autoscroll", key_display="^+a"),
     ]
 
     async def _on_mount(self, _event: events.Mount) -> None:
@@ -269,6 +270,17 @@ class Home(Screen):
 
     def action_toggle_sidebar(self) -> None:
         self.query_one(Sidebar).toggle_class("-hidden")
+
+    def action_toggle_autoscroll(self) -> None:
+        active_pane = self.query_one(CallbackTabs).active_pane
+        if active_pane is None:
+            return
+        try:
+            panel = active_pane.query_one(ConsolePanel)
+        except NoMatches:
+            return
+        enabled = panel.toggle_autoscroll()
+        self.notify(f"Autoscroll {'on' if enabled else 'off'}")
 
     @work()
     async def _get_active_callbacks(self):

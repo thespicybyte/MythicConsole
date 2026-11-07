@@ -62,6 +62,17 @@ class ConsolePanel(Container):
         """
         self.console_output.write(data)
 
+    def toggle_autoscroll(self) -> bool:
+        """
+        Flip autoscroll for this panel's output. On re-enable, jump to the newest line.
+        :return: the new enabled state
+        """
+        enabled = not self.console_output.auto_scroll
+        self.console_output.auto_scroll = enabled
+        if enabled:
+            self.console_output.scroll_end(animate=False)
+        return enabled
+
     async def set_agent(self, payload_type: str):
         from mythic_console.agents import get_agent
 
