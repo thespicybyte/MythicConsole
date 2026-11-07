@@ -234,23 +234,23 @@ async def test_user_list_all_refreshes_cache_with_deleted_filtered_set(mythic_co
     assert "eve" in _render(result)  # --all still shows deleted users in the listing
 
 
-async def test_user_create_refreshes_username_cache(mythic_commands, monkeypatch):
+async def test_user_create_returns_table(mythic_commands, monkeypatch):
+    calls = []
+
     async def fake_create_operator(session, username, password):
+        calls.append((username, password))
         return _operator(user_id=5, username=username)
 
     async def fake_query_by_id(session, user_id):
         return _operator(user_id=user_id, username="test2")
 
-    async def fake_get_all_usernames(session):
-        return ["alice", "bob", "test2"]
-
     monkeypatch.setattr(UserQueries, "create_operator", fake_create_operator)
     monkeypatch.setattr(UserQueries, "query_by_id", fake_query_by_id)
-    monkeypatch.setattr(UserQueries, "get_all_usernames", fake_get_all_usernames)
 
-    await mythic_commands._user_create(_Args(username="test2", password="hunter2"))
+    result = await mythic_commands._user_create(_Args(username="test2", password="hunter2"))
 
-    assert "test2" in mythic_commands._user_cache
+    assert calls == [("test2", "hunter2")]
+    assert "test2" in _render(result)
 
 
 async def test_user_info_by_username(mythic_commands, monkeypatch):
@@ -745,41 +745,6 @@ async def test_user_delete_renders_false_fields_through_real_update(mythic_comma
     rendered = _render(result)
     assert "False" in rendered
     assert "True" in rendered
-
-
-async def test_user_delete_refreshes_username_cache(mythic_commands, monkeypatch):
-    responses = [
-        _operator(username="bob", active=True, deleted=False),
-        _operator(username="bob", active=False, deleted=True),
-    ]
-
-    async def fake_query_by_username(session, username):
-        return responses.pop(0)
-
-    async def fake_query_by_id(session, user_id):
-        return responses.pop(0)
-
-    async def fake_delete_operator(session, operator_id):
-        return {"id": operator_id, "active": False, "deleted": True}
-
-    async def fake_prompt(screen):
-        return True
-
-    async def fake_get_all_usernames(session):
-        return ["alice"]
-
-    monkeypatch.setattr(UserQueries, "query_by_username", fake_query_by_username)
-    monkeypatch.setattr(UserQueries, "query_by_id", fake_query_by_id)
-    monkeypatch.setattr(UserQueries, "delete_operator", fake_delete_operator)
-    monkeypatch.setattr(mythic_agent, "_prompt", fake_prompt)
-    monkeypatch.setattr(UserQueries, "get_all_usernames", fake_get_all_usernames)
-
-    mythic_commands._user_cache[:] = ["alice", "bob"]
-
-    await mythic_commands._user_delete(_Args(identifier="bob", force=False))
-
-    assert "bob" not in mythic_commands._user_cache
-    assert "alice" in mythic_commands._user_cache
 
 
 async def test_user_set_active_false_renders_through_real_update(mythic_commands, monkeypatch):

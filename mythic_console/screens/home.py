@@ -25,7 +25,7 @@ from textual.worker import WorkerFailed
 from textual_console import ConsoleInput
 
 from mythic_console.agents import get_agent
-from mythic_console.backend import Callback, MythicInstance, User, Operation, Task, MythicAgent, FormatterNotAvailable
+from mythic_console.backend import Callback, MythicInstance, User, Operation, Task, MythicAgent, FormatterNotAvailable, MythicCommands
 from mythic_console.backend.cmd.mythic_cmd import MythicCmd
 from mythic_console.backend.task.task import TaskError
 from mythic_console.screens.manage_callbacks import ManageCallbacks
@@ -163,6 +163,7 @@ class Home(Screen):
         worker = self._seed_known_callbacks()
         await worker.wait()
         self._monitor_callback_updates()
+        self._monitor_operator_updates()
         self.set_interval(1.0, self._refresh_live_cells)
         self._get_and_monitor_tasks()
         self._monitor_tasks()
@@ -215,6 +216,11 @@ class Home(Screen):
             self.known_callbacks[uuid] = cb.active
             table.reconcile_callback(cb, self.current_tab_id)
             self._refresh_callbacks_title()
+
+    @work()
+    async def _monitor_operator_updates(self) -> None:
+        async for usernames in self.instance.monitor_operator_updates():
+            MythicCommands.set_user_cache(usernames)
 
     def action_manage_callbacks(self) -> None:
         self.run_worker(self._manage_callbacks())

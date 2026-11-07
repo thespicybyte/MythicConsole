@@ -1110,7 +1110,6 @@ class MythicCommands(Cmd):
             user = User(self.instance, username=args.username)
             await user.create(args.password)
             await user.query()
-            await self.cache_users()
 
             user_info = [[str(user.id), user.username, user.current_operation_name or "", str(user.admin)]]
 
@@ -1196,7 +1195,6 @@ class MythicCommands(Cmd):
 
             await user.delete()
             await user.query()
-            await self.cache_users()
 
             user_info = [[str(user.id), user.username, str(user.active), str(user.deleted)]]
             return DefaultFormatter().build_table(*user_info, headers=["id", "username", "active", "deleted"],
@@ -1375,9 +1373,13 @@ class MythicCommands(Cmd):
         except Exception as e:
             logger.warning(f"could not cache payload types: {e}")
 
+    @classmethod
+    def set_user_cache(cls, usernames: List[str]) -> None:
+        cls._user_cache[:] = usernames
+
     async def cache_users(self):
         try:
-            self._user_cache[:] = await UserQueries.get_all_usernames(self.instance.mythic)
+            self.set_user_cache(await UserQueries.get_all_usernames(self.instance.mythic))
         except Exception as e:
             logger.warning(f"could not cache users: {e}")
 
