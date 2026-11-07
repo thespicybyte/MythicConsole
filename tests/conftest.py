@@ -8,7 +8,7 @@ import pytest
 from textual_console import CompletionHint
 
 from mythic_console.backend.formatter.formatter import DefaultFormatter
-from mythic_console.backend.mythic_agent.mythic_agent import MythicAgent
+from mythic_console.backend.mythic_agent.mythic_agent import MythicAgent, MythicCommands
 from mythic_console.backend.task.task import Task
 from mythic_console.plugins import registry
 from mythic_console.plugins.installer import install_from_path
@@ -32,6 +32,17 @@ def isolated_plugin_registry(tmp_path):
     registry.set_plugins_dir(str(tmp_path / "empty_plugins_dir"))
     yield
     registry.reset()
+
+
+@pytest.fixture(autouse=True)
+def reset_mythic_commands_caches():
+    """MythicCommands._user_cache/_payload_type_cache are class-level (shared across every
+    instance); reset them around each test so tests can't leak cached values into each other."""
+    MythicCommands._user_cache = []
+    MythicCommands._payload_type_cache = []
+    yield
+    MythicCommands._user_cache = []
+    MythicCommands._payload_type_cache = []
 
 
 @pytest.fixture

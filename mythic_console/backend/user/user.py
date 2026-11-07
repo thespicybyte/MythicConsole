@@ -31,17 +31,17 @@ class User:
             self.id = data.get("id")
         if data.get("username"):
             self.username = data.get("username")
-        if data.get("admin"):
+        if data.get("admin") is not None:
             self.admin = data.get("admin")
         if data.get("creation_time"):
             self.creation_time = data.get("creation_time")
         if data.get("last_login"):
             self.last_login = data.get("last_login")
-        if data.get("active"):
+        if data.get("active") is not None:
             self.active = data.get("active")
-        if data.get("view_utc_time"):
+        if data.get("view_utc_time") is not None:
             self.view_utc_time = data.get("view_utc_time")
-        if data.get("deleted"):
+        if data.get("deleted") is not None:
             self.deleted = data.get("deleted")
         if data.get("current_operation_id"):
             self.current_operation_id = data.get("current_operation_id")
@@ -81,17 +81,16 @@ class User:
         self._update(resp)
 
     async def set_admin_status(self, is_admin: bool):
-        raise NotImplemented
         username = await self.get_username()
-        resp = await UserQueries.set_admin_status(self.mythic, username, is_admin)
-        self._update(resp)
+        await UserQueries.set_admin_status(self.mythic, username, is_admin)
 
     async def set_active_status(self, is_active: bool):
-        raise NotImplemented
         username = await self.get_username()
-        resp = await UserQueries.set_active_status(self.mythic, username, is_active)
-        print(resp)
-        # self._update(resp)
+        await UserQueries.set_active_status(self.mythic, username, is_active)
+
+    async def delete(self):
+        operator_id = await self.get_id()
+        await UserQueries.delete_operator(self.mythic, operator_id)
 
     async def set_password(self, new_password: str, old_password: str):
         raise NotImplemented

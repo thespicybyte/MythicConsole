@@ -293,6 +293,25 @@ async def test_cache_payload_types_degrades_safely_on_error(payload_commands, mo
     assert payload_commands._payload_type_cache == []
 
 
+async def test_payload_type_completion_shared_across_instances(operation_instance, monkeypatch):
+    """One MythicCommands is constructed per console panel (home tab + each callback tab), so a
+    second instance is routinely constructed after the first has already cached payload types.
+    The completer must keep returning the cached values from every instance, not just whichever
+    one was constructed last."""
+    async def fake_query_all_payload_types(_session):
+        return [{"name": "poseidon"}, {"name": "arachne"}]
+
+    monkeypatch.setattr(PayloadTypeQueries, "query_all_payload_types", fake_query_all_payload_types)
+
+    first = MythicCommands(operation_instance)
+    await first.cache_payload_types()
+
+    second = MythicCommands(operation_instance)  # constructed after caching, e.g. a new callback tab
+
+    assert completer_values(first.get_completer_items("payload build ")) == {"poseidon", "arachne"}
+    assert completer_values(second.get_completer_items("payload build ")) == {"poseidon", "arachne"}
+
+
 # ----- introspection queries (string-level shape) -----
 
 async def test_query_build_parameters_shape(monkeypatch):
