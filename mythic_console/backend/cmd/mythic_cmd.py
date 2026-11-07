@@ -36,7 +36,7 @@ async def _plugin_install(self, args):
         return error(f"[-] install failed: {e}")
 
     get_plugin_registry().reload()
-    return success(f"[+] installed '{manifest.name}' (payload type: {manifest.payload_type}) — "
+    return success(f"[+] installed '{manifest.name}' (payload type: {manifest.payload_type}) - "
                    f"reselect a callback of that payload type to use it")
 
 
