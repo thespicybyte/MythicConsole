@@ -12,16 +12,23 @@ client), so this codebase issues tasks and reads results — it is not the C2 se
 ## Commands
 
 ```shell
+pipx install mythic-console
+mythic-console                # run the app
+```
+
+For development, install the package in editable mode instead:
+
+```shell
 python -m venv venv && source venv/bin/activate
-pip install -r requirements.txt
-python console.py            # run the app
+pip install -e ".[dev]"
+mythic-console                # run the app
 ```
 
 Requires Python 3.11+ (`cmd2` 4.x and the updated `mythic`/`textual` stack need it). There is no
-linter or build step in this repo.
+linter or build step in this repo. `pyproject.toml` is the single source of dependency truth
+(runtime deps plus the `dev` extra); there is no `requirements.txt`.
 
 ```shell
-pip install -r requirements-dev.txt
 pytest                         # run the default (offline) test suite
 pytest tests/test_environment.py::test_log_level_mapping   # run a single test
 pytest -m live                 # live/Pilot tests — need .env + a reachable Mythic server
@@ -31,39 +38,45 @@ The default suite needs no Mythic server: the two objects that reach the network
 (`Task.get_responses`, `MythicInstance.login`) are mocked via fixtures in `tests/conftest.py`. Tests
 marked `@pytest.mark.live` (under `tests/live/`) are opt-in and deselected by default.
 
-`textual-dev` is a dependency, so the Textual tooling is available for debugging a running TUI:
+`textual-dev` is a dev dependency, so the Textual tooling is available for debugging a running TUI:
 
 ```shell
-textual console              # in one terminal: live log/console
-textual run --dev console.py # in another: run the app connected to it
+textual console                               # in one terminal: live log/console
+textual run --dev mythic_console/console.py   # in another: run the app connected to it
 ```
 
-Runtime config comes from environment variables or a `.env` file (parsed in `utils/environment.py`),
+Runtime config comes from environment variables or a `.env` file (parsed in
+`mythic_console/utils/environment.py`),
 not CLI flags: `MYTHIC_CONSOLE_USER`, `MYTHIC_CONSOLE_PASSWORD`, `MYTHIC_SERVER_URL` prefill the login
 screen; `DOWNLOAD_DIRECTORY`, `LOG_DIRECTORY`, `LOG_FILE`, `LOG_LEVEL` configure downloads and logging.
 Logs default to `.console.log` in the cwd.
 
 ## Architecture
 
-The app is a state machine (`State` enum in `console.py`) that pushes Textual screens: `LoginScreen`
-authenticates and produces a `MythicInstance`; on success `Home` is pushed. `MythicInstance`
-(`backend/mythic_instance/`) holds the authenticated `mythic.Mythic` client and the asyncio loop, and is
-threaded through almost every backend object as the handle to the server.
+The app is a state machine (`State` enum in `mythic_console/console.py`) that pushes Textual
+screens: `LoginScreen` authenticates and produces a `MythicInstance`; on success `Home` is pushed.
+`MythicInstance` (`mythic_console/backend/mythic_instance/`) holds the authenticated `mythic.Mythic`
+client and the asyncio loop, and is threaded through almost every backend object as the handle to
+the server.
 
-**Backend domain layer** (`backend/`). Each Mythic concept is its own package — `callback`, `task`,
-`response`, `payload`, `payload_type`, `operation`, `user`, `file_browser`. The recurring pattern is a
-domain class (e.g. `Task`, `Callback`) paired with a `queries.py` and `fragments.py` that hold the raw
-GraphQL. When changing what data is fetched, edit the `fragments`/`queries` alongside the class; don't
-inline GraphQL elsewhere. `backend/__init__.py` re-exports the public classes, so import from `backend`
-(e.g. `from backend import Task, Callback`) rather than deep module paths.
+**Backend domain layer** (`mythic_console/backend/`). Each Mythic concept is its own package —
+`callback`, `task`, `response`, `payload`, `payload_type`, `operation`, `user`, `file_browser`. The
+recurring pattern is a domain class (e.g. `Task`, `Callback`) paired with a `queries.py` and
+`fragments.py` that hold the raw GraphQL. When changing what data is fetched, edit the
+`fragments`/`queries` alongside the class; don't inline GraphQL elsewhere.
+`mythic_console/backend/__init__.py` re-exports the public classes, so import from
+`mythic_console.backend` (e.g. `from mythic_console.backend import Task, Callback`) rather than
+deep module paths.
 
-- `Tasker` (`backend/tasker/`) issues a command to the currently selected `Callback` via
-  `mythic.issue_task` and returns a `Task`.
-- `Task` (`backend/task/`) wraps one Mythic task: it can `wait_for_completion`, stream responses, and
-  download files. A `Task` carries `console_args` (the parsed argparse namespace) and `background` so the
-  formatter can later re-render output using the original command arguments.
+- `Tasker` (`mythic_console/backend/tasker/`) issues a command to the currently selected `Callback`
+  via `mythic.issue_task` and returns a `Task`.
+- `Task` (`mythic_console/backend/task/`) wraps one Mythic task: it can `wait_for_completion`,
+  stream responses, and download files. A `Task` carries `console_args` (the parsed argparse
+  namespace) and `background` so the formatter can later re-render output using the original
+  command arguments.
 
-**Agent / command layer** (`backend/mythic_agent/mythic_agent.py`, the largest and most important file).
+**Agent / command layer** (`mythic_console/backend/mythic_agent/mythic_agent.py`, the largest and
+most important file).
 This is where per-agent command sets are defined and dynamically loaded:
 
 - `MythicAgent` is the base class for a supported agent. It owns a `Tasker` and a `Formatter`.
@@ -78,30 +91,33 @@ This is where per-agent command sets are defined and dynamically loaded:
   overriding `get_agent_commands`, calling `super()`, and patching the returned `AgentCommands`
   mapping (pop/add by name). Scripts are the one piece still loaded by convention rather than
   explicit wiring: `get_script_classes` globs `scripts/*.py` and imports each module, but for a
-  plugin (`PluginAgent.get_script_classes`, `plugins/base.py`) it discovers by **type**, not name —
-  every `ScriptCommand` subclass defined in the file is loaded, so the class can be named whatever
-  reads well. The in-repo `agents/<Name>/` base loader (`MythicAgent.get_script_classes`,
-  `mythic_agent.py:744`) still uses the older convention — capitalizing the filename (`ping.py` →
-  `Ping`) — but there are no curated in-repo agents left to hit it; out of scope for plugin authors.
+  plugin (`PluginAgent.get_script_classes`, `mythic_console/plugins/base.py`) it discovers by
+  **type**, not name — every `ScriptCommand` subclass defined in the file is loaded, so the class
+  can be named whatever reads well. The in-repo `agents/<Name>/` base loader
+  (`MythicAgent.get_script_classes`, `mythic_agent.py:816`) still uses the older convention —
+  capitalizing the filename (`ping.py` → `Ping`) — but there are no curated in-repo agents left to
+  hit it; out of scope for plugin authors.
 
-**Formatters** (`backend/formatter/`). A `Formatter` turns a completed `Task` into a Rich
-`RenderableType` for the console. A subclass tags render methods with `@renders("<command>")`
+**Formatters** (`mythic_console/backend/formatter/`). A `Formatter` turns a completed `Task` into
+a Rich `RenderableType` for the console. A subclass tags render methods with `@renders("<command>")`
 instead of overriding `format_output`; the base `format_output` dispatches to the tagged method by
 command name and falls back to `format_plaintext` for anything untagged. Base helpers:
 `format_plaintext`, `format_pretty`, `build_table`, `get_raw_output`.
 
-**Agent registration** (`agents/`). `agents/__init__.py` `get_agent(instance, payload_type_name)`
-looks up an installed plugin for that payload type; if none is installed, it returns a generated
-`MythicAgent(payload_type_name, instance, DefaultFormatter())`. There are no hard-coded agent names.
-Supporting a new payload type needs zero code — the generated baseline just works. Poseidon is no
-longer in this repo; it ships as its own plugin, installed like any other. Optional curation (a
-custom command, formatter, or script) ships as a plugin too: a `PluginAgent` subclass plus a
-`manifest.json`. Full walkthrough is in `customize.md`.
+**Agent registration** (`mythic_console/agents/`). `mythic_console/agents/__init__.py`
+`get_agent(instance, payload_type_name)` looks up an installed plugin for that payload type; if
+none is installed, it returns a generated `MythicAgent(payload_type_name, instance,
+DefaultFormatter())`. There are no hard-coded agent names. Supporting a new payload type needs zero
+code — the generated baseline just works. Poseidon is no longer in this repo; it ships as its own
+plugin, installed like any other. Optional curation (a custom command, formatter, or script) ships
+as a plugin too: a `PluginAgent` subclass plus a `manifest.json`. Full walkthrough is in
+`customize.md`.
 
-**UI layer**. `screens/` (`home.py` is the main operator screen; `login.py`; `prompts.py` holds
-`TaskPrompt`/`YesNoPrompt` modal confirmations) and `widgets/` (console panel, callback tabs, tables,
-session info, themes). `Home` runs background Textual workers to monitor new callbacks and task updates
-live. `mythic.tcss` is the stylesheet. A `Task` can set `verify_prompt` to force a modal confirmation
+**UI layer**. `mythic_console/screens/` (`home.py` is the main operator screen; `login.py`;
+`prompts.py` holds `TaskPrompt`/`YesNoPrompt` modal confirmations) and `mythic_console/widgets/`
+(console panel, callback tabs, tables, session info, themes). `Home` runs background Textual
+workers to monitor new callbacks and task updates live. `mythic_console/mythic.tcss` is the
+stylesheet, shipped as package data. A `Task` can set `verify_prompt` to force a modal confirmation
 before a dangerous command (e.g. `exit`) runs.
 
 ## Key conventions

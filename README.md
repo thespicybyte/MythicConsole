@@ -36,6 +36,18 @@ Mythic Console requires python 3.11 or greater.
 ## Installation
 
 ```shell
+pipx install mythic-console
+```
+
+Or run it directly without installing, via [uv](https://docs.astral.sh/uv/):
+
+```shell
+uvx mythic-console
+```
+
+### Development install
+
+```shell
 git clone https://github.com/thespicybyte/MythicConsole.git
 cd MythicConsole
 python -m venv venv
@@ -46,7 +58,7 @@ source venv/bin/activate
 # windows
 .\venv\Scripts\activate
 
-pip install -r requirements.txt
+pip install -e ".[dev]"
 ```
 
 ## Configuration
@@ -69,9 +81,11 @@ Other variables may be passed to further configure your environment.
 
 ## Execution
 
+```shell
+mythic-console
 ```
-python console.py
-```
+
+Running from a development checkout (editable install) uses the same command.
 
 ## Keyboard Shortcuts
 

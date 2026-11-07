@@ -25,11 +25,11 @@ When you want more than the generated baseline, such as a custom command, tailor
 confirmation prompt, or a client-side script, you ship it as an installable plugin. Plugins are managed from the command line:
 
 ```shell
-console.py install <github-url-or-path>    # install a plugin
-console.py plugin list                     # list installed plugins
-console.py plugin new <name> <payload>     # scaffold a new plugin
-console.py plugin validate <path>          # validate before shipping
-console.py plugin remove <name>            # remove a plugin
+mythic-console install <github-url-or-path>    # install a plugin
+mythic-console plugin list                     # list installed plugins
+mythic-console plugin new <name> <payload>     # scaffold a new plugin
+mythic-console plugin validate <path>          # validate before shipping
+mythic-console plugin remove <name>            # remove a plugin
 ```
 
 See [customize.md](../customize.md) for a full walkthrough.
