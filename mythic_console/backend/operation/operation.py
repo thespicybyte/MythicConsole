@@ -52,7 +52,7 @@ class Operation:
                     self.callbacks.append(callback.get("agent_callback_id"))
         if data.get("disabledcommandsprofiles"):
             self.disabled_commands_profiles = []
-            disabled_commands_profiles = data.get("disabled_commands_profiles")
+            disabled_commands_profiles = data.get("disabledcommandsprofiles")
             for profile in disabled_commands_profiles:
                 if profile.get("id"):
                     self.disabled_commands_profiles.append(profile.get("id"))

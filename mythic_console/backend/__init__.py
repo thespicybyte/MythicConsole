@@ -1,5 +1,6 @@
 from mythic_console.backend.mythic_instance.mythic_instance import MythicInstance
 from mythic_console.backend.operation.operation import Operation
+from mythic_console.backend.disabled_commands_profile.disabled_commands_profile import DisabledCommandsProfile
 from mythic_console.backend.user.user import User
 from mythic_console.backend.task.task import Task
 from mythic_console.backend.callback.callback import Callback
