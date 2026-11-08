@@ -86,6 +86,55 @@ operation_operator_role_parser.add_argument('username', help='username to update
 operation_operator_role_parser.add_argument('--role', choices=['operator', 'spectator'], default='operator',
                                              help='role to assign')
 
+operation_blocklist_parser = operation_subparsers.add_parser(
+    'blocklist', help='manage command block lists for the active operation')
+operation_blocklist_subparsers = operation_blocklist_parser.add_subparsers(
+    title='subcommands', help='subcommand help')
+
+operation_blocklist_list_parser = operation_blocklist_subparsers.add_parser('list', help='list block lists')
+
+operation_blocklist_show_parser = operation_blocklist_subparsers.add_parser('show', help='show a block list')
+operation_blocklist_show_parser.add_argument('name', help='block list name')
+
+operation_blocklist_create_parser = operation_blocklist_subparsers.add_parser(
+    'create', help='create a block list seeded with one or more commands')
+operation_blocklist_create_parser.add_argument('name', help='block list name')
+operation_blocklist_create_parser.add_argument('command', nargs='+', help='command name(s) to block')
+operation_blocklist_create_parser.add_argument('--payload-type', default=None,
+                                                help='payload type to disambiguate the command name')
+
+operation_blocklist_add_parser = operation_blocklist_subparsers.add_parser(
+    'add', help='add a command to a block list (creates it if absent)')
+operation_blocklist_add_parser.add_argument('name', help='block list name')
+operation_blocklist_add_parser.add_argument('command', help='command name to block')
+operation_blocklist_add_parser.add_argument('--payload-type', default=None,
+                                             help='payload type to disambiguate the command name')
+
+operation_blocklist_remove_parser = operation_blocklist_subparsers.add_parser(
+    'remove', help='remove a command from a block list')
+operation_blocklist_remove_parser.add_argument('name', help='block list name')
+operation_blocklist_remove_parser.add_argument('command', help='command name to unblock')
+operation_blocklist_remove_parser.add_argument('--payload-type', default=None,
+                                                help='payload type to disambiguate the command name')
+operation_blocklist_remove_parser.add_argument('--force', action='store_true', help='skip confirmation prompt')
+
+operation_blocklist_assign_parser = operation_blocklist_subparsers.add_parser(
+    'assign', help='assign a block list to an operator')
+operation_blocklist_assign_parser.add_argument('name', help='block list name')
+operation_blocklist_assign_parser.add_argument('operator', help='operator username')
+operation_blocklist_assign_parser.add_argument('--force', action='store_true', help='skip confirmation prompt')
+
+operation_blocklist_unassign_parser = operation_blocklist_subparsers.add_parser(
+    'unassign', help='unassign a block list from an operator')
+operation_blocklist_unassign_parser.add_argument('name', help='block list name')
+operation_blocklist_unassign_parser.add_argument('operator', help='operator username')
+operation_blocklist_unassign_parser.add_argument('--force', action='store_true', help='skip confirmation prompt')
+
+operation_blocklist_delete_parser = operation_blocklist_subparsers.add_parser(
+    'delete', help='delete a block list')
+operation_blocklist_delete_parser.add_argument('name', help='block list name')
+operation_blocklist_delete_parser.add_argument('--force', action='store_true', help='skip confirmation prompt')
+
 ##### Payload Parsers #####
 
 payload_parser = Cmd2ArgumentParser()
