@@ -41,6 +41,51 @@ operation_subparsers = operation_parser.add_subparsers(title='subcommands', help
 
 operation_list_parser = operation_subparsers.add_parser('list', help='list operations')
 
+operation_info_parser = operation_subparsers.add_parser('info', help='show details for one operation')
+operation_info_parser.add_argument('operation', help='operation id or name')
+
+operation_set_parser = operation_subparsers.add_parser('set', help='switch the active operation')
+operation_set_parser.add_argument('operation', help='operation id or name')
+
+operation_create_parser = operation_subparsers.add_parser('create', help='create an operation')
+operation_create_parser.add_argument('name', help='name of operation')
+operation_create_parser.add_argument('--lead', default=None, help='username to set as operation lead')
+
+operation_update_parser = operation_subparsers.add_parser('update', help='update an operation')
+operation_update_parser.add_argument('operation', help='operation id or name')
+operation_update_parser.add_argument('--name', default=None, help='new operation name')
+operation_update_parser.add_argument('--channel', default=None, help='new notification channel')
+operation_update_parser.add_argument('--webhook', default=None, help='new webhook url')
+operation_update_parser.add_argument('--lead', default=None, help='username to set as operation lead')
+operation_update_complete_group = operation_update_parser.add_mutually_exclusive_group()
+operation_update_complete_group.add_argument('--complete', action='store_true', help='mark operation complete')
+operation_update_complete_group.add_argument('--incomplete', action='store_true',
+                                              help='mark operation incomplete')
+operation_update_delete_group = operation_update_parser.add_mutually_exclusive_group()
+operation_update_delete_group.add_argument('--delete', action='store_true', help='soft-delete operation')
+operation_update_delete_group.add_argument('--restore', action='store_true', help='restore a deleted operation')
+operation_update_parser.add_argument('--force', action='store_true', help='skip confirmation prompt')
+
+operation_operator_parser = operation_subparsers.add_parser('operator', help='manage operation members')
+operation_operator_subparsers = operation_operator_parser.add_subparsers(title='subcommands', help='subcommand help')
+
+operation_operator_add_parser = operation_operator_subparsers.add_parser('add', help='add a member to an operation')
+operation_operator_add_parser.add_argument('operation', help='operation id or name')
+operation_operator_add_parser.add_argument('username', help='username to add')
+
+operation_operator_remove_parser = operation_operator_subparsers.add_parser(
+    'remove', help='remove a member from an operation')
+operation_operator_remove_parser.add_argument('operation', help='operation id or name')
+operation_operator_remove_parser.add_argument('username', help='username to remove')
+operation_operator_remove_parser.add_argument('--force', action='store_true', help='skip confirmation prompt')
+
+operation_operator_role_parser = operation_operator_subparsers.add_parser(
+    'role', help='change a member\'s role')
+operation_operator_role_parser.add_argument('operation', help='operation id or name')
+operation_operator_role_parser.add_argument('username', help='username to update')
+operation_operator_role_parser.add_argument('--role', choices=['operator', 'spectator'], default='operator',
+                                             help='role to assign')
+
 ##### Payload Parsers #####
 
 payload_parser = Cmd2ArgumentParser()
