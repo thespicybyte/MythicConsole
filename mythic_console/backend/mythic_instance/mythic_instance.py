@@ -160,6 +160,22 @@ class MythicInstance:
         except asyncio.CancelledError:
             pass
 
+    async def monitor_operation_updates(self) -> AsyncGenerator[List[str], None]:
+        """
+        Monitor the operation table for any change and yield the current list of
+        operation names on every push
+        :return: list of operation names
+        """
+        sub = """
+            subscription OperationUpdates {
+              operation { name }
+            }"""
+        try:
+            async for result in mythic.subscribe_custom_query(self.mythic, sub):
+                yield [o["name"] for o in result.get("operation", []) if o.get("name")]
+        except asyncio.CancelledError:
+            pass
+
     async def get_all_callbacks_detail(self) -> list[dict]:
         """
         Get all callbacks, including ones that are no longer active, for the manage-callbacks

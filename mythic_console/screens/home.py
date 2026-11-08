@@ -165,6 +165,7 @@ class Home(Screen):
         await worker.wait()
         self._monitor_callback_updates()
         self._monitor_operator_updates()
+        self._monitor_operation_updates()
         self.set_interval(1.0, self._refresh_live_cells)
         self._get_and_monitor_tasks()
         self._monitor_tasks()
@@ -222,6 +223,11 @@ class Home(Screen):
     async def _monitor_operator_updates(self) -> None:
         async for usernames in self.instance.monitor_operator_updates():
             MythicCommands.set_user_cache(usernames)
+
+    @work()
+    async def _monitor_operation_updates(self) -> None:
+        async for names in self.instance.monitor_operation_updates():
+            MythicCommands.set_operation_cache(names)
 
     def action_manage_callbacks(self) -> None:
         self.run_worker(self._manage_callbacks())
