@@ -21,11 +21,15 @@ class Operation:
         self.callbacks: List[str] = []
         self.disabled_commands_profiles: List[int] = []
         self.operators: List[int] = []
+        self.lead: Optional[str] = None
+        self.operator_roles: List[dict] = []
 
     def __str__(self):
         return self.name
 
     def _update(self, data: dict):
+        if data.get("id"):
+            self.id = data.get("id")
         if data.get("name"):
             self.name = data.get("name")
         if data.get("admin_id"):
@@ -58,6 +62,16 @@ class Operation:
             for operator in operators:
                 if operator.get("id"):
                     self.operators.append(operator.get("id"))
+        if data.get("admin"):
+            self.lead = data.get("admin").get("username")
+        if data.get("operatoroperations"):
+            self.operator_roles = []
+            for entry in data.get("operatoroperations"):
+                operator = entry.get("operator") or {}
+                if operator.get("username"):
+                    self.operator_roles.append(
+                        {"username": operator.get("username"), "role": entry.get("view_mode")}
+                    )
 
     def get_name(self):
         if not self.name:
@@ -114,6 +128,21 @@ class Operation:
                                                     webhook,
                                                     complete,
                                                     deleted)
+        except Exception as e:
+            logger.error(e)
+            raise
+
+    async def create(self):
+        try:
+            await OperationQueries.create_operation(self.mythic, self.get_name())
+            await self.query()
+        except Exception as e:
+            logger.error(e)
+            raise
+
+    async def select(self, operator_id: int):
+        try:
+            await OperationQueries.select_operation(self.mythic, operator_id, self.id)
         except Exception as e:
             logger.error(e)
             raise

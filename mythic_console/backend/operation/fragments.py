@@ -20,5 +20,16 @@ class OperationFragments:
                 operators {
                     id
                 }
+                admin {
+                    id
+                    username
+                }
+                operatoroperations {
+                    view_mode
+                    operator {
+                        id
+                        username
+                    }
+                }
             }"""
         return fragment

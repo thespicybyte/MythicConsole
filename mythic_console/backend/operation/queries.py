@@ -130,6 +130,30 @@ class OperationQueries:
                                       deleted)
 
     @staticmethod
+    async def create_operation(session: Mythic, operation_name: str):
+        return await mythic.create_operation(session, operation_name)
+
+    @staticmethod
+    async def select_operation(session: Mythic, operator_id: int, operation_id: int):
+        return await mythic.update_current_operation_for_user(session, operator_id, operation_id)
+
+    @staticmethod
+    async def get_all_operation_names(session: Mythic) -> List[str]:
+        resp = await mythic.execute_custom_query(
+            mythic=session,
+            query="""
+                query AllOperationNames {
+                  operation {
+                    name
+                  }
+                }
+                """,
+        )
+
+        operations = resp.get("operation") or []
+        return [o["name"] for o in operations if o.get("name")]
+
+    @staticmethod
     async def get_active_callbacks(session: Mythic) -> List[dict]:
         resp = await mythic.get_all_active_callbacks(session)
         return resp
