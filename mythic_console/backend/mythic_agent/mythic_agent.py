@@ -19,7 +19,7 @@ from textual.app import active_app
 from textual.worker import Worker
 from textual_console import ArgparseCompleter, set_completer
 
-from mythic_console.backend import MythicInstance, Task, User, Operation, Payload, Callback
+from mythic_console.backend import MythicInstance, Task, User, Operation, Payload, Callback, DisabledCommandsProfile
 from mythic_console.utils.logger import logger
 from mythic_console.utils.environment import Environment
 from mythic_console.utils.severity import Severity, severity_style, success, warning, error
@@ -31,6 +31,7 @@ from . import mythic_command_parsers
 from ..c2_profile.queries import C2ProfileQueries
 from ..callback.queries import CallbackQueries
 from ..operation.queries import OperationQueries
+from ..disabled_commands_profile.queries import DisabledCommandsProfileQueries
 from ..payload.queries import PayloadQueries
 from ..payload_type.queries import PayloadTypeQueries
 from ..tasker.tasker import Tasker
@@ -952,6 +953,8 @@ class MythicCommands(Cmd):
     _payload_type_cache: List[str] = []
     _user_cache: List[str] = []
     _operation_cache: List[str] = []
+    _blocklist_cache: List[str] = []
+    _blocklist_command_cache: List[str] = []
 
     def __init__(self, instance: MythicInstance):
         super().__init__()
@@ -977,6 +980,15 @@ class MythicCommands(Cmd):
             "operation operator add": mythic_command_parsers.operation_operator_add_parser,
             "operation operator remove": mythic_command_parsers.operation_operator_remove_parser,
             "operation operator role": mythic_command_parsers.operation_operator_role_parser,
+            "operation blocklist": mythic_command_parsers.operation_blocklist_parser,
+            "operation blocklist list": mythic_command_parsers.operation_blocklist_list_parser,
+            "operation blocklist show": mythic_command_parsers.operation_blocklist_show_parser,
+            "operation blocklist create": mythic_command_parsers.operation_blocklist_create_parser,
+            "operation blocklist add": mythic_command_parsers.operation_blocklist_add_parser,
+            "operation blocklist remove": mythic_command_parsers.operation_blocklist_remove_parser,
+            "operation blocklist assign": mythic_command_parsers.operation_blocklist_assign_parser,
+            "operation blocklist unassign": mythic_command_parsers.operation_blocklist_unassign_parser,
+            "operation blocklist delete": mythic_command_parsers.operation_blocklist_delete_parser,
             "profiles list": mythic_command_parsers.profiles_list_parser,
             "user list": mythic_command_parsers.user_list_parser,
             "user create": mythic_command_parsers.user_create_parser,
@@ -1032,6 +1044,33 @@ class MythicCommands(Cmd):
         ):
             operation_action = next(a for a in parser._actions if a.dest == "operation")
             set_completer(operation_action, lambda word: list(self._operation_cache))
+
+        for parser in (
+            mythic_command_parsers.operation_blocklist_show_parser,
+            mythic_command_parsers.operation_blocklist_create_parser,
+            mythic_command_parsers.operation_blocklist_add_parser,
+            mythic_command_parsers.operation_blocklist_remove_parser,
+            mythic_command_parsers.operation_blocklist_assign_parser,
+            mythic_command_parsers.operation_blocklist_unassign_parser,
+            mythic_command_parsers.operation_blocklist_delete_parser,
+        ):
+            name_action = next(a for a in parser._actions if a.dest == "name")
+            set_completer(name_action, lambda word: list(self._blocklist_cache))
+
+        for parser in (
+            mythic_command_parsers.operation_blocklist_create_parser,
+            mythic_command_parsers.operation_blocklist_add_parser,
+            mythic_command_parsers.operation_blocklist_remove_parser,
+        ):
+            command_action = next(a for a in parser._actions if a.dest == "command")
+            set_completer(command_action, lambda word: list(self._blocklist_command_cache))
+
+        for parser in (
+            mythic_command_parsers.operation_blocklist_assign_parser,
+            mythic_command_parsers.operation_blocklist_unassign_parser,
+        ):
+            operator_action = next(a for a in parser._actions if a.dest == "operator")
+            set_completer(operator_action, lambda word: list(self._user_cache))
 
     @property
     def commands(self) -> List[str]:
@@ -1294,6 +1333,8 @@ class MythicCommands(Cmd):
             user = await UserQueries.query_by_username(self.instance.mythic, self.instance.mythic.username)
             await operation.select(user["id"])
             self.instance.mythic.current_operation_id = operation.id
+            await self.cache_blocklists()
+            await self.cache_blocklist_commands()
             return success(f"Set active operation to '{operation.name}'")
         except Exception as e:
             logger.error(e)
@@ -1379,6 +1420,202 @@ class MythicCommands(Cmd):
             return error(f"Error: {e}")
 
     mythic_command_parsers.operation_operator_role_parser.set_defaults(func=_operation_operator_role)
+
+    @classmethod
+    def set_blocklist_cache(cls, names: List[str]) -> None:
+        cls._blocklist_cache[:] = names
+
+    async def cache_blocklists(self):
+        operation_id = getattr(self.instance.mythic, "current_operation_id", None)
+        if not operation_id:
+            return
+        try:
+            names = await DisabledCommandsProfileQueries.get_all_profile_names(self.instance.mythic, operation_id)
+            self.set_blocklist_cache(names)
+        except Exception as e:
+            logger.warning(f"could not cache block lists: {e}")
+
+    @classmethod
+    def set_blocklist_command_cache(cls, names: List[str]) -> None:
+        cls._blocklist_command_cache[:] = names
+
+    async def cache_blocklist_commands(self):
+        operation_id = getattr(self.instance.mythic, "current_operation_id", None)
+        if not operation_id:
+            return
+        try:
+            payload_types = await PayloadTypeQueries.query_all_payload_types(self.instance.mythic)
+            names = set()
+            for payload_type in payload_types or []:
+                if payload_type.get("deleted") or not payload_type.get("name"):
+                    continue
+                commands = await mythic.get_all_commands_for_payloadtype(
+                    self.instance.mythic, payload_type["name"], custom_return_attributes="cmd attributes")
+                for command in commands:
+                    if command.get("cmd"):
+                        names.add(command["cmd"])
+            self.set_blocklist_command_cache(sorted(names))
+        except Exception as e:
+            logger.warning(f"could not cache block list commands: {e}")
+
+    def _blocklist(self) -> DisabledCommandsProfile:
+        operation_id = self.instance.mythic.current_operation_id
+        if not operation_id:
+            raise Exception("Operation not set")
+        return DisabledCommandsProfile(self.instance, operation_id)
+
+    async def _blocklist_list(self, _args) -> RenderableType:
+        try:
+            profile = self._blocklist()
+            rows = await profile.list()
+            await self.cache_blocklists()
+
+            grouped: Dict[str, Dict] = {}
+            for row in rows:
+                name = row.get("name")
+                if not name:
+                    continue
+                entry = grouped.setdefault(name, {"commands": 0, "operators": set()})
+                entry["commands"] += 1
+                for assignment in row.get("operatoroperations") or []:
+                    username = (assignment.get("operator") or {}).get("username")
+                    if username:
+                        entry["operators"].add(username)
+
+            table_rows = []
+            for name in sorted(grouped):
+                entry = grouped[name]
+                table_rows.append([name, str(entry["commands"]), ", ".join(sorted(entry["operators"]))])
+
+            headers = ["name", "commands", "assigned operators"]
+            return DefaultFormatter().build_table(*table_rows, headers=headers, title="Block Lists")
+        except Exception as e:
+            logger.error(e)
+            return error(f"Error: {e}")
+
+    mythic_command_parsers.operation_blocklist_list_parser.set_defaults(func=_blocklist_list)
+
+    async def _blocklist_show(self, args) -> RenderableType:
+        try:
+            profile = self._blocklist()
+            rows = await profile.show(args.name)
+            await self.cache_blocklists()
+
+            operators = set()
+            table_rows = []
+            for row in rows:
+                command = row.get("command") or {}
+                payload_type = (command.get("payloadtype") or {}).get("name") or ""
+                table_rows.append([str(row.get("id")), command.get("cmd") or "", payload_type])
+                for assignment in row.get("operatoroperations") or []:
+                    username = (assignment.get("operator") or {}).get("username")
+                    if username:
+                        operators.add(username)
+
+            title = f"Block List {args.name}"
+            if operators:
+                title += f" (assigned: {', '.join(sorted(operators))})"
+
+            headers = ["row id", "command", "payload type"]
+            return DefaultFormatter().build_table(*table_rows, headers=headers, title=title)
+        except Exception as e:
+            logger.error(e)
+            return error(f"Error: {e}")
+
+    mythic_command_parsers.operation_blocklist_show_parser.set_defaults(func=_blocklist_show)
+
+    async def _blocklist_create(self, args) -> RenderableType:
+        try:
+            profile = self._blocklist()
+            command_ids = [await profile.resolve_command_id(cmd, args.payload_type) for cmd in args.command]
+            await profile.create(args.name, command_ids)
+            await self.cache_blocklists()
+            return success(f"Created block list '{args.name}' with {len(command_ids)} command(s)")
+        except Exception as e:
+            logger.error(e)
+            return error(f"Error: {e}")
+
+    mythic_command_parsers.operation_blocklist_create_parser.set_defaults(func=_blocklist_create)
+
+    async def _blocklist_add(self, args) -> RenderableType:
+        try:
+            profile = self._blocklist()
+            command_id = await profile.resolve_command_id(args.command, args.payload_type)
+            await profile.add(args.name, command_id)
+            await self.cache_blocklists()
+            return success(f"Added '{args.command}' to block list '{args.name}'")
+        except Exception as e:
+            logger.error(e)
+            return error(f"Error: {e}")
+
+    mythic_command_parsers.operation_blocklist_add_parser.set_defaults(func=_blocklist_add)
+
+    async def _blocklist_remove(self, args) -> RenderableType:
+        try:
+            if not args.force and not await _prompt(
+                    YesNoPrompt(f"Allow '{args.command}' again by removing it from '{args.name}'?")):
+                return warning("Cancelled")
+
+            profile = self._blocklist()
+            command_id = await profile.resolve_command_id(args.command, args.payload_type)
+            await profile.remove(args.name, command_id)
+            return success(f"Removed '{args.command}' from block list '{args.name}'")
+        except Exception as e:
+            logger.error(e)
+            return error(f"Error: {e}")
+
+    mythic_command_parsers.operation_blocklist_remove_parser.set_defaults(func=_blocklist_remove)
+
+    async def _blocklist_assign(self, args) -> RenderableType:
+        try:
+            user = await UserQueries.query_by_username(self.instance.mythic, args.operator)
+            user_id = user.get("id")
+            if not user_id:
+                raise Exception(f"could not resolve operator '{args.operator}'")
+
+            profile = self._blocklist()
+            await profile.assign(args.name, user_id)
+            return success(f"Assigned block list '{args.name}' to '{args.operator}'")
+        except Exception as e:
+            logger.error(e)
+            return error(f"Error: {e}")
+
+    mythic_command_parsers.operation_blocklist_assign_parser.set_defaults(func=_blocklist_assign)
+
+    async def _blocklist_unassign(self, args) -> RenderableType:
+        try:
+            if not args.force and not await _prompt(
+                    YesNoPrompt(f"Unassign block list '{args.name}' from '{args.operator}'?")):
+                return warning("Cancelled")
+
+            user = await UserQueries.query_by_username(self.instance.mythic, args.operator)
+            user_id = user.get("id")
+            if not user_id:
+                raise Exception(f"could not resolve operator '{args.operator}'")
+
+            profile = self._blocklist()
+            await profile.unassign(user_id)
+            return success(f"Unassigned block list '{args.name}' from '{args.operator}'")
+        except Exception as e:
+            logger.error(e)
+            return error(f"Error: {e}")
+
+    mythic_command_parsers.operation_blocklist_unassign_parser.set_defaults(func=_blocklist_unassign)
+
+    async def _blocklist_delete(self, args) -> RenderableType:
+        try:
+            if not args.force and not await _prompt(YesNoPrompt(f"Delete block list '{args.name}'?")):
+                return warning("Cancelled")
+
+            profile = self._blocklist()
+            await profile.delete(args.name)
+            await self.cache_blocklists()
+            return success(f"Deleted block list '{args.name}'")
+        except Exception as e:
+            logger.error(e)
+            return error(f"Error: {e}")
+
+    mythic_command_parsers.operation_blocklist_delete_parser.set_defaults(func=_blocklist_delete)
 
     @with_argparser(mythic_command_parsers.profiles_parser)
     def do_profiles(self, args):
