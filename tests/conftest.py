@@ -36,13 +36,16 @@ def isolated_plugin_registry(tmp_path):
 
 @pytest.fixture(autouse=True)
 def reset_mythic_commands_caches():
-    """MythicCommands._user_cache/_payload_type_cache are class-level (shared across every
-    instance); reset them around each test so tests can't leak cached values into each other."""
+    """MythicCommands._user_cache/_payload_type_cache/_operation_cache are class-level (shared
+    across every instance); reset them around each test so tests can't leak cached values into
+    each other."""
     MythicCommands._user_cache = []
     MythicCommands._payload_type_cache = []
+    MythicCommands._operation_cache = []
     yield
     MythicCommands._user_cache = []
     MythicCommands._payload_type_cache = []
+    MythicCommands._operation_cache = []
 
 
 @pytest.fixture

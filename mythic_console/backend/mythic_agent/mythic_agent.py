@@ -951,6 +951,7 @@ class MythicCommands(Cmd):
 
     _payload_type_cache: List[str] = []
     _user_cache: List[str] = []
+    _operation_cache: List[str] = []
 
     def __init__(self, instance: MythicInstance):
         super().__init__()
@@ -968,6 +969,14 @@ class MythicCommands(Cmd):
         }
         self._subcommand_parsers: Dict[str, Cmd2ArgumentParser] = {
             "operation list": mythic_command_parsers.operation_list_parser,
+            "operation info": mythic_command_parsers.operation_info_parser,
+            "operation set": mythic_command_parsers.operation_set_parser,
+            "operation create": mythic_command_parsers.operation_create_parser,
+            "operation update": mythic_command_parsers.operation_update_parser,
+            "operation operator": mythic_command_parsers.operation_operator_parser,
+            "operation operator add": mythic_command_parsers.operation_operator_add_parser,
+            "operation operator remove": mythic_command_parsers.operation_operator_remove_parser,
+            "operation operator role": mythic_command_parsers.operation_operator_role_parser,
             "profiles list": mythic_command_parsers.profiles_list_parser,
             "user list": mythic_command_parsers.user_list_parser,
             "user create": mythic_command_parsers.user_create_parser,
@@ -1004,6 +1013,25 @@ class MythicCommands(Cmd):
         ):
             identifier_action = next(a for a in parser._actions if a.dest == "identifier")
             set_completer(identifier_action, lambda word: list(self._user_cache))
+
+        for parser in (
+            mythic_command_parsers.operation_operator_add_parser,
+            mythic_command_parsers.operation_operator_remove_parser,
+            mythic_command_parsers.operation_operator_role_parser,
+        ):
+            username_action = next(a for a in parser._actions if a.dest == "username")
+            set_completer(username_action, lambda word: list(self._user_cache))
+
+        for parser in (
+            mythic_command_parsers.operation_info_parser,
+            mythic_command_parsers.operation_set_parser,
+            mythic_command_parsers.operation_update_parser,
+            mythic_command_parsers.operation_operator_add_parser,
+            mythic_command_parsers.operation_operator_remove_parser,
+            mythic_command_parsers.operation_operator_role_parser,
+        ):
+            operation_action = next(a for a in parser._actions if a.dest == "operation")
+            set_completer(operation_action, lambda word: list(self._operation_cache))
 
     @property
     def commands(self) -> List[str]:
@@ -1213,6 +1241,7 @@ class MythicCommands(Cmd):
 
     async def _operation_list(self, _args):
         try:
+            await self.cache_operations()
             operation_ids = await OperationQueries.get_all_operations(self.instance.mythic)
             operation_info = []
             for operation_id in sorted(operation_ids):
@@ -1227,6 +1256,129 @@ class MythicCommands(Cmd):
             return error(f"Error: {e}")
 
     mythic_command_parsers.operation_list_parser.set_defaults(func=_operation_list)
+
+    async def _resolve_operation(self, token: str) -> Operation:
+        operation = Operation(self.instance, operation_id=int(token)) if token.isdigit() \
+            else Operation(self.instance, name=token)
+        await operation.query()
+        return operation
+
+    async def _operation_info(self, args) -> RenderableType:
+        try:
+            operation = await self._resolve_operation(args.operation)
+
+            rows = [
+                ["id", str(operation.id)],
+                ["name", operation.name],
+                ["lead", operation.lead or ""],
+                ["channel", operation.channel or ""],
+                ["webhook", operation.webhook or ""],
+                ["complete", str(operation.complete)],
+                ["deleted", str(operation.deleted)],
+                ["callbacks", str(len(operation.callbacks))],
+            ]
+            for member in operation.operator_roles:
+                rows.append([f"operator: {member['username']}", member["role"]])
+
+            return DefaultFormatter().build_table(*rows, headers=["field", "value"],
+                                                   title=f"Operation {operation.name}")
+        except Exception as e:
+            logger.error(e)
+            return error(f"Error: {e}")
+
+    mythic_command_parsers.operation_info_parser.set_defaults(func=_operation_info)
+
+    async def _operation_set(self, args) -> RenderableType:
+        try:
+            operation = await self._resolve_operation(args.operation)
+            user = await UserQueries.query_by_username(self.instance.mythic, self.instance.mythic.username)
+            await operation.select(user["id"])
+            self.instance.mythic.current_operation_id = operation.id
+            return success(f"Set active operation to '{operation.name}'")
+        except Exception as e:
+            logger.error(e)
+            return error(f"Error: {e}")
+
+    mythic_command_parsers.operation_set_parser.set_defaults(func=_operation_set)
+
+    async def _operation_create(self, args) -> RenderableType:
+        try:
+            operation = Operation(self.instance, name=args.name)
+            await operation.create()
+            if args.lead:
+                await operation.update(lead_operator_username=args.lead)
+
+            return success(f"Created '{args.name}'")
+        except Exception as e:
+            logger.error(e)
+            return error(f"Error: {e}")
+
+    mythic_command_parsers.operation_create_parser.set_defaults(func=_operation_create)
+
+    async def _operation_update(self, args) -> RenderableType:
+        try:
+            operation = await self._resolve_operation(args.operation)
+
+            if (args.delete or args.complete) and not args.force:
+                action = "Delete" if args.delete else "Mark complete"
+                if not await _prompt(YesNoPrompt(f"{action} '{operation.name}'?")):
+                    return warning("Cancelled")
+
+            complete = True if args.complete else (False if args.incomplete else None)
+            deleted = True if args.delete else (False if args.restore else None)
+
+            await operation.update(
+                lead_operator_username=args.lead,
+                new_operation_name=args.name,
+                channel=args.channel,
+                webhook=args.webhook,
+                complete=complete,
+                deleted=deleted,
+            )
+
+            return success(f"Updated '{operation.name}'")
+        except Exception as e:
+            logger.error(e)
+            return error(f"Error: {e}")
+
+    mythic_command_parsers.operation_update_parser.set_defaults(func=_operation_update)
+
+    async def _operation_operator_add(self, args) -> RenderableType:
+        try:
+            operation = await self._resolve_operation(args.operation)
+            await operation.add_operator(args.username)
+            return success(f"Added '{args.username}' to '{operation.name}'")
+        except Exception as e:
+            logger.error(e)
+            return error(f"Error: {e}")
+
+    mythic_command_parsers.operation_operator_add_parser.set_defaults(func=_operation_operator_add)
+
+    async def _operation_operator_remove(self, args) -> RenderableType:
+        try:
+            operation = await self._resolve_operation(args.operation)
+            if not args.force and not await _prompt(
+                    YesNoPrompt(f"Remove '{args.username}' from '{operation.name}'?")):
+                return warning("Cancelled")
+
+            await operation.remove_operator(args.username)
+            return success(f"Removed '{args.username}' from '{operation.name}'")
+        except Exception as e:
+            logger.error(e)
+            return error(f"Error: {e}")
+
+    mythic_command_parsers.operation_operator_remove_parser.set_defaults(func=_operation_operator_remove)
+
+    async def _operation_operator_role(self, args) -> RenderableType:
+        try:
+            operation = await self._resolve_operation(args.operation)
+            await operation.update_operator(args.username, args.role)
+            return success(f"Set '{args.username}' role to '{args.role}' in '{operation.name}'")
+        except Exception as e:
+            logger.error(e)
+            return error(f"Error: {e}")
+
+    mythic_command_parsers.operation_operator_role_parser.set_defaults(func=_operation_operator_role)
 
     @with_argparser(mythic_command_parsers.profiles_parser)
     def do_profiles(self, args):
@@ -1382,6 +1534,16 @@ class MythicCommands(Cmd):
             self.set_user_cache(await UserQueries.get_all_usernames(self.instance.mythic))
         except Exception as e:
             logger.warning(f"could not cache users: {e}")
+
+    @classmethod
+    def set_operation_cache(cls, names: List[str]) -> None:
+        cls._operation_cache[:] = names
+
+    async def cache_operations(self):
+        try:
+            self.set_operation_cache(await OperationQueries.get_all_operation_names(self.instance.mythic))
+        except Exception as e:
+            logger.warning(f"could not cache operations: {e}")
 
     async def _payload_build(self, args) -> RenderableType:
         try:
