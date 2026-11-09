@@ -1,9 +1,27 @@
 import pytest
 from cmd2 import Cmd2ArgumentParser
+from textual_autocomplete.fuzzy_search import FuzzySearch
+from textual_console import CompletionHint
 
 from mythic_console.backend.mythic_agent.mythic_agent import MythicCommands
 
 from conftest import completer_values
+
+
+def top_ranked_value(items, word):
+    """Mirror CommandAutoComplete.get_matches: fuzzy-score each selectable candidate
+    against `word` and return the value of the top-ranked match, or None if none match."""
+    fuzzy_search = FuzzySearch()
+    scored = []
+    for item in items:
+        if isinstance(item, CompletionHint):
+            continue
+        score, _ = fuzzy_search.match(word, item.value)
+        if score <= 0:
+            continue
+        scored.append((item.value, score))
+    scored.sort(key=lambda pair: pair[1], reverse=True)
+    return scored[0][0] if scored else None
 
 CMD2_BUILTINS = {
     "_eof", "_relative_run_script", "alias", "edit", "help", "history",
@@ -82,13 +100,43 @@ def test_completer_positional_choice_completes_values(mythic_commands_with_test_
 def test_completer_option_flags_complete_on_dash_for_command(mythic_commands_with_test_parser):
     items = mythic_commands_with_test_parser.get_completer_items("testcmd -")
 
-    assert completer_values(items) == {"-v", "--verbose"}
+    assert completer_values(items) == {"-v", "--verbose", "-h", "--help"}
 
 
 def test_completer_option_flags_complete_on_dash_for_subcommand(mythic_commands_with_test_parser):
     items = mythic_commands_with_test_parser.get_completer_items("testcmd create -")
 
-    assert completer_values(items) == {"--role"}
+    assert completer_values(items) == {"--role", "-h", "--help"}
+
+
+def test_completer_help_flags_are_offered_for_global_command(mythic_commands):
+    items = mythic_commands.get_completer_items("operation update -h")
+
+    assert {"-h", "--help"}.issubset(completer_values(items))
+
+
+def test_completer_help_flag_is_offered_long_form(mythic_commands):
+    items = mythic_commands.get_completer_items("operation update --help")
+
+    assert "--help" in completer_values(items)
+
+
+def test_completer_help_flag_outranks_other_options_for_dash_h(mythic_commands):
+    items = mythic_commands.get_completer_items("operation update -h")
+
+    assert top_ranked_value(items, "-h") == "-h"
+
+
+def test_completer_help_flag_outranks_other_options_for_dash_dash_help(mythic_commands):
+    items = mythic_commands.get_completer_items("operation update --help")
+
+    assert top_ranked_value(items, "--help") == "--help"
+
+
+def test_completer_help_flag_does_not_outrank_a_real_flag_prefix(mythic_commands):
+    items = mythic_commands.get_completer_items("operation update --ch")
+
+    assert top_ranked_value(items, "--ch") == "--channel"
 
 
 async def test_empty_string_lists_top_level_commands(test_plugin_agent):
@@ -127,6 +175,20 @@ async def test_two_token_line_returns_subcommands_and_options(test_plugin_agent)
     items = test_plugin_agent.get_completer_items("net echo")
 
     assert set(items) == {"echo", "connect", "-h", "--help"}
+
+
+async def test_help_word_is_offered_for_agent_alias(test_plugin_agent):
+    items = test_plugin_agent.get_completer_items("echo -h")
+
+    assert "-h" in items
+    assert "--help" in items
+
+
+async def test_help_word_is_offered_for_generated_command(generic_agent):
+    items = generic_agent.get_completer_items("echo -h")
+
+    assert "-h" in items
+    assert "--help" in items
 
 
 async def test_multi_token_line_excludes_tokens_already_on_the_line(test_plugin_agent):
