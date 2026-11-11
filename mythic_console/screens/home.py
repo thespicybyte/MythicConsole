@@ -193,36 +193,47 @@ class Home(Screen):
                 continue
             self.known_callbacks[uuid] = bool(row.get("active"))
         self._refresh_callbacks_title()
+        logger.debug(f"seeded {len(self.known_callbacks)} known callbacks")
 
     @work()
     async def _monitor_callback_updates(self) -> None:
         """Reconcile the table and known_callbacks on every callback_stream update."""
+        logger.info("callback-update worker started")
         try:
             table = self.query_one("#callback_table", CallbackTable)
         except NoMatches:
+            logger.debug("callback table not found; callback-update worker exiting")
             return
 
-        async for row in self.instance.monitor_callback_updates():
-            uuid = row.get("agent_callback_id")
-            if not uuid:
-                continue
+        try:
+            async for row in self.instance.monitor_callback_updates():
+                uuid = row.get("agent_callback_id")
+                if not uuid:
+                    continue
 
-            cb = self.active_callbacks.get(uuid)
-            if not cb:
-                cb = Callback(self.instance, callback_uuid=uuid)
-                await cb.query()
-                self.active_callbacks[uuid] = cb
+                cb = self.active_callbacks.get(uuid)
+                if not cb:
+                    cb = Callback(self.instance, callback_uuid=uuid)
+                    await cb.query()
+                    self.active_callbacks[uuid] = cb
 
-            cb.apply_stream_update(row)
-            self.known_callbacks[uuid] = cb.active
-            table.reconcile_callback(cb, self.current_tab_id)
-            self._refresh_callbacks_title()
+                cb.apply_stream_update(row)
+                self.known_callbacks[uuid] = cb.active
+                table.reconcile_callback(cb, self.current_tab_id)
+                self._refresh_callbacks_title()
+                logger.debug(f"applied callback update {uuid}")
+        finally:
+            logger.info("callback-update worker stopped")
 
     @work()
     async def _monitor_operator_updates(self) -> None:
-        async for usernames in self.instance.monitor_operator_updates():
-            MythicCommands.set_user_cache(usernames)
-            logger.debug(f"applied operator cache update: {len(usernames)} usernames")
+        logger.info("operator-update worker started")
+        try:
+            async for usernames in self.instance.monitor_operator_updates():
+                MythicCommands.set_user_cache(usernames)
+                logger.debug(f"applied operator cache update: {len(usernames)} usernames")
+        finally:
+            logger.info("operator-update worker stopped")
 
     def action_manage_callbacks(self) -> None:
         self.run_worker(self._manage_callbacks())
@@ -272,6 +283,7 @@ class Home(Screen):
     @work(exclusive=True, group="cmd_queue")
     async def _run_cmd_queue(self) -> None:
         """Run queued commands one at a time, in order."""
+        logger.info("command queue worker started")
         while True:
             cmd = await self._cmd_queue.get()
             await self.execute_cmd(cmd)
@@ -300,6 +312,7 @@ class Home(Screen):
             callback_table.add_row(*build_callback_row(cb, datetime.now(timezone.utc)), key=cb.uuid)
             if cb.uuid not in self.active_callbacks.keys():
                 self.active_callbacks[cb.uuid] = cb
+        logger.debug(f"loaded {len(callback_uuids)} active callbacks")
 
     @work()
     async def _get_and_monitor_tasks(self) -> None:
@@ -307,44 +320,58 @@ class Home(Screen):
         Get all the tasks Mythic has. Put the task in the correct callback instance so we don't have to query them again.
         This function will then continue to monitor for new tasks
         """
-        logger.debug("monitoring for tasks")
-        async for task_id in self.instance.get_and_monitor_new_tasks():
-            task = Task(self.instance, task_id=task_id)
-            await task.query()
-            if task.callback_uuid not in self.active_callbacks.keys():
-                continue
+        logger.info("task worker started")
+        try:
+            async for task_id in self.instance.get_and_monitor_new_tasks():
+                task = Task(self.instance, task_id=task_id)
+                await task.query()
+                if task.callback_uuid not in self.active_callbacks.keys():
+                    continue
 
-            callback = self.active_callbacks[task.callback_uuid]
-            if task not in callback.tasks:
-                callback.tasks.append(task)
-            else:
-                # refresh the tracked instance so row/formatter see the latest state
-                for i, t in enumerate(callback.tasks):
-                    if t.uuid == task.uuid:
-                        callback.tasks[i] = task
-                        break
-            self.post_message(TasksTable.NewTask(task))
+                callback = self.active_callbacks[task.callback_uuid]
+                if task not in callback.tasks:
+                    callback.tasks.append(task)
+                else:
+                    # refresh the tracked instance so row/formatter see the latest state
+                    for i, t in enumerate(callback.tasks):
+                        if t.uuid == task.uuid:
+                            callback.tasks[i] = task
+                            break
+                self.post_message(TasksTable.NewTask(task))
+                logger.debug(f"applied task {task_id}")
+        finally:
+            logger.info("task worker stopped")
 
     @work()
     async def _monitor_tasks(self) -> None:
         """Monitor for task updates"""
-        async for task_id in self.instance.monitor_tasks_updates():
-            task = Task(self.instance, task_id=task_id)
-            await task.query()
-            await self._update_task(task)
+        logger.info("task-update worker started")
+        try:
+            async for task_id in self.instance.monitor_tasks_updates():
+                task = Task(self.instance, task_id=task_id)
+                await task.query()
+                await self._update_task(task)
+                logger.debug(f"applied task update {task_id}")
+        finally:
+            logger.info("task-update worker stopped")
 
     @work()
     async def monitor_callbacks(self):
         callback_table = self.query_one("#callback_table", CallbackTable)
-        async for uuid in self.instance.monitor_new_callbacks():
-            if uuid in self.active_callbacks.keys():
-                continue
-            cb = Callback(self.instance, callback_uuid=uuid)
-            await cb.query()
-            callback_table.add_row(*build_callback_row(cb, datetime.now(timezone.utc)), key=cb.uuid)
-            self.active_callbacks[cb.uuid] = cb
-            self.known_callbacks[cb.uuid] = cb.active
-            self._refresh_callbacks_title()
+        logger.info("new-callback worker started")
+        try:
+            async for uuid in self.instance.monitor_new_callbacks():
+                if uuid in self.active_callbacks.keys():
+                    continue
+                cb = Callback(self.instance, callback_uuid=uuid)
+                await cb.query()
+                callback_table.add_row(*build_callback_row(cb, datetime.now(timezone.utc)), key=cb.uuid)
+                self.active_callbacks[cb.uuid] = cb
+                self.known_callbacks[cb.uuid] = cb.active
+                self._refresh_callbacks_title()
+                logger.debug(f"added new callback {uuid}")
+        finally:
+            logger.info("new-callback worker stopped")
 
     async def _update_task(self, task: Task):
         tasked_callback = self.active_callbacks.get(task.callback_uuid)
