@@ -121,21 +121,83 @@ operation_blocklist_remove_parser.add_argument('--payload-type', default=None,
 operation_blocklist_remove_parser.add_argument('--force', action='store_true', help='skip confirmation prompt')
 
 operation_blocklist_assign_parser = operation_blocklist_subparsers.add_parser(
-    'assign', help='assign a block list to an operator')
+    'assign', help='assign a block list to one or more operators')
 operation_blocklist_assign_parser.add_argument('name', help='block list name')
-operation_blocklist_assign_parser.add_argument('operator', help='operator username')
+operation_blocklist_assign_parser.add_argument('operator', nargs='+', help='operator username(s)')
 operation_blocklist_assign_parser.add_argument('--force', action='store_true', help='skip confirmation prompt')
 
 operation_blocklist_unassign_parser = operation_blocklist_subparsers.add_parser(
-    'unassign', help='unassign a block list from an operator')
+    'unassign', help='unassign a block list from one or more operators')
 operation_blocklist_unassign_parser.add_argument('name', help='block list name')
-operation_blocklist_unassign_parser.add_argument('operator', help='operator username')
+operation_blocklist_unassign_parser.add_argument('operator', nargs='+', help='operator username(s)')
 operation_blocklist_unassign_parser.add_argument('--force', action='store_true', help='skip confirmation prompt')
 
 operation_blocklist_delete_parser = operation_blocklist_subparsers.add_parser(
     'delete', help='delete a block list')
 operation_blocklist_delete_parser.add_argument('name', help='block list name')
 operation_blocklist_delete_parser.add_argument('--force', action='store_true', help='skip confirmation prompt')
+
+##### Operation Whitelist Parsers #####
+
+_whitelist_help = (
+    'manage command block lists for the active operation by naming the commands to allow. '
+    'This creates and edits an ordinary block list holding the complement of the allowed commands. '
+    'The complement is a point-in-time snapshot: commands added to a payload type later are not '
+    'auto-blocked until the whitelist is recreated. `show`/`list` display the stored block list '
+    '(the complement of the allowed commands), not the allowed set.'
+)
+
+operation_whitelist_parser = operation_subparsers.add_parser(
+    'whitelist', help=_whitelist_help, description=_whitelist_help)
+operation_whitelist_subparsers = operation_whitelist_parser.add_subparsers(
+    title='subcommands', help='subcommand help')
+
+operation_whitelist_list_parser = operation_whitelist_subparsers.add_parser('list', help='list block lists')
+
+operation_whitelist_show_parser = operation_whitelist_subparsers.add_parser(
+    'show', help='show a block list (the stored block list, not the allowed set)')
+operation_whitelist_show_parser.add_argument('name', help='block list name')
+
+operation_whitelist_create_parser = operation_whitelist_subparsers.add_parser(
+    'create',
+    help='create a block list allowing only the given command(s); blocks everything else',
+    description=_whitelist_help)
+operation_whitelist_create_parser.add_argument('name', help='block list name')
+operation_whitelist_create_parser.add_argument('command', nargs='+', help='command name(s) to allow')
+operation_whitelist_create_parser.add_argument('--payload-type', default=None,
+                                                help='payload type to scope the allowed command(s) to')
+
+operation_whitelist_add_parser = operation_whitelist_subparsers.add_parser(
+    'add', help='allow a command (removes it from the underlying block list)')
+operation_whitelist_add_parser.add_argument('name', help='block list name')
+operation_whitelist_add_parser.add_argument('command', help='command name to allow')
+operation_whitelist_add_parser.add_argument('--payload-type', default=None,
+                                             help='payload type to disambiguate the command name')
+
+operation_whitelist_remove_parser = operation_whitelist_subparsers.add_parser(
+    'remove', help='stop allowing a command (adds it to the underlying block list)')
+operation_whitelist_remove_parser.add_argument('name', help='block list name')
+operation_whitelist_remove_parser.add_argument('command', help='command name to stop allowing')
+operation_whitelist_remove_parser.add_argument('--payload-type', default=None,
+                                                help='payload type to disambiguate the command name')
+operation_whitelist_remove_parser.add_argument('--force', action='store_true', help='skip confirmation prompt')
+
+operation_whitelist_assign_parser = operation_whitelist_subparsers.add_parser(
+    'assign', help='assign a whitelist to one or more operators')
+operation_whitelist_assign_parser.add_argument('name', help='block list name')
+operation_whitelist_assign_parser.add_argument('operator', nargs='+', help='operator username(s)')
+operation_whitelist_assign_parser.add_argument('--force', action='store_true', help='skip confirmation prompt')
+
+operation_whitelist_unassign_parser = operation_whitelist_subparsers.add_parser(
+    'unassign', help='unassign a whitelist from one or more operators')
+operation_whitelist_unassign_parser.add_argument('name', help='block list name')
+operation_whitelist_unassign_parser.add_argument('operator', nargs='+', help='operator username(s)')
+operation_whitelist_unassign_parser.add_argument('--force', action='store_true', help='skip confirmation prompt')
+
+operation_whitelist_delete_parser = operation_whitelist_subparsers.add_parser(
+    'delete', help='delete a whitelist')
+operation_whitelist_delete_parser.add_argument('name', help='block list name')
+operation_whitelist_delete_parser.add_argument('--force', action='store_true', help='skip confirmation prompt')
 
 ##### Payload Parsers #####
 
