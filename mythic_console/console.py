@@ -124,14 +124,17 @@ class MythicConsole(App, inherit_bindings=False):
 
     def watch_authenticated(self) -> None:
         if self.authenticated:
+            logger.info("authenticated; pushing Home screen")
             self.push_screen(self.SCREENS["home"](self.instance))
 
     def on_mount(self):
-        logger.debug("starting console")
+        logger.info("starting console")
         load_installed_plugins()
+        logger.info("installed plugins loaded")
         saved_theme = state.get_theme()
         if saved_theme and saved_theme in self.available_themes:
             self.theme = saved_theme
+        logger.debug("pushing login screen")
         self.push_screen(LoginScreen(), callback=self.handle_login_response)
 
     def compose(self) -> ComposeResult:
@@ -142,12 +145,14 @@ class MythicConsole(App, inherit_bindings=False):
         self.instance = response
 
         err_message = self.instance.get_login_error()
-        logger.debug(err_message)
         if err_message:
+            logger.warning(f"login failed: {err_message}")
             self.notify(f"login failed: {err_message}", severity="error", timeout=15)
+            logger.debug("re-pushing login screen after failure")
             self.push_screen(LoginScreen(), callback=self.handle_login_response)
             return
 
+        logger.info("login succeeded")
         self.notify(f"login success")
         loop = asyncio.get_running_loop()
         if loop:
@@ -176,14 +181,14 @@ class MythicConsole(App, inherit_bindings=False):
         self.authenticated = False
         self.instance = None
 
-        logger.debug(self.workers)
+        logger.info(f"logout: cancelling {len(self.workers)} workers")
         for worker in self.workers:
             worker.cancel()
 
         while len(self.screen_stack) > 1:
             logger.debug(self.screen_stack[-1].id)
             self.pop_screen()
-        logger.debug(self.screen_stack)
+        logger.info("logout: returning to login screen")
         self.push_screen(LoginScreen(), callback=self.handle_login_response)
 
 

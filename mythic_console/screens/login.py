@@ -64,14 +64,13 @@ class LoginScreen(ModalScreen):
             self.notify(f"password required", severity="warning")
             return
 
+        logger.info(f"submitting login for server '{self._server}'")
         self.query_one(".login_screen").loading = True
         self.instance = MythicInstance(self._username, self._password, self._server)
         self.run_worker(self.instance.login(), exclusive=True)
 
     def action_quit(self) -> None:
-        logger.info("we here")
-        print(f"workers: {self.app.workers}")
-
+        logger.info(f"quit requested; {len(self.app.workers)} workers active")
         self.app.exit(None, 0)
 
     def on_worker_state_changed(self, event: Worker.StateChanged) -> None:
@@ -79,5 +78,6 @@ class LoginScreen(ModalScreen):
         if event.worker.name == "login":
             if not event.worker.is_finished:
                 return
+            logger.debug("login worker finished; dismissing login screen")
             self.query_one(".login_screen").loading = False
             self.dismiss(self.instance)
