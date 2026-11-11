@@ -7,6 +7,7 @@ from rich.console import Console
 from mythic_console.backend.mythic_agent import mythic_agent
 from mythic_console.backend.mythic_agent import mythic_command_parsers
 from mythic_console.backend.mythic_agent.mythic_agent import MythicCommands
+from mythic_console.backend.operation import queries as operation_queries_module
 from mythic_console.backend.operation.operation import Operation
 from mythic_console.backend.operation.queries import OperationQueries
 from mythic_console.backend.user.queries import UserQueries
@@ -150,6 +151,20 @@ async def test_cache_operations_populates_from_query(mythic_commands, monkeypatc
     await mythic_commands.cache_operations()
 
     assert mythic_commands._operation_cache == ["main", "red-team"]
+
+
+async def test_get_all_operation_names_filters_deleted(monkeypatch):
+    captured = {}
+
+    async def fake_execute_custom_query(mythic, query, variables=None):
+        captured["query"] = query
+        return {"operation": [{"name": "main"}]}
+
+    monkeypatch.setattr(operation_queries_module.mythic, "execute_custom_query", fake_execute_custom_query)
+
+    await OperationQueries.get_all_operation_names(None)
+
+    assert "where: {deleted: {_eq: false}}" in captured["query"]
 
 
 async def test_cache_operations_swallows_errors(mythic_commands, monkeypatch):
@@ -321,6 +336,23 @@ async def test_operation_create_with_lead_calls_update(mythic_commands, monkeypa
     assert calls == [{"lead_operator_username": "bob"}]
 
 
+async def test_operation_create_refreshes_operation_cache(mythic_commands, monkeypatch):
+    async def fake_create(self):
+        self.id = 11
+
+    async def fake_get_all_operation_names(session):
+        return ["main", "new-op"]
+
+    monkeypatch.setattr(Operation, "create", fake_create)
+    monkeypatch.setattr(OperationQueries, "get_all_operation_names", fake_get_all_operation_names)
+
+    mythic_commands._operation_cache[:] = ["stale"]
+
+    await mythic_commands._operation_create(_Args(name="new-op", lead=None))
+
+    assert mythic_commands._operation_cache == ["main", "new-op"]
+
+
 async def test_operation_update_rename_does_not_prompt(mythic_commands, monkeypatch):
     prompted = False
 
@@ -353,6 +385,30 @@ async def test_operation_update_rename_does_not_prompt(mythic_commands, monkeypa
         "channel": None, "webhook": None, "complete": None, "deleted": None,
     }]
     assert "main" in result.plain
+
+
+async def test_operation_update_refreshes_operation_cache(mythic_commands, monkeypatch):
+    async def fake_query_by_name(session, name):
+        return _operation(operation_id=1, name=name)
+
+    async def fake_update(self, **kwargs):
+        pass
+
+    async def fake_get_all_operation_names(session):
+        return ["renamed"]
+
+    monkeypatch.setattr(OperationQueries, "query_by_name", fake_query_by_name)
+    monkeypatch.setattr(Operation, "update", fake_update)
+    monkeypatch.setattr(OperationQueries, "get_all_operation_names", fake_get_all_operation_names)
+
+    mythic_commands._operation_cache[:] = ["stale"]
+
+    await mythic_commands._operation_update(_Args(
+        operation="main", name="renamed", channel=None, webhook=None, lead=None,
+        complete=False, incomplete=False, delete=False, restore=False, force=False,
+    ))
+
+    assert mythic_commands._operation_cache == ["renamed"]
 
 
 async def test_operation_update_restore_does_not_prompt(mythic_commands, monkeypatch):
