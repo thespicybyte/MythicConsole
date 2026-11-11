@@ -156,23 +156,9 @@ class MythicInstance:
             }"""
         try:
             async for result in mythic.subscribe_custom_query(self.mythic, sub):
-                yield [o["username"] for o in result.get("operator", []) if o.get("username")]
-        except asyncio.CancelledError:
-            pass
-
-    async def monitor_operation_updates(self) -> AsyncGenerator[List[str], None]:
-        """
-        Monitor the operation table for any change and yield the current list of
-        operation names on every push
-        :return: list of operation names
-        """
-        sub = """
-            subscription OperationUpdates {
-              operation { name }
-            }"""
-        try:
-            async for result in mythic.subscribe_custom_query(self.mythic, sub):
-                yield [o["name"] for o in result.get("operation", []) if o.get("name")]
+                usernames = [o["username"] for o in result.get("operator", []) if o.get("username")]
+                logger.debug(f"operator subscription pushed {len(usernames)} usernames")
+                yield usernames
         except asyncio.CancelledError:
             pass
 

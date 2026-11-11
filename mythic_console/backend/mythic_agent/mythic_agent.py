@@ -1151,7 +1151,6 @@ class MythicCommands(Cmd):
 
     async def _user_list(self, args):
         try:
-            await self.cache_users()
             user_ids = await UserQueries.get_all_users(self.instance.mythic, include_deleted=args.all)
             user_info = []
             for user_id in sorted(user_ids):
@@ -1349,6 +1348,7 @@ class MythicCommands(Cmd):
             if args.lead:
                 await operation.update(lead_operator_username=args.lead)
 
+            await self.cache_operations()
             return success(f"Created '{args.name}'")
         except Exception as e:
             logger.error(e)
@@ -1377,6 +1377,7 @@ class MythicCommands(Cmd):
                 deleted=deleted,
             )
 
+            await self.cache_operations()
             return success(f"Updated '{operation.name}'")
         except Exception as e:
             logger.error(e)
@@ -1778,7 +1779,9 @@ class MythicCommands(Cmd):
 
     async def cache_operations(self):
         try:
-            self.set_operation_cache(await OperationQueries.get_all_operation_names(self.instance.mythic))
+            names = await OperationQueries.get_all_operation_names(self.instance.mythic)
+            self.set_operation_cache(names)
+            logger.debug(f"refreshed operation cache: {len(names)} names")
         except Exception as e:
             logger.warning(f"could not cache operations: {e}")
 

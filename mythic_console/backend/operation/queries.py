@@ -143,7 +143,7 @@ class OperationQueries:
             mythic=session,
             query="""
                 query AllOperationNames {
-                  operation {
+                  operation(where: {deleted: {_eq: false}}) {
                     name
                   }
                 }
