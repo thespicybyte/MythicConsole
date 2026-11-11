@@ -2,13 +2,14 @@ from mythic.mythic_classes import Mythic
 from mythic import mythic
 
 from .fragments import TaskFragments
+from mythic_console.backend.graphql_log import logged_query
 
 
 class TaskQueries:
     @staticmethod
     async def query_by_id(session: Mythic, task_id: int):
-        resp = await mythic.execute_custom_query(
-            mythic=session,
+        resp = await logged_query(
+            session,
             query=f"""
                     query Query($id: Int!) {{
                       task(where: {{id: {{_eq: $id}}}}) {{
@@ -32,8 +33,8 @@ class TaskQueries:
 
     @staticmethod
     async def query_by_uuid(session: Mythic, uuid: str):
-        resp = await mythic.execute_custom_query(
-            mythic=session,
+        resp = await logged_query(
+            session,
             query=f"""
                     query Query($uuid: String!) {{
                       task(where: {{agent_task_id: {{_eq: $uuid}}}}) {{

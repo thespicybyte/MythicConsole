@@ -4,6 +4,7 @@ from mythic import mythic
 from mythic.mythic_classes import Mythic
 
 from .fragments import CallbackFragments
+from mythic_console.backend.graphql_log import logged_query
 
 
 class CallbackQueries:
@@ -15,8 +16,8 @@ class CallbackQueries:
         :param callback_id: callback id
         :return: dict response from query
         """
-        resp = await mythic.execute_custom_query(
-            mythic=session,
+        resp = await logged_query(
+            session,
             query=f"""
                 query Query($id: Int!) {{
                   callback(where: {{id: {{_eq: $id}}}}) {{
@@ -46,8 +47,8 @@ class CallbackQueries:
         :param uuid: callback uuid
         :return: dict response from query
         """
-        resp = await mythic.execute_custom_query(
-            mythic=session,
+        resp = await logged_query(
+            session,
             query=f"""
                 query Query($uuid: String!) {{
                   callback(where: {{agent_callback_id: {{_eq: $uuid}}}}) {{
@@ -89,8 +90,8 @@ class CallbackQueries:
         :param display_id: display id for callback
         :return: dictionary returned from query
         """
-        resp = await mythic.execute_custom_query(
-            mythic=session,
+        resp = await logged_query(
+            session,
             query=f"""
                 query Query($display_id: Int!) {{
                   callback(where: {{display_id: {{_eq: $display_id}}}}) {{
@@ -121,8 +122,8 @@ class CallbackQueries:
         :param display_id: display id for callback
         :return: list of loaded command names
         """
-        resp = await mythic.execute_custom_query(
-            mythic=session,
+        resp = await logged_query(
+            session,
             query=f"""
                 query Query($display_id: Int!) {{
                   callback(where: {{display_id: {{_eq: $display_id}}}}) {{
@@ -150,8 +151,8 @@ class CallbackQueries:
 
     @staticmethod
     async def export(session: Mythic, callback_uuid: str) -> str:
-        resp = await mythic.execute_custom_query(
-            mythic=session,
+        resp = await logged_query(
+            session,
             query=f"""
                 query Query($uuid: String!) {{
                   exportCallbackConfig(agent_callback_id: $uuid) {{
@@ -193,8 +194,8 @@ class CallbackQueries:
         @param config: Callback config in string format
         """
 
-        resp = await mythic.execute_custom_query(
-            mythic=session,
+        resp = await logged_query(
+            session,
             query=f"""
                 mutation Query($config: jsonb!) {{
                   importCallbackConfig(config: $config) {{

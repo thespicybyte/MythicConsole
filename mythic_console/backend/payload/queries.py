@@ -4,13 +4,14 @@ from mythic.mythic_classes import Mythic
 from mythic import mythic
 
 from .fragments import PayloadFragments
+from mythic_console.backend.graphql_log import logged_query
 
 
 class PayloadQueries:
     @staticmethod
     async def query_by_id(session: Mythic, payload_id: int) -> dict:
-        resp = await mythic.execute_custom_query(
-            mythic=session,
+        resp = await logged_query(
+            session,
             query=f"""
                     query Query($id: Int!) {{
                       payload(where: {{id: {{_eq: $id}}}}) {{
@@ -34,8 +35,8 @@ class PayloadQueries:
 
     @staticmethod
     async def query_by_uuid(session: Mythic, payload_uuid: str) -> dict:
-        resp = await mythic.execute_custom_query(
-            mythic=session,
+        resp = await logged_query(
+            session,
             query=f"""
                     query Query($uuid: String!) {{
                       payload(where: {{uuid: {{_eq: $uuid}}}}) {{
@@ -59,8 +60,8 @@ class PayloadQueries:
 
     @staticmethod
     async def export(session: Mythic, payload_uuid: str) -> str:
-        resp = await mythic.execute_custom_query(
-            mythic=session,
+        resp = await logged_query(
+            session,
             query=f"""
                 query Query($uuid: String!) {{
                   exportPayloadConfig(uuid: $uuid) {{
@@ -100,8 +101,8 @@ class PayloadQueries:
 
     @staticmethod
     async def get_all_payloads(session: Mythic, payload_id: int) -> List[int]:
-        resp = await mythic.execute_custom_query(
-            mythic=session,
+        resp = await logged_query(
+            session,
             query=f"""
                 query Query($operation_id: Int!) {{
                     payload(where: {{operation_id: {{_eq: $operation_id}}}}) {{
@@ -127,8 +128,8 @@ class PayloadQueries:
 
     @staticmethod
     async def get_all_payload_uuids(session: Mythic, operation_id: int) -> List[str]:
-        resp = await mythic.execute_custom_query(
-            mythic=session,
+        resp = await logged_query(
+            session,
             query=f"""
                 query Query($operation_id: Int!) {{
                     payload(where: {{operation_id: {{_eq: $operation_id}}}}) {{
