@@ -40,6 +40,8 @@ operation_parser = Cmd2ArgumentParser()
 operation_subparsers = operation_parser.add_subparsers(title='subcommands', help='subcommand help')
 
 operation_list_parser = operation_subparsers.add_parser('list', help='list operations')
+operation_list_parser.add_argument('-v', '--verbose', action='store_true',
+                                    help='show all columns and include deleted operations')
 
 operation_info_parser = operation_subparsers.add_parser('info', help='show details for one operation')
 operation_info_parser.add_argument('operation', help='operation id or name')
