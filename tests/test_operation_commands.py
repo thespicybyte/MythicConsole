@@ -7,6 +7,7 @@ from rich.console import Console
 from mythic_console.backend.mythic_agent import mythic_agent
 from mythic_console.backend.mythic_agent import mythic_command_parsers
 from mythic_console.backend.mythic_agent.mythic_agent import MythicCommands
+from mythic_console.backend.operation import queries as operation_queries_module
 from mythic_console.backend.operation.operation import Operation
 from mythic_console.backend.operation.queries import OperationQueries
 from mythic_console.backend.user.queries import UserQueries
@@ -152,6 +153,20 @@ async def test_cache_operations_populates_from_query(mythic_commands, monkeypatc
     assert mythic_commands._operation_cache == ["main", "red-team"]
 
 
+async def test_get_all_operation_names_filters_deleted(monkeypatch):
+    captured = {}
+
+    async def fake_execute_custom_query(mythic, query, variables=None):
+        captured["query"] = query
+        return {"operation": [{"name": "main"}]}
+
+    monkeypatch.setattr(operation_queries_module.mythic, "execute_custom_query", fake_execute_custom_query)
+
+    await OperationQueries.get_all_operation_names(None)
+
+    assert "where: {deleted: {_eq: false}}" in captured["query"]
+
+
 async def test_cache_operations_swallows_errors(mythic_commands, monkeypatch):
     async def fake_get_all_operation_names(session):
         raise Exception("boom")
@@ -198,7 +213,7 @@ async def test_resolve_operation_not_found_raises(mythic_commands, monkeypatch):
 
 
 async def test_operation_list_refreshes_operation_cache(mythic_commands, monkeypatch):
-    async def fake_get_all_operations(session):
+    async def fake_get_all_operations(session, include_deleted=False):
         return [1]
 
     async def fake_query_by_id(session, operation_id):
@@ -216,6 +231,112 @@ async def test_operation_list_refreshes_operation_cache(mythic_commands, monkeyp
     await mythic_commands._operation_list(_Args())
 
     assert mythic_commands._operation_cache == ["main"]
+
+
+async def test_operation_list_default_excludes_deleted_and_columns(mythic_commands, monkeypatch):
+    captured = {}
+
+    async def fake_get_all_operations(session, include_deleted=False):
+        captured["include_deleted"] = include_deleted
+        return [1]
+
+    async def fake_query_by_id(session, operation_id):
+        return _operation(operation_id=operation_id, name="main", deleted=False)
+
+    async def fake_get_all_operation_names(session):
+        return ["main"]
+
+    monkeypatch.setattr(OperationQueries, "get_all_operations", fake_get_all_operations)
+    monkeypatch.setattr(OperationQueries, "query_by_id", fake_query_by_id)
+    monkeypatch.setattr(OperationQueries, "get_all_operation_names", fake_get_all_operation_names)
+
+    result = await mythic_commands._operation_list(_Args(verbose=False))
+
+    assert captured["include_deleted"] is False
+    rendered = _render(result)
+    assert "deleted" not in rendered
+    assert "operators" not in rendered
+    assert "lead" not in rendered
+    assert "main" in rendered
+
+
+async def test_operation_list_verbose_includes_deleted_and_columns(mythic_commands, monkeypatch):
+    captured = {}
+
+    async def fake_get_all_operations(session, include_deleted=False):
+        captured["include_deleted"] = include_deleted
+        return [1, 2]
+
+    async def fake_query_by_id(session, operation_id):
+        if operation_id == 1:
+            return _operation(operation_id=1, name="main", lead="alice", channel="chan",
+                              webhook="hook", complete=True, deleted=False)
+        return _operation(operation_id=2, name="archived", lead="bob", deleted=True)
+
+    async def fake_get_all_operation_names(session):
+        return ["main"]
+
+    monkeypatch.setattr(OperationQueries, "get_all_operations", fake_get_all_operations)
+    monkeypatch.setattr(OperationQueries, "query_by_id", fake_query_by_id)
+    monkeypatch.setattr(OperationQueries, "get_all_operation_names", fake_get_all_operation_names)
+
+    result = await mythic_commands._operation_list(_Args(verbose=True))
+
+    assert captured["include_deleted"] is True
+    rendered = _render(result)
+    for header in ("lead", "operators", "complete", "channel", "webhook", "alert count", "deleted"):
+        assert header in rendered
+    assert "archived" in rendered
+
+
+async def test_operation_list_highlights_active_operation(mythic_commands, monkeypatch):
+    async def fake_get_all_operations(session, include_deleted=False):
+        return [1, 2]
+
+    async def fake_query_by_id(session, operation_id):
+        return _operation(operation_id=operation_id, name=f"op{operation_id}")
+
+    async def fake_get_all_operation_names(session):
+        return ["op1", "op2"]
+
+    monkeypatch.setattr(OperationQueries, "get_all_operations", fake_get_all_operations)
+    monkeypatch.setattr(OperationQueries, "query_by_id", fake_query_by_id)
+    monkeypatch.setattr(OperationQueries, "get_all_operation_names", fake_get_all_operation_names)
+
+    mythic_commands.instance.mythic.current_operation_id = 2
+
+    result = await mythic_commands._operation_list(_Args(verbose=False))
+
+    assert result.rows[0].style is None
+    assert result.rows[1].style is not None
+
+
+async def test_get_all_operations_filters_deleted_by_default(monkeypatch):
+    captured = {}
+
+    async def fake_execute_custom_query(mythic, query, variables=None):
+        captured["query"] = query
+        return {"operation": [{"id": 1}]}
+
+    monkeypatch.setattr(operation_queries_module.mythic, "execute_custom_query", fake_execute_custom_query)
+
+    await OperationQueries.get_all_operations(None)
+
+    assert "where: {deleted: {_eq: false}}" in captured["query"]
+
+
+async def test_get_all_operations_include_deleted_skips_filter(monkeypatch):
+    captured = {}
+
+    async def fake_execute_custom_query(mythic, query, variables=None):
+        captured["query"] = query
+        return {"operation": [{"id": 1}]}
+
+    monkeypatch.setattr(operation_queries_module.mythic, "execute_custom_query", fake_execute_custom_query)
+
+    await OperationQueries.get_all_operations(None, include_deleted=True)
+
+    assert "deleted" not in captured["query"]
 
 
 async def test_operation_info_by_name(mythic_commands, monkeypatch):
@@ -321,6 +442,23 @@ async def test_operation_create_with_lead_calls_update(mythic_commands, monkeypa
     assert calls == [{"lead_operator_username": "bob"}]
 
 
+async def test_operation_create_refreshes_operation_cache(mythic_commands, monkeypatch):
+    async def fake_create(self):
+        self.id = 11
+
+    async def fake_get_all_operation_names(session):
+        return ["main", "new-op"]
+
+    monkeypatch.setattr(Operation, "create", fake_create)
+    monkeypatch.setattr(OperationQueries, "get_all_operation_names", fake_get_all_operation_names)
+
+    mythic_commands._operation_cache[:] = ["stale"]
+
+    await mythic_commands._operation_create(_Args(name="new-op", lead=None))
+
+    assert mythic_commands._operation_cache == ["main", "new-op"]
+
+
 async def test_operation_update_rename_does_not_prompt(mythic_commands, monkeypatch):
     prompted = False
 
@@ -353,6 +491,30 @@ async def test_operation_update_rename_does_not_prompt(mythic_commands, monkeypa
         "channel": None, "webhook": None, "complete": None, "deleted": None,
     }]
     assert "main" in result.plain
+
+
+async def test_operation_update_refreshes_operation_cache(mythic_commands, monkeypatch):
+    async def fake_query_by_name(session, name):
+        return _operation(operation_id=1, name=name)
+
+    async def fake_update(self, **kwargs):
+        pass
+
+    async def fake_get_all_operation_names(session):
+        return ["renamed"]
+
+    monkeypatch.setattr(OperationQueries, "query_by_name", fake_query_by_name)
+    monkeypatch.setattr(Operation, "update", fake_update)
+    monkeypatch.setattr(OperationQueries, "get_all_operation_names", fake_get_all_operation_names)
+
+    mythic_commands._operation_cache[:] = ["stale"]
+
+    await mythic_commands._operation_update(_Args(
+        operation="main", name="renamed", channel=None, webhook=None, lead=None,
+        complete=False, incomplete=False, delete=False, restore=False, force=False,
+    ))
+
+    assert mythic_commands._operation_cache == ["renamed"]
 
 
 async def test_operation_update_restore_does_not_prompt(mythic_commands, monkeypatch):

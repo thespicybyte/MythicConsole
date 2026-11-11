@@ -143,7 +143,7 @@ class OperationQueries:
             mythic=session,
             query="""
                 query AllOperationNames {
-                  operation {
+                  operation(where: {deleted: {_eq: false}}) {
                     name
                   }
                 }
@@ -159,12 +159,13 @@ class OperationQueries:
         return resp
 
     @staticmethod
-    async def get_all_operations(session: Mythic) -> List[int]:
+    async def get_all_operations(session: Mythic, include_deleted: bool = False) -> List[int]:
+        where_clause = "" if include_deleted else "(where: {deleted: {_eq: false}})"
         resp = await mythic.execute_custom_query(
             mythic=session,
             query=f"""
                 query Query {{
-                    operation{{
+                    operation{where_clause} {{
                         id
                     }}
                 }}

@@ -2,6 +2,7 @@ import importlib.resources
 
 from textual.app import App, ComposeResult
 
+from mythic_console.backend.mythic_agent.mythic_agent import MythicCommands
 from mythic_console.widgets.console import ConsolePanel
 
 CSS_PATH = str(importlib.resources.files("mythic_console") / "mythic.tcss")
@@ -33,3 +34,18 @@ async def test_output_does_not_overlap_input(fake_instance):
         assert output_region.bottom <= input_region.y
         assert input_region.bottom <= app.screen.region.bottom
         assert output_region.height >= 3
+
+
+async def test_on_mount_seeds_operation_cache(fake_instance, monkeypatch):
+    calls = []
+
+    async def fake_cache_operations(self):
+        calls.append(True)
+
+    monkeypatch.setattr(MythicCommands, "cache_operations", fake_cache_operations)
+
+    app = _Harness(fake_instance)
+    async with app.run_test() as pilot:
+        await pilot.pause()
+
+        assert calls == [True]

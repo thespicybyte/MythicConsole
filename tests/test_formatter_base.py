@@ -31,6 +31,18 @@ def test_build_table_sets_title():
     assert table.title == "my table"
 
 
+def test_build_table_no_row_styles_leaves_rows_unstyled():
+    table = Formatter.build_table(["a"], ["b"], headers=["name"])
+    assert table.rows[0].style is None
+    assert table.rows[1].style is None
+
+
+def test_build_table_row_styles_applies_only_to_matching_index():
+    table = Formatter.build_table(["a"], ["b"], headers=["name"], row_styles={1: "green"})
+    assert table.rows[0].style is None
+    assert table.rows[1].style == "green"
+
+
 async def test_format_plaintext_decodes_and_concatenates(make_task, fake_responses):
     fake_responses(["hello ", "world"])
     task = make_task(completed=True)

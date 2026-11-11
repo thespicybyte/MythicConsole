@@ -44,6 +44,7 @@ class ConsolePanel(Container):
     def on_mount(self) -> None:
         self.run_worker(self.mythic_commands.cache_payload_types(), exit_on_error=False)
         self.run_worker(self.mythic_commands.cache_users(), exit_on_error=False)
+        self.run_worker(self.mythic_commands.cache_operations(), exit_on_error=False)
 
     def _completer_items(self, text: str) -> Iterable[str | DropdownItem]:
         """Candidate source for CommandAutoComplete: last-word matching is handled by the

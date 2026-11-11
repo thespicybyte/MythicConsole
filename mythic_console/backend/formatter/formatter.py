@@ -1,7 +1,7 @@
 import base64
 import json
 from abc import ABC
-from typing import Optional, List
+from typing import Optional, List, Dict
 
 from rich.console import Console, RenderableType
 from rich.pretty import Pretty
@@ -64,13 +64,14 @@ class Formatter(ABC):
 
     @staticmethod
     def build_table(*rows: List[Optional["RenderableType"]], headers: List[Column | str] = None,
-                    title: str = None) -> Table:
+                    title: str = None, row_styles: Optional[Dict[int, str]] = None) -> Table:
         """
         Initialize a rich.Table object to display command output.
 
         :param rows: List of renderable objects that will make up a row
         :param headers: List of column headers. Leave None if no headers are desired
         :param title: Title of table
+        :param row_styles: Optional map of row index to a Rich style string for that row
         :return: rich Table object
         """
         show_header = True if headers else False
@@ -82,8 +83,9 @@ class Formatter(ABC):
             columns.append(column)
 
         table = Table(*columns, title=title, show_header=show_header)
-        for row in rows:
-            table.add_row(*row)
+        row_styles = row_styles or {}
+        for index, row in enumerate(rows):
+            table.add_row(*row, style=row_styles.get(index))
 
         return table
 

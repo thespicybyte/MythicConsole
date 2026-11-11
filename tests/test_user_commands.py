@@ -186,7 +186,7 @@ async def test_user_list_all_includes_deleted_user_and_column(mythic_commands, m
     assert "deleted" in rendered.lower()
 
 
-async def test_user_list_refreshes_username_cache(mythic_commands, monkeypatch):
+async def test_user_list_does_not_refresh_username_cache(mythic_commands, monkeypatch):
     async def fake_get_all_users(session, include_deleted=False):
         return [1]
 
@@ -204,10 +204,10 @@ async def test_user_list_refreshes_username_cache(mythic_commands, monkeypatch):
 
     await mythic_commands._user_list(_Args(all=False))
 
-    assert mythic_commands._user_cache == ["alice", "bob"]
+    assert mythic_commands._user_cache == ["stale"]
 
 
-async def test_user_list_all_refreshes_cache_with_deleted_filtered_set(mythic_commands, monkeypatch):
+async def test_user_list_all_does_not_refresh_cache(mythic_commands, monkeypatch):
     async def fake_get_all_users(session, include_deleted=False):
         return [1, 2]
 
@@ -220,7 +220,7 @@ async def test_user_list_all_refreshes_cache_with_deleted_filtered_set(mythic_co
         return responses[user_id]
 
     async def fake_get_all_usernames(session):
-        return ["bob"]  # server-side deleted filter already drops eve
+        return ["bob"]
 
     monkeypatch.setattr(UserQueries, "get_all_users", fake_get_all_users)
     monkeypatch.setattr(UserQueries, "query_by_id", fake_query_by_id)
@@ -230,7 +230,7 @@ async def test_user_list_all_refreshes_cache_with_deleted_filtered_set(mythic_co
 
     result = await mythic_commands._user_list(_Args(all=True))
 
-    assert mythic_commands._user_cache == ["bob"]
+    assert mythic_commands._user_cache == ["stale"]
     assert "eve" in _render(result)  # --all still shows deleted users in the listing
 
 
