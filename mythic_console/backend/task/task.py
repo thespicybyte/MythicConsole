@@ -185,8 +185,10 @@ class Task:
     async def wait_for_completion(self, timeout: int = None):
         try:
             display_id = await self.get_display_id()
+            logger.debug(f"waiting for task completion: display_id={display_id} timeout={timeout}")
             await TaskQueries.wait_for_complete(self.mythic, display_id, timeout=timeout)
             await self.query()
+            logger.debug(f"task complete: id={self.id} status={self.status}")
         except Exception as e:
             logger.exception(e)
             raise
@@ -244,6 +246,7 @@ class Task:
             raise ValueError("callback display id not set")
 
         try:
+            logger.info(f"executing '{self.command_name}' on callback {self.callback_display_id}")
             for dest, local_path in self.file_params.items():
                 with open(local_path, 'rb') as f:
                     data = f.read()
@@ -251,6 +254,7 @@ class Task:
                 if not file_id:
                     raise Exception(f"failed to register file for '{dest}': {local_path}")
                 self.args[dest] = file_id
+                logger.debug(f"registered file for '{dest}': id={file_id}")
 
             if self.callback is not None and self.callback.loaded_commands is not None \
                     and self.command_name not in self.callback.loaded_commands:
@@ -261,6 +265,7 @@ class Task:
                 return
 
             self.id = task_id
+            logger.debug(f"task created: id={self.id}")
             await self.query()
 
         except TaskError:
@@ -277,6 +282,7 @@ class Task:
         :return: returh True if download was successful
         """
 
+        logger.info(f"downloading file for task {self.id} to {local_path}")
         if not file_id:
             if not self.completed:
                 await self.wait_for_completion()
@@ -294,9 +300,11 @@ class Task:
             if not file_id:
                 raise Exception(f"could not get file_id from task {self.id} response")
 
+            logger.debug(f"resolved file_id {file_id}")
             data = await mythic.mythic.download_file(self.instance.mythic, file_id)
 
             with open(local_path, 'wb') as f:
                 f.write(data)
 
+        logger.info(f"download complete: {local_path}")
         return True
