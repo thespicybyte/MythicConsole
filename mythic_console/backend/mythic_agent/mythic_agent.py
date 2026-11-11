@@ -1277,18 +1277,41 @@ class MythicCommands(Cmd):
         if func:
             return func(self, args)
 
-    async def _operation_list(self, _args):
+    async def _operation_list(self, args):
         try:
             await self.cache_operations()
-            operation_ids = await OperationQueries.get_all_operations(self.instance.mythic)
+            verbose = getattr(args, "verbose", False)
+            active_operation_id = getattr(self.instance.mythic, "current_operation_id", None)
+
+            operation_ids = await OperationQueries.get_all_operations(self.instance.mythic,
+                                                                      include_deleted=verbose)
             operation_info = []
-            for operation_id in sorted(operation_ids):
+            row_styles = {}
+            for index, operation_id in enumerate(sorted(operation_ids)):
                 operation = Operation(self.instance, operation_id=operation_id)
                 await operation.query()
-                operation_info.append([str(operation.id), operation.name, str(operation.deleted)])
 
-            headers = ["id", "operation name", "deleted"]
-            return DefaultFormatter().build_table(*operation_info, headers=headers, title="Operations")
+                if verbose:
+                    row = [str(operation.id), operation.name, operation.lead or "",
+                           str(len(operation.operators)), str(operation.complete),
+                           operation.channel or "", operation.webhook or "",
+                           str(operation.alert_count), str(operation.deleted)]
+                else:
+                    row = [str(operation.id), operation.name]
+
+                if active_operation_id is not None and operation.id == active_operation_id:
+                    row_styles[index] = severity_style(Severity.SUCCESS)
+
+                operation_info.append(row)
+
+            if verbose:
+                headers = ["id", "operation name", "lead", "operators", "complete", "channel",
+                           "webhook", "alert count", "deleted"]
+            else:
+                headers = ["id", "operation name"]
+
+            return DefaultFormatter().build_table(*operation_info, headers=headers, title="Operations",
+                                                  row_styles=row_styles)
         except Exception as e:
             logger.error(e)
             return error(f"Error: {e}")
