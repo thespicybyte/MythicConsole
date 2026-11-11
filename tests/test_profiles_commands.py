@@ -18,7 +18,7 @@ def test_completer_lists_profiles_subcommand(mythic_commands):
 
 def test_completer_profiles_list_options(mythic_commands):
     items = completer_values(mythic_commands.get_completer_items("profiles list -"))
-    assert items == set()
+    assert items == {"-h", "--help"}
 
 
 async def test_profiles_list_renders_one_card_per_profile(mythic_commands, monkeypatch):

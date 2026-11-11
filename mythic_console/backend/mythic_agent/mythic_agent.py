@@ -1009,7 +1009,7 @@ class MythicCommands(Cmd):
         for alias in self._aliases:
             if not alias.subcommand:
                 self._completer_parsers[alias.name] = self._command_parsers[alias.command]
-        self._completer = ArgparseCompleter(self._completer_parsers, show_help_option=False)
+        self._completer = ArgparseCompleter(self._completer_parsers, show_help_option=True)
 
         payload_type_action = next(
             action for action in mythic_command_parsers.payload_build_parser._actions

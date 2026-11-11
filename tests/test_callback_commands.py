@@ -55,7 +55,7 @@ def test_completer_lists_callback_subcommands(mythic_commands):
 
 def test_completer_callback_export_options_omit_background(mythic_commands):
     items = completer_values(mythic_commands.get_completer_items("callback export 5 -"))
-    assert items == set()
+    assert items == {"-h", "--help"}
 
 
 async def test_callback_export_default_path(mythic_commands, monkeypatch, tmp_path):
