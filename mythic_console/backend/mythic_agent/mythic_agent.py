@@ -706,16 +706,13 @@ class MythicAgent:
                     if candidates is not None:
                         return candidates
 
+            entered = tokens if trailing_space else tokens[:-1]
             options = self.get_subcommand_options(command, subcommand)
             for option in options:
-                if option in tokens:
+                if option in entered:
                     continue
-                for token in tokens:
-                    if token == option:
-                        continue
-                    if option in items:
-                        continue
-                items.append(option)
+                if option not in items:
+                    items.append(option)
 
         return items
 
