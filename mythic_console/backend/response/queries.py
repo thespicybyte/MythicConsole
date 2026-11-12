@@ -1,14 +1,14 @@
 from mythic.mythic_classes import Mythic
-from mythic import mythic
 
 from .fragments import ResponseFragments
+from mythic_console.backend.graphql_log import logged_query
 
 
 class ResponseQueries:
     @staticmethod
     async def query_by_id(session: Mythic, response_id: int) -> dict:
-        resp = await mythic.execute_custom_query(
-            mythic=session,
+        resp = await logged_query(
+            session,
             query=f"""
                 query Query($id: Int!) {{
                   response(where: {{id: {{_eq: $id}}}}) {{
@@ -32,8 +32,8 @@ class ResponseQueries:
 
     @staticmethod
     async def query_responses_for_tasks(session: Mythic, task_id: int) -> dict | None:
-        resp = await mythic.execute_custom_query(
-            mythic=session,
+        resp = await logged_query(
+            session,
             query=f"""
                 query Query($task_id: Int!) {{
                   response(where: {{task_id: {{_eq: $task_id}}}}) {{

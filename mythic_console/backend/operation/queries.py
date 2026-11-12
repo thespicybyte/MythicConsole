@@ -2,9 +2,9 @@ from typing import Dict, Literal, List
 
 from mythic import mythic
 from mythic.mythic_classes import Mythic
-from mythic.mythic import execute_custom_query
 
 from .fragments import OperationFragments
+from mythic_console.backend.graphql_log import logged_query
 from mythic_console.utils.logger import logger
 
 
@@ -14,8 +14,8 @@ class OperationQueries:
 
     @staticmethod
     async def query_by_id(session: Mythic, operation_id: int) -> Dict:
-        resp = await execute_custom_query(
-            mythic=session,
+        resp = await logged_query(
+            session,
             query=f"""
                 query Query($id: Int!) {{
                   operation(where: {{id: {{_eq: $id}}}}) {{
@@ -38,8 +38,8 @@ class OperationQueries:
 
     @staticmethod
     async def query_by_name(session: Mythic, name: str) -> Dict:
-        resp = await execute_custom_query(
-            mythic=session,
+        resp = await logged_query(
+            session,
             query=f"""
                 query Query($name: String!) {{
                   operation(where: {{name: {{_eq: $name}}}}) {{
@@ -64,8 +64,8 @@ class OperationQueries:
     async def query_operation_name(session: Mythic, operation_id: int) -> str:
         """Query operation name providing the id"""
 
-        resp = await execute_custom_query(
-            mythic=session,
+        resp = await logged_query(
+            session,
             query="""
                 query QueryOperationName($id: Int!) {
                   operation(where: {id: {_eq: $id}}) {
@@ -139,8 +139,8 @@ class OperationQueries:
 
     @staticmethod
     async def get_all_operation_names(session: Mythic) -> List[str]:
-        resp = await mythic.execute_custom_query(
-            mythic=session,
+        resp = await logged_query(
+            session,
             query="""
                 query AllOperationNames {
                   operation(where: {deleted: {_eq: false}}) {
@@ -184,8 +184,8 @@ class OperationQueries:
     @staticmethod
     async def get_all_operations(session: Mythic, include_deleted: bool = False) -> List[int]:
         where_clause = "" if include_deleted else "(where: {deleted: {_eq: false}})"
-        resp = await mythic.execute_custom_query(
-            mythic=session,
+        resp = await logged_query(
+            session,
             query=f"""
                 query Query {{
                     operation{where_clause} {{

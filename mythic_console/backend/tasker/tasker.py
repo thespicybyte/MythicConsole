@@ -4,6 +4,7 @@ from mythic import mythic
 from ..mythic_instance.mythic_instance import MythicInstance
 from ..task.task import Task
 from ..callback.callback import Callback
+from mythic_console.utils.logger import logger
 
 class Tasker:
     def __init__(self, instance: MythicInstance):
@@ -40,6 +41,7 @@ class Tasker:
             raise Exception("callback not set")
 
         display_id = await self.callback.get_display_id()
+        logger.info(f"issuing task '{cmd}' to callback {display_id}")
         resp = await mythic.issue_task(self.mythic, cmd, args, display_id)
         if not resp:
             raise Exception("unknown error issuing task")
@@ -58,6 +60,7 @@ class Tasker:
         if not task_id:
             raise Exception(f"error issuing task: {resp}")
         task = Task(self.instance, task_id=task_id, callback=self.callback)
+        logger.debug(f"task issued: id={task_id}")
 
         if wait:
             await task.wait_for_completion(timeout=timeout)

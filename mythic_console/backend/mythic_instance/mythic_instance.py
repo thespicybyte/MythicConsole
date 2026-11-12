@@ -8,6 +8,7 @@ import asyncio
 from mythic import mythic
 from mythic.mythic_classes import Mythic
 
+from mythic_console.backend.graphql_log import logged_query
 from mythic_console.utils.logger import logger
 
 
@@ -56,7 +57,7 @@ class MythicInstance:
 
         self.url = f"{self.protocol}://{self.server_address}:{self.server_port}"
         try:
-            logger.debug(f"logging in to {self.url}")
+            logger.info(f"login attempt to {self.url}")
             self.mythic = await mythic.login(
                 server_ip=self.server_address,
                 server_port=self.server_port,
@@ -65,6 +66,7 @@ class MythicInstance:
                 ssl=self.use_tls,
                 logging_level=50)  # logging.CRITICAL
 
+            logger.info(f"login success for {self.username}")
             return True
         except Exception as e:
             self._login_error = str(e)
@@ -85,7 +87,7 @@ class MythicInstance:
         }
         """
         try:
-            resp = await mythic.execute_custom_query(self.mythic, query)
+            resp = await logged_query(self.mythic, query)
             return resp["getGlobalSettings"]["settings"]["server_config"]["version"]
         except Exception as e:
             logger.error(f"failed to query server version: {e}")
@@ -106,9 +108,13 @@ class MythicInstance:
                 for callback in callbacks:
                     callback_uuid = callback.get("agent_callback_id")
                     if callback_uuid:
+                        logger.debug(f"new callback: {callback_uuid}")
                         yield callback_uuid
         except asyncio.CancelledError:
-            pass
+            logger.debug("new-callback subscription cancelled")
+        except Exception as e:
+            logger.error(f"new-callback subscription error: {e}")
+            raise
 
     async def get_active_callbacks(self) -> List[str]:
         """
@@ -138,11 +144,17 @@ class MythicInstance:
             }""" % attrs
         variables = {"now": str(datetime.utcnow()), "batch": 100}
         try:
+            logger.info("callback_stream subscription started")
             async for result in mythic.subscribe_custom_query(self.mythic, sub, variables):
-                for row in result.get("callback_stream", []):
+                rows = result.get("callback_stream", [])
+                logger.debug(f"callback_stream pushed {len(rows)} rows")
+                for row in rows:
                     yield row
         except asyncio.CancelledError:
-            pass
+            logger.debug("callback_stream subscription cancelled")
+        except Exception as e:
+            logger.error(f"callback_stream subscription error: {e}")
+            raise
 
     async def monitor_operator_updates(self) -> AsyncGenerator[List[str], None]:
         """
@@ -155,12 +167,16 @@ class MythicInstance:
               operator(where: {deleted: {_eq: false}}) { username }
             }"""
         try:
+            logger.info("operator subscription started")
             async for result in mythic.subscribe_custom_query(self.mythic, sub):
                 usernames = [o["username"] for o in result.get("operator", []) if o.get("username")]
                 logger.debug(f"operator subscription pushed {len(usernames)} usernames")
                 yield usernames
         except asyncio.CancelledError:
-            pass
+            logger.debug("operator subscription cancelled")
+        except Exception as e:
+            logger.error(f"operator subscription error: {e}")
+            raise
 
     async def get_all_callbacks_detail(self) -> list[dict]:
         """
@@ -177,7 +193,7 @@ class MythicInstance:
         Monitor for new tasks during sessions
         :return: yields task id
         """
-        logger.debug("monitoring for task updates")
+        logger.info("task-updates subscription started")
         try:
             return_attr = "id"
             async for task in mythic.subscribe_new_tasks_and_updates(self.mythic, custom_return_attributes=return_attr):
@@ -187,7 +203,10 @@ class MythicInstance:
                     if task_id:
                         yield task_id
         except asyncio.CancelledError:
-            pass
+            logger.debug("task-updates subscription cancelled")
+        except Exception as e:
+            logger.error(f"task-updates subscription error: {e}")
+            raise
 
     async def get_and_monitor_new_tasks(self) -> AsyncGenerator[int, None]:
         """
@@ -195,11 +214,13 @@ class MythicInstance:
         :return: yields task id
         """
         try:
+            logger.info("all-tasks subscription started")
             return_attr = "id"
             async for task in mythic.subscribe_all_tasks(self.mythic, custom_return_attributes=return_attr):
                 if isinstance(task, dict):
                     task_id = task.get("id")
                     if task_id:
+                        logger.debug(f"task update: id={task_id}")
                         yield task_id
                         continue
 
@@ -207,7 +228,11 @@ class MythicInstance:
                     for t in task:
                         task_id = t.get("id")
                         if task_id:
+                            logger.debug(f"task update: id={task_id}")
                             yield task_id
 
         except asyncio.CancelledError:
-            pass
+            logger.debug("all-tasks subscription cancelled")
+        except Exception as e:
+            logger.error(f"all-tasks subscription error: {e}")
+            raise

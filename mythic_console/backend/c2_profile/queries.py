@@ -1,16 +1,17 @@
 from typing import List
 
-from mythic.mythic_classes import Mythic
 from mythic import mythic
+from mythic.mythic_classes import Mythic
 
 from .fragments import C2ProfileFragments
+from mythic_console.backend.graphql_log import logged_query
 
 
 class C2ProfileQueries:
     @staticmethod
     async def query_by_id(session: Mythic, c2_profile_id: int) -> dict:
-        resp = await mythic.execute_custom_query(
-            mythic=session,
+        resp = await logged_query(
+            session,
             query=f"""
                     query Query($id: Int!) {{
                       c2profile(where: {{id: {{_eq: $id}}}}) {{
@@ -41,8 +42,8 @@ class C2ProfileQueries:
         :return: dict object of the c2 profile
         """
 
-        resp = await mythic.execute_custom_query(
-            mythic=session,
+        resp = await logged_query(
+            session,
             query=f"""
                     query Query($name: String!) {{
                       c2profile(where: {{name: {{_eq: $name}}}}) {{
@@ -65,8 +66,8 @@ class C2ProfileQueries:
 
     @staticmethod
     async def query_all_c2_profiles(session: Mythic) -> List[dict]:
-        resp = await mythic.execute_custom_query(
-            mythic=session,
+        resp = await logged_query(
+            session,
             query=f"""
                         query Query {{
                           c2profile(where: {{deleted: {{_eq: false}}}}) {{

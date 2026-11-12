@@ -756,6 +756,7 @@ class MythicAgent:
         return AgentCommands(AgentCommand.from_server(self, spec, all_command_names) for spec in specs)
 
     async def load_commands(self):
+        logger.info(f"loading commands for payload type '{self.name}'")
         self.commands = await self.get_agent_commands()
         self.get_script_classes()
         await self._cache_loaded_commands()
@@ -772,6 +773,7 @@ class MythicAgent:
             return
         if loaded:
             callback.loaded_commands = set(loaded)
+            logger.debug(f"cached {len(loaded)} loaded commands for callback {callback.display_id}")
 
     async def _cache_payload_uuids(self):
         """Warm the PayloadList value-completion cache. The completer is synchronous, so a
@@ -781,6 +783,7 @@ class MythicAgent:
             return
         try:
             self._payload_uuid_cache = await PayloadQueries.get_all_payload_uuids(self.mythic, operation_id)
+            logger.debug(f"cached {len(self._payload_uuid_cache)} payload uuids")
         except Exception as e:
             logger.warning(f"could not cache payload uuids: {e}")
 
@@ -1308,6 +1311,7 @@ class MythicCommands(Cmd):
 
     async def _operation_list(self, args):
         try:
+            logger.debug("refreshing operation cache after operation mutation")
             await self.cache_operations()
             verbose = getattr(args, "verbose", False)
             active_operation_id = getattr(self.instance.mythic, "current_operation_id", None)
@@ -1384,6 +1388,7 @@ class MythicCommands(Cmd):
             user = await UserQueries.query_by_username(self.instance.mythic, self.instance.mythic.username)
             await operation.select(user["id"])
             self.instance.mythic.current_operation_id = operation.id
+            logger.debug("refreshing block-list caches after profile mutation")
             await self.cache_blocklists()
             await self.cache_blocklist_commands()
             return success(f"Set active operation to '{operation.name}'")
@@ -1400,6 +1405,7 @@ class MythicCommands(Cmd):
             if args.lead:
                 await operation.update(lead_operator_username=args.lead)
 
+            logger.debug("refreshing operation cache after operation mutation")
             await self.cache_operations()
             return success(f"Created '{args.name}'")
         except Exception as e:
@@ -1429,6 +1435,7 @@ class MythicCommands(Cmd):
                 deleted=deleted,
             )
 
+            logger.debug("refreshing operation cache after operation mutation")
             await self.cache_operations()
             return success(f"Updated '{operation.name}'")
         except Exception as e:
@@ -1485,6 +1492,7 @@ class MythicCommands(Cmd):
         try:
             names = await DisabledCommandsProfileQueries.get_all_profile_names(self.instance.mythic, operation_id)
             self.set_blocklist_cache(names)
+            logger.debug(f"refreshed block-list cache: {len(names)} names")
         except Exception as e:
             logger.warning(f"could not cache block lists: {e}")
 
@@ -1508,6 +1516,7 @@ class MythicCommands(Cmd):
                     if command.get("cmd"):
                         names.add(command["cmd"])
             self.set_blocklist_command_cache(sorted(names))
+            logger.debug(f"refreshed block-list-command cache: {len(names)} names")
         except Exception as e:
             logger.warning(f"could not cache block list commands: {e}")
 
@@ -1933,6 +1942,7 @@ class MythicCommands(Cmd):
         try:
             payload_types = await PayloadTypeQueries.query_all_payload_types(self.instance.mythic)
             self._payload_type_cache[:] = [p["name"] for p in payload_types or [] if p.get("name")]
+            logger.debug(f"refreshed payload-type cache: {len(self._payload_type_cache)} names")
         except Exception as e:
             logger.warning(f"could not cache payload types: {e}")
 
@@ -1942,7 +1952,9 @@ class MythicCommands(Cmd):
 
     async def cache_users(self):
         try:
-            self.set_user_cache(await UserQueries.get_all_usernames(self.instance.mythic))
+            usernames = await UserQueries.get_all_usernames(self.instance.mythic)
+            self.set_user_cache(usernames)
+            logger.debug(f"refreshed user cache: {len(usernames)} names")
         except Exception as e:
             logger.warning(f"could not cache users: {e}")
 

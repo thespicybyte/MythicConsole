@@ -4,13 +4,14 @@ from mythic import mythic
 from mythic.mythic_classes import Mythic
 
 from .fragments import UserFragments
+from mythic_console.backend.graphql_log import logged_query
 
 
 class UserQueries:
     @staticmethod
     async def query_by_id(session: Mythic, user_id: int) -> dict | None:
-        resp = await mythic.execute_custom_query(
-            mythic=session,
+        resp = await logged_query(
+            session,
             query=f"""
                 query Query($id: Int!) {{
                   operator(where: {{id: {{_eq: $id}}}}) {{
@@ -33,8 +34,8 @@ class UserQueries:
 
     @staticmethod
     async def query_by_username(session: Mythic, username: str) -> dict | None:
-        resp = await mythic.execute_custom_query(
-            mythic=session,
+        resp = await logged_query(
+            session,
             query=f"""
                 query Query($username: String!) {{
                   operator(where: {{username: {{_eq: $username}}}}) {{
@@ -93,8 +94,8 @@ class UserQueries:
 
     @staticmethod
     async def delete_operator(session: Mythic, operator_id: int) -> dict:
-        resp = await mythic.execute_custom_query(
-            mythic=session,
+        resp = await logged_query(
+            session,
             query="""
                 mutation DeleteOperator($operator_id: Int!) {
                   updateOperatorStatus(operator_id: $operator_id, active: false, deleted: true) {
@@ -115,8 +116,8 @@ class UserQueries:
 
     @staticmethod
     async def get_all_usernames(session: Mythic) -> List[str]:
-        resp = await mythic.execute_custom_query(
-            mythic=session,
+        resp = await logged_query(
+            session,
             query="""
                 query AllUsernames {
                   operator(where: {deleted: {_eq: false}}) {
@@ -132,8 +133,8 @@ class UserQueries:
     @staticmethod
     async def get_all_users(session: Mythic, include_deleted: bool = False) -> List[int]:
         where = "" if include_deleted else "(where: {deleted: {_eq: false}})"
-        resp = await mythic.execute_custom_query(
-            mythic=session,
+        resp = await logged_query(
+            session,
             query=f"""
                 query Query {{
                     operator{where}{{

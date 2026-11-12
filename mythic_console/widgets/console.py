@@ -12,6 +12,7 @@ from textual_console import CommandAutoComplete, ConsoleInput, ConsoleOutput
 
 from mythic_console.backend import MythicInstance
 from mythic_console.utils.history import load_history
+from mythic_console.utils.logger import logger
 
 if TYPE_CHECKING:
     from mythic_console.backend import MythicAgent
@@ -42,6 +43,7 @@ class ConsolePanel(Container):
                 yield self.auto
 
     def on_mount(self) -> None:
+        logger.info("seeding completion caches (payload types, users, operations)")
         self.run_worker(self.mythic_commands.cache_payload_types(), exit_on_error=False)
         self.run_worker(self.mythic_commands.cache_users(), exit_on_error=False)
         self.run_worker(self.mythic_commands.cache_operations(), exit_on_error=False)

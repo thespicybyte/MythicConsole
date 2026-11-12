@@ -1,9 +1,10 @@
 from typing import Dict, List
 
-from mythic.mythic_classes import Mythic
 from mythic import mythic
+from mythic.mythic_classes import Mythic
 
 from .fragments import PayloadTypeFragments
+from mythic_console.backend.graphql_log import logged_query
 
 
 class PayloadTypeQueries:
@@ -12,8 +13,8 @@ class PayloadTypeQueries:
 
     @staticmethod
     async def query_by_id(session: Mythic, payload_type_id: int) -> Dict | None:
-        resp = await mythic.execute_custom_query(
-            mythic=session,
+        resp = await logged_query(
+            session,
             query=f"""
                 query Query($id: Int!) {{
                   payloadtype(where: {{id: {{_eq: $id}}}}) {{
@@ -44,8 +45,8 @@ class PayloadTypeQueries:
         :return: dict object of the payload type
         """
 
-        resp = await mythic.execute_custom_query(
-            mythic=session,
+        resp = await logged_query(
+            session,
             query=f"""
                     query Query($name: String!) {{
                       payloadtype(where: {{name: {{_eq: $name}}}}) {{
@@ -68,8 +69,8 @@ class PayloadTypeQueries:
 
     @staticmethod
     async def query_all_payload_types(session: Mythic):
-        resp = await mythic.execute_custom_query(
-            mythic=session,
+        resp = await logged_query(
+            session,
             query=f"""
                         query Query {{
                           payloadtype {{
@@ -94,8 +95,8 @@ class PayloadTypeQueries:
         :return: list of build parameter dicts
         """
 
-        resp = await mythic.execute_custom_query(
-            mythic=session,
+        resp = await logged_query(
+            session,
             query=f"""
                         query Query($name: String!) {{
                           payloadtype(where: {{name: {{_eq: $name}}}}) {{
@@ -122,8 +123,8 @@ class PayloadTypeQueries:
         Each profile dict carries its `c2profileparameters`, the same shape
         `C2ProfileQueries.query_all_c2_profiles` returns."""
 
-        resp = await mythic.execute_custom_query(
-            mythic=session,
+        resp = await logged_query(
+            session,
             query=f"""
                         query Query($name: String!) {{
                           payloadtype(where: {{name: {{_eq: $name}}}}) {{

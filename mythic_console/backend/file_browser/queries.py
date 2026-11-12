@@ -1,8 +1,9 @@
 from pathlib import Path
 from typing import List
 
-from mythic.mythic import execute_custom_query
 from mythic.mythic_classes import Mythic
+
+from mythic_console.backend.graphql_log import logged_query
 
 
 class FileBrowserQueries:
@@ -11,8 +12,8 @@ class FileBrowserQueries:
 
     @staticmethod
     async def query(session: Mythic, callback_uuid: str) -> List[Path]:
-        resp = await execute_custom_query(
-            mythic=session,
+        resp = await logged_query(
+            session,
             query=f"""
                 query Query($uuid: String!) {{
                     mythictree(where: {{tree_type: {{_eq: "file"}}, callback: {{agent_callback_id: {{_eq: $uuid}}}}}}) {{
