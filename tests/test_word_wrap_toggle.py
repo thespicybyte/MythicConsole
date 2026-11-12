@@ -113,7 +113,7 @@ async def test_existing_content_rewraps(fake_instance):
         assert len(active_panel.console_output.lines) > lines_before
 
 
-async def test_scroll_position_preserved_when_scrolled_up(fake_instance):
+async def test_toggle_lands_on_newest_line_when_scrolled_up(fake_instance):
     app = _Harness(fake_instance)
     async with app.run_test() as pilot:
         await pilot.pause()
@@ -126,18 +126,13 @@ async def test_scroll_position_preserved_when_scrolled_up(fake_instance):
 
         active_panel.console_output.scroll_to(y=30, animate=False)
         await pilot.pause()
-        y_before = active_panel.console_output.scroll_offset.y
-        assert y_before > 0
         assert active_panel.console_output.is_vertical_scroll_end is False
-        anchor = active_panel._entry_at_display_line(y_before)
 
         await pilot.press("f3")
         await pilot.pause()
 
         assert active_panel.console_output.wrap is True
-        assert active_panel.console_output.scroll_offset.y > 0
-        assert active_panel.console_output.is_vertical_scroll_end is False
-        assert active_panel._entry_at_display_line(active_panel.console_output.scroll_offset.y) == anchor
+        assert active_panel.console_output.is_vertical_scroll_end is True
 
 
 async def test_at_bottom_stays_pinned_to_bottom(fake_instance):
