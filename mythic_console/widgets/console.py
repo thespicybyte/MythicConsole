@@ -34,6 +34,7 @@ class ConsolePanel(Container):
         self.console_output = ConsoleOutput()
         self.console_input = ConsoleInput(prompt="> ", id="prompt", history=load_history())
         self.auto = CommandAutoComplete(self.console_input, candidates=self._completer_items)
+        self._written: list[RenderableType] = []
 
     def compose(self) -> ComposeResult:
         with Container():
@@ -67,6 +68,7 @@ class ConsolePanel(Container):
         Write a renderable value to the console
         :param data: any renderable value
         """
+        self._written.append(data)
         self.console_output.write(data)
 
     def toggle_autoscroll(self) -> bool:
@@ -78,6 +80,21 @@ class ConsolePanel(Container):
         self.console_output.auto_scroll = enabled
         if enabled:
             self.console_output.scroll_end(animate=False)
+        return enabled
+
+    def toggle_word_wrap(self) -> bool:
+        """
+        Flip word wrap for this panel's output, re-render existing content, and show the
+        newest line.
+        :return: the new wrap state
+        """
+        output = self.console_output
+        enabled = not output.wrap
+        output.wrap = enabled
+        output.clear()
+        for renderable in self._written:
+            output.write(renderable, scroll_end=False)
+        output.scroll_end(animate=False)
         return enabled
 
     async def set_agent(self, payload_type: str):

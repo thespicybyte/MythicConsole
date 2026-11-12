@@ -157,6 +157,7 @@ class Home(Screen):
         Binding(key="m", action="manage_callbacks", description="manage callbacks", key_display="m"),
         Binding(key="ctrl+shift+a", action="toggle_autoscroll", description="toggle autoscroll", key_display="^+a"),
         Binding(key="f2", action="toggle_log_viewer", description="log viewer", key_display="F2"),
+        Binding(key="f3", action="toggle_word_wrap", description="toggle word wrap", key_display="F3"),
     ]
 
     async def _on_mount(self, _event: events.Mount) -> None:
@@ -309,6 +310,17 @@ class Home(Screen):
             return
         enabled = panel.toggle_autoscroll()
         self.notify(f"Autoscroll {'on' if enabled else 'off'}")
+
+    def action_toggle_word_wrap(self) -> None:
+        active_pane = self.query_one(CallbackTabs).active_pane
+        if active_pane is None:
+            return
+        try:
+            panel = active_pane.query_one(ConsolePanel)
+        except NoMatches:
+            return
+        enabled = panel.toggle_word_wrap()
+        self.notify(f"Word wrap {'on' if enabled else 'off'}")
 
     @work()
     async def _get_active_callbacks(self):
