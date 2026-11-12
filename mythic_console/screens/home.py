@@ -36,6 +36,7 @@ from mythic_console.utils.logger import logger
 from mythic_console.widgets.calback_tabs import CallbackTabs
 from mythic_console.widgets.callbacks import Callbacks, CallbackTable, build_callback_row
 from mythic_console.widgets.console import ConsolePanel
+from mythic_console.widgets.log_viewer import LogViewer
 from mythic_console.widgets.messages import TabClosed, UpdateCurrentCallback
 from mythic_console.widgets.session_info import SessionInfo
 from mythic_console.widgets.tasks_table import TasksTable, ReplayTask
@@ -155,6 +156,7 @@ class Home(Screen):
         Binding(key="ctrl+z", action="background_current_task", description="background", key_display="^z"),
         Binding(key="m", action="manage_callbacks", description="manage callbacks", key_display="m"),
         Binding(key="ctrl+shift+a", action="toggle_autoscroll", description="toggle autoscroll", key_display="^+a"),
+        Binding(key="f2", action="toggle_log_viewer", description="log viewer", key_display="F2"),
     ]
 
     async def _on_mount(self, _event: events.Mount) -> None:
@@ -274,6 +276,9 @@ class Home(Screen):
         with CallbackTabs(self.instance):
             for _name, pane in self.displayed_tabs.items():
                 yield pane
+        log_viewer = LogViewer()
+        log_viewer.add_class("-hidden")
+        yield log_viewer
         yield Footer()
 
     @on(ConsolePanel.NewInput)
@@ -290,6 +295,9 @@ class Home(Screen):
 
     def action_toggle_sidebar(self) -> None:
         self.query_one(Sidebar).toggle_class("-hidden")
+
+    def action_toggle_log_viewer(self) -> None:
+        self.query_one(LogViewer).toggle()
 
     def action_toggle_autoscroll(self) -> None:
         active_pane = self.query_one(CallbackTabs).active_pane

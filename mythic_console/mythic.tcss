@@ -88,6 +88,23 @@ Sidebar.-hidden {
     display: none;
 }
 
+LogViewer {
+    width: 100%;
+    height: 40%;
+    dock: bottom;
+    background: $panel;
+    border: $accent;
+    border-title-align: left;
+}
+
+LogViewer.-hidden {
+    display: none;
+}
+
+LogViewer > ConsoleOutput {
+    border: none;
+}
+
 SidebarModule {
     border: $accent;
     margin: 1;
