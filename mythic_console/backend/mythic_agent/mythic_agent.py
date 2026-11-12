@@ -1622,6 +1622,16 @@ class MythicCommands(Cmd):
 
     mythic_command_parsers.operation_blocklist_remove_parser.set_defaults(func=_blocklist_remove)
 
+    async def _require_operator_membership(self, profile: DisabledCommandsProfile,
+                                             user_id: int, username: str) -> Optional[str]:
+        """None if `username` is a member of the profile's operation, else a failure reason."""
+        if await OperationQueries.is_operator_member(self.instance.mythic, profile.operation_id, user_id):
+            return None
+
+        operation_name = await OperationQueries.query_operation_name(self.instance.mythic, profile.operation_id)
+        return (f"'{username}' is not a member of '{operation_name}'; "
+                f"add them with 'operation operator add' first")
+
     async def _assign_one_operator(self, profile: DisabledCommandsProfile, name: str,
                                     username: str) -> Optional[str]:
         """Assign `name` to `username`. Returns a failure reason, or None on success."""
@@ -1630,6 +1640,10 @@ class MythicCommands(Cmd):
             user_id = user.get("id")
             if not user_id:
                 return f"could not resolve operator '{username}'"
+
+            membership_failure = await self._require_operator_membership(profile, user_id, username)
+            if membership_failure:
+                return membership_failure
 
             await profile.assign(name, user_id)
             return None
@@ -1643,6 +1657,10 @@ class MythicCommands(Cmd):
             user_id = user.get("id")
             if not user_id:
                 return f"could not resolve operator '{username}'"
+
+            membership_failure = await self._require_operator_membership(profile, user_id, username)
+            if membership_failure:
+                return membership_failure
 
             await profile.unassign(user_id)
             return None
