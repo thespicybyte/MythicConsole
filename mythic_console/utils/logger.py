@@ -22,7 +22,14 @@ class LogBufferHandler(logging.Handler):
 
     def snapshot(self) -> list[str]:
         """Return the buffered lines seen so far, oldest first."""
-        return list(self.buffer)
+        with self.lock:
+            return list(self.buffer)
+
+    def drain_state(self) -> tuple[int, list[str]]:
+        """Return (count, snapshot) read together, so a drain's tail slice can't be
+        skewed by a concurrent emit() between reading one and the other."""
+        with self.lock:
+            return self.count, list(self.buffer)
 
 
 logger = logging.getLogger('mythic_tui')

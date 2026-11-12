@@ -26,13 +26,12 @@ class LogViewer(Container):
         self.set_interval(DRAIN_INTERVAL, self._drain)
 
     def _drain(self) -> None:
-        handler = get_log_buffer_handler()
-        total = handler.count
+        total, snapshot = get_log_buffer_handler().drain_state()
         new_count = total - self._seen
         self._seen = total
         if new_count <= 0:
             return
-        for line in handler.snapshot()[-new_count:]:
+        for line in snapshot[-new_count:]:
             self.console_output.write(line)
 
     def show(self) -> None:
