@@ -34,6 +34,8 @@ class ConsolePanel(Container):
         self.console_output = ConsoleOutput()
         self.console_input = ConsoleInput(prompt="> ", id="prompt", history=load_history())
         self.auto = CommandAutoComplete(self.console_input, candidates=self._completer_items)
+        self._written: list[RenderableType] = []
+        self._entry_end_lines: list[int] = []
 
     def compose(self) -> ComposeResult:
         with Container():
@@ -67,7 +69,9 @@ class ConsolePanel(Container):
         Write a renderable value to the console
         :param data: any renderable value
         """
+        self._written.append(data)
         self.console_output.write(data)
+        self._entry_end_lines.append(len(self.console_output.lines))
 
     def toggle_autoscroll(self) -> bool:
         """
@@ -79,6 +83,40 @@ class ConsolePanel(Container):
         if enabled:
             self.console_output.scroll_end(animate=False)
         return enabled
+
+    def toggle_word_wrap(self) -> bool:
+        """
+        Flip word wrap for this panel's output, re-render existing content, and keep the
+        viewport anchored on the same content.
+        :return: the new wrap state
+        """
+        output = self.console_output
+        at_bottom = output.is_vertical_scroll_end
+        anchor_index = self._entry_at_display_line(output.scroll_offset.y)
+
+        enabled = not output.wrap
+        output.wrap = enabled
+        output.clear()
+        self._entry_end_lines = []
+        anchor_line = 0
+        for index, renderable in enumerate(self._written):
+            if index == anchor_index:
+                anchor_line = len(output.lines)
+            output.write(renderable)
+            self._entry_end_lines.append(len(output.lines))
+
+        if at_bottom:
+            output.scroll_end(animate=False)
+        elif anchor_index is not None:
+            output.scroll_to(y=anchor_line, animate=False)
+        return enabled
+
+    def _entry_at_display_line(self, line: int) -> int | None:
+        """Index into _written of the entry whose display lines contain line."""
+        for index, end in enumerate(self._entry_end_lines):
+            if end > line:
+                return index
+        return len(self._written) - 1 if self._written else None
 
     async def set_agent(self, payload_type: str):
         from mythic_console.agents import get_agent
