@@ -119,7 +119,6 @@ async def test_scroll_position_preserved_when_scrolled_up(fake_instance):
         await pilot.pause()
         screen = app.word_wrap_screen
         active_panel = screen.query_one(CallbackTabs).active_pane.query_one(ConsolePanel)
-        active_panel.console_output.auto_scroll = False
 
         for i in range(60):
             active_panel.write_string(f"line {i} " + "x" * 200)
@@ -130,6 +129,7 @@ async def test_scroll_position_preserved_when_scrolled_up(fake_instance):
         y_before = active_panel.console_output.scroll_offset.y
         assert y_before > 0
         assert active_panel.console_output.is_vertical_scroll_end is False
+        anchor = active_panel._entry_at_display_line(y_before)
 
         await pilot.press("f3")
         await pilot.pause()
@@ -137,7 +137,7 @@ async def test_scroll_position_preserved_when_scrolled_up(fake_instance):
         assert active_panel.console_output.wrap is True
         assert active_panel.console_output.scroll_offset.y > 0
         assert active_panel.console_output.is_vertical_scroll_end is False
-        assert active_panel.console_output.scroll_offset.y > y_before
+        assert active_panel._entry_at_display_line(active_panel.console_output.scroll_offset.y) == anchor
 
 
 async def test_at_bottom_stays_pinned_to_bottom(fake_instance):

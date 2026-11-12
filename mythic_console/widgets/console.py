@@ -102,7 +102,7 @@ class ConsolePanel(Container):
         for index, renderable in enumerate(self._written):
             if index == anchor_index:
                 anchor_line = len(output.lines)
-            output.write(renderable)
+            output.write(renderable, scroll_end=False)
             self._entry_end_lines.append(len(output.lines))
 
         if at_bottom:
