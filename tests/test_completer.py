@@ -198,6 +198,40 @@ async def test_multi_token_line_excludes_tokens_already_on_the_line(test_plugin_
     assert "--text" not in items
 
 
+def top_ranked_string(items, word):
+    """Mirror CommandAutoComplete.get_matches for the agent completer's plain-string
+    candidates: fuzzy-score each against `word` and return the top-ranked value, or None."""
+    fuzzy_search = FuzzySearch()
+    scored = []
+    for value in items:
+        score, _ = fuzzy_search.match(word, value)
+        if score <= 0:
+            continue
+        scored.append((value, score))
+    scored.sort(key=lambda pair: pair[1], reverse=True)
+    return scored[0][0] if scored else None
+
+
+async def test_help_short_flag_offered_for_multi_token_subcommand(test_plugin_agent):
+    items = test_plugin_agent.get_completer_items("net echo -h")
+
+    assert "-h" in items
+    assert "--help" in items
+
+
+async def test_help_short_flag_outranks_help_for_multi_token_subcommand(test_plugin_agent):
+    items = test_plugin_agent.get_completer_items("net echo -h")
+
+    assert top_ranked_string(items, "-h") == "-h"
+
+
+async def test_help_short_flag_offered_for_generated_command_with_flag(generic_agent):
+    items = generic_agent.get_completer_items("echo --shout -h")
+
+    assert "-h" in items
+    assert "--help" in items
+
+
 async def test_generated_command_name_is_completer_visible(test_plugin_agent):
     items = test_plugin_agent.get_completer_items("")
 
