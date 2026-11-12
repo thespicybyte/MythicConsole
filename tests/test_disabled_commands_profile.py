@@ -9,6 +9,7 @@ from mythic_console.backend.disabled_commands_profile.disabled_commands_profile 
 from mythic_console.backend.disabled_commands_profile.queries import DisabledCommandsProfileQueries
 from mythic_console.backend.mythic_agent import mythic_agent
 from mythic_console.backend.mythic_agent.mythic_agent import MythicCommands
+from mythic_console.backend.operation.queries import OperationQueries
 from mythic_console.backend.payload_type.queries import PayloadTypeQueries
 from mythic_console.backend.user.queries import UserQueries
 
@@ -390,7 +391,7 @@ async def test_blocklist_unassign_prompts_and_cancels_without_mutation(mythic_co
 
     monkeypatch.setattr(UserQueries, "query_by_username", fake_query_by_username)
 
-    result = await mythic_commands._blocklist_unassign(_Args(name="no-exec", operator="bob", force=False))
+    result = await mythic_commands._blocklist_unassign(_Args(name="no-exec", operator=["bob"], force=False))
 
     assert calls == []
     assert result.plain == "Cancelled"
@@ -410,15 +411,19 @@ async def test_blocklist_unassign_force_skips_prompt(mythic_commands, monkeypatc
     async def fake_query_by_username(session, username):
         return {"id": 2, "username": username}
 
+    async def fake_is_operator_member(session, operation_id, user_id):
+        return True
+
     calls = []
 
     async def fake_unassign(self, user_id):
         calls.append(user_id)
 
     monkeypatch.setattr(UserQueries, "query_by_username", fake_query_by_username)
+    monkeypatch.setattr(OperationQueries, "is_operator_member", fake_is_operator_member)
     monkeypatch.setattr(DisabledCommandsProfile, "unassign", fake_unassign)
 
-    result = await mythic_commands._blocklist_unassign(_Args(name="no-exec", operator="bob", force=True))
+    result = await mythic_commands._blocklist_unassign(_Args(name="no-exec", operator=["bob"], force=True))
 
     assert not prompted
     assert calls == [2]
@@ -483,15 +488,19 @@ async def test_blocklist_assign_does_not_prompt_even_with_force_flag(mythic_comm
     async def fake_query_by_username(session, username):
         return {"id": 2, "username": username}
 
+    async def fake_is_operator_member(session, operation_id, user_id):
+        return True
+
     calls = []
 
     async def fake_assign(self, name, user_id):
         calls.append((name, user_id))
 
     monkeypatch.setattr(UserQueries, "query_by_username", fake_query_by_username)
+    monkeypatch.setattr(OperationQueries, "is_operator_member", fake_is_operator_member)
     monkeypatch.setattr(DisabledCommandsProfile, "assign", fake_assign)
 
-    result = await mythic_commands._blocklist_assign(_Args(name="no-exec", operator="bob", force=False))
+    result = await mythic_commands._blocklist_assign(_Args(name="no-exec", operator=["bob"], force=False))
 
     assert not prompted
     assert calls == [("no-exec", 2)]
@@ -551,3 +560,623 @@ async def test_blocklist_operator_completion_reuses_user_cache(mythic_commands):
         mythic_commands.get_completer_items("operation blocklist assign no-exec "))
     assert {"alice", "bob"} <= completer_values(
         mythic_commands.get_completer_items("operation blocklist unassign no-exec "))
+
+
+async def test_blocklist_operator_completion_per_token_with_nargs(mythic_commands):
+    mythic_commands._user_cache = ["alice", "bob"]
+
+    assert {"alice", "bob"} <= completer_values(
+        mythic_commands.get_completer_items("operation blocklist assign no-exec alice "))
+
+
+# ---- part 1: --payload-type completion for blocklist/whitelist ----
+
+
+async def test_blocklist_and_whitelist_payload_type_completion(mythic_commands):
+    mythic_commands._payload_type_cache = ["poseidon", "apfell"]
+
+    for cmdline in (
+        "operation blocklist create no-exec shell --payload-type ",
+        "operation blocklist add no-exec shell --payload-type ",
+        "operation blocklist remove no-exec shell --payload-type ",
+        "operation whitelist create allow-basic ls --payload-type ",
+        "operation whitelist add allow-basic ls --payload-type ",
+        "operation whitelist remove allow-basic ls --payload-type ",
+    ):
+        assert {"poseidon", "apfell"} <= completer_values(mythic_commands.get_completer_items(cmdline))
+
+
+# ---- part 2/3: whitelist parser group ----
+
+
+def test_whitelist_help_states_snapshot_limitation():
+    from mythic_console.backend.mythic_agent import mythic_command_parsers as p
+
+    assert "point-in-time" in p.operation_whitelist_parser.format_help()
+    assert "point-in-time" in p.operation_whitelist_create_parser.format_help()
+
+
+def test_whitelist_shares_blocklist_handlers_for_list_show_assign_unassign_delete():
+    from mythic_console.backend.mythic_agent import mythic_command_parsers as p
+
+    pairs = [
+        (p.operation_whitelist_list_parser, MythicCommands._blocklist_list),
+        (p.operation_whitelist_show_parser, MythicCommands._blocklist_show),
+        (p.operation_whitelist_assign_parser, MythicCommands._blocklist_assign),
+        (p.operation_whitelist_unassign_parser, MythicCommands._blocklist_unassign),
+        (p.operation_whitelist_delete_parser, MythicCommands._blocklist_delete),
+    ]
+    for parser, handler in pairs:
+        assert parser.get_default("func") is handler
+
+
+async def test_whitelist_name_completion(mythic_commands):
+    mythic_commands._blocklist_cache = ["allow-basic"]
+
+    assert {"allow-basic"} <= completer_values(
+        mythic_commands.get_completer_items("operation whitelist show "))
+
+
+async def test_whitelist_command_completion_reuses_blocklist_command_cache(mythic_commands):
+    mythic_commands._blocklist_command_cache = ["ls", "shell"]
+
+    assert {"ls", "shell"} <= completer_values(
+        mythic_commands.get_completer_items("operation whitelist create allow-basic "))
+
+
+# ---- part 4: complement computation ----
+
+
+async def test_complement_command_ids_scoped_to_payload_type(monkeypatch):
+    profile = DisabledCommandsProfile(types.SimpleNamespace(mythic=None), operation_id=7)
+
+    async def fake_get_all_commands_for_payloadtype(session, payload_type_name, custom_return_attributes=None):
+        assert payload_type_name == "poseidon"
+        return [{"id": 10, "cmd": "ls"}, {"id": 11, "cmd": "pwd"}, {"id": 12, "cmd": "shell"}]
+
+    import mythic_console.backend.disabled_commands_profile.disabled_commands_profile as dcp_module
+    monkeypatch.setattr(dcp_module.mythic_lib, "get_all_commands_for_payloadtype",
+                         fake_get_all_commands_for_payloadtype)
+
+    blocked_ids, unknown = await profile.complement_command_ids(["ls"], payload_type="poseidon")
+
+    assert sorted(blocked_ids) == [11, 12]
+    assert unknown == []
+
+
+async def test_complement_command_ids_all_types_excludes_shared_name_and_skips_deleted(monkeypatch):
+    profile = DisabledCommandsProfile(types.SimpleNamespace(mythic=None), operation_id=7)
+
+    async def fake_query_all_payload_types(session):
+        return [
+            {"id": 1, "name": "poseidon", "deleted": False},
+            {"id": 2, "name": "apfell", "deleted": False},
+            {"id": 3, "name": "retired", "deleted": True},
+        ]
+
+    async def fake_get_all_commands_for_payloadtype(session, payload_type_name, custom_return_attributes=None):
+        if payload_type_name == "poseidon":
+            return [{"id": 10, "cmd": "ls"}, {"id": 11, "cmd": "shell"}]
+        if payload_type_name == "apfell":
+            return [{"id": 20, "cmd": "ls"}, {"id": 21, "cmd": "download"}]
+        raise AssertionError(f"should not query deleted payload type '{payload_type_name}'")
+
+    monkeypatch.setattr(PayloadTypeQueries, "query_all_payload_types", fake_query_all_payload_types)
+    import mythic_console.backend.disabled_commands_profile.disabled_commands_profile as dcp_module
+    monkeypatch.setattr(dcp_module.mythic_lib, "get_all_commands_for_payloadtype",
+                         fake_get_all_commands_for_payloadtype)
+
+    blocked_ids, unknown = await profile.complement_command_ids(["ls"])
+
+    assert sorted(blocked_ids) == [11, 21]
+    assert unknown == []
+
+
+async def test_complement_command_ids_reports_unknown_allowed_name(monkeypatch):
+    profile = DisabledCommandsProfile(types.SimpleNamespace(mythic=None), operation_id=7)
+
+    async def fake_get_all_commands_for_payloadtype(session, payload_type_name, custom_return_attributes=None):
+        return [{"id": 10, "cmd": "ls"}]
+
+    import mythic_console.backend.disabled_commands_profile.disabled_commands_profile as dcp_module
+    monkeypatch.setattr(dcp_module.mythic_lib, "get_all_commands_for_payloadtype",
+                         fake_get_all_commands_for_payloadtype)
+
+    blocked_ids, unknown = await profile.complement_command_ids(["ls", "ghost"], payload_type="poseidon")
+
+    assert blocked_ids == []
+    assert unknown == ["ghost"]
+
+
+# ---- part 4: whitelist handlers ----
+
+
+async def test_whitelist_create_creates_complement_and_caches(mythic_commands, monkeypatch):
+    calls = {}
+
+    async def fake_complement_command_ids(self, allowed, payload_type=None):
+        calls["allowed"] = allowed
+        calls["payload_type"] = payload_type
+        return [5, 6], []
+
+    created = []
+
+    async def fake_create(self, name, command_ids):
+        created.append((name, command_ids))
+
+    cached = []
+
+    async def fake_cache_blocklists(self):
+        cached.append(True)
+
+    monkeypatch.setattr(DisabledCommandsProfile, "complement_command_ids", fake_complement_command_ids)
+    monkeypatch.setattr(DisabledCommandsProfile, "create", fake_create)
+    monkeypatch.setattr(MythicCommands, "cache_blocklists", fake_cache_blocklists)
+
+    result = await mythic_commands._whitelist_create(
+        _Args(name="allow-basic", command=["ls", "pwd"], payload_type=None))
+
+    assert calls == {"allowed": ["ls", "pwd"], "payload_type": None}
+    assert created == [("allow-basic", [5, 6])]
+    assert cached == [True]
+    assert result.style == "green"
+
+
+async def test_whitelist_create_rejects_unknown_command_without_creating(mythic_commands, monkeypatch):
+    async def fake_complement_command_ids(self, allowed, payload_type=None):
+        return [5, 6], ["ghost"]
+
+    created = []
+
+    async def fake_create(self, name, command_ids):
+        created.append((name, command_ids))
+
+    monkeypatch.setattr(DisabledCommandsProfile, "complement_command_ids", fake_complement_command_ids)
+    monkeypatch.setattr(DisabledCommandsProfile, "create", fake_create)
+
+    result = await mythic_commands._whitelist_create(
+        _Args(name="allow-basic", command=["ghost"], payload_type=None))
+
+    assert created == []
+    assert "ghost" in result.plain
+    assert result.style == "red"
+
+
+async def test_whitelist_add_allows_via_remove_with_no_prompt(mythic_commands, monkeypatch):
+    prompted = False
+
+    async def fake_prompt(screen):
+        nonlocal prompted
+        prompted = True
+        return True
+
+    monkeypatch.setattr(mythic_agent, "_prompt", fake_prompt)
+
+    async def fake_resolve_command_id(self, cmd_name, payload_type=None):
+        return 9
+
+    removed = []
+
+    async def fake_remove(self, name, command_id):
+        removed.append((name, command_id))
+
+    monkeypatch.setattr(DisabledCommandsProfile, "resolve_command_id", fake_resolve_command_id)
+    monkeypatch.setattr(DisabledCommandsProfile, "remove", fake_remove)
+
+    result = await mythic_commands._whitelist_add(
+        _Args(name="allow-basic", command="shell", payload_type=None))
+
+    assert not prompted
+    assert removed == [("allow-basic", 9)]
+    assert result.style == "green"
+
+
+async def test_whitelist_remove_prompts_and_cancels_without_mutation(mythic_commands, monkeypatch):
+    async def fake_prompt(screen):
+        return False
+
+    monkeypatch.setattr(mythic_agent, "_prompt", fake_prompt)
+
+    calls = []
+
+    async def fake_resolve_command_id(self, cmd_name, payload_type=None):
+        calls.append("resolved")
+        return 9
+
+    async def fake_add(self, name, command_id):
+        calls.append("added")
+
+    monkeypatch.setattr(DisabledCommandsProfile, "resolve_command_id", fake_resolve_command_id)
+    monkeypatch.setattr(DisabledCommandsProfile, "add", fake_add)
+
+    result = await mythic_commands._whitelist_remove(
+        _Args(name="allow-basic", command="shell", payload_type=None, force=False))
+
+    assert calls == []
+    assert result.plain == "Cancelled"
+    assert result.style == "yellow"
+
+
+async def test_whitelist_remove_force_skips_prompt_and_adds_to_blocklist(mythic_commands, monkeypatch):
+    prompted = False
+
+    async def fake_prompt(screen):
+        nonlocal prompted
+        prompted = True
+        return True
+
+    monkeypatch.setattr(mythic_agent, "_prompt", fake_prompt)
+
+    async def fake_resolve_command_id(self, cmd_name, payload_type=None):
+        return 9
+
+    added = []
+
+    async def fake_add(self, name, command_id):
+        added.append((name, command_id))
+
+    monkeypatch.setattr(DisabledCommandsProfile, "resolve_command_id", fake_resolve_command_id)
+    monkeypatch.setattr(DisabledCommandsProfile, "add", fake_add)
+
+    result = await mythic_commands._whitelist_remove(
+        _Args(name="allow-basic", command="shell", payload_type=None, force=True))
+
+    assert not prompted
+    assert added == [("allow-basic", 9)]
+    assert result.style == "green"
+
+
+# ---- part 5: multi-operator assign / unassign ----
+
+
+def test_blocklist_assign_unassign_parsers_accept_multiple_operators():
+    from mythic_console.backend.mythic_agent import mythic_command_parsers as p
+
+    args = p.operation_blocklist_assign_parser.parse_args(["no-exec", "alice", "bob", "carol"])
+    assert args.operator == ["alice", "bob", "carol"]
+
+    args = p.operation_blocklist_unassign_parser.parse_args(["no-exec", "alice", "bob", "carol"])
+    assert args.operator == ["alice", "bob", "carol"]
+
+
+def test_whitelist_assign_unassign_parsers_accept_multiple_operators():
+    from mythic_console.backend.mythic_agent import mythic_command_parsers as p
+
+    args = p.operation_whitelist_assign_parser.parse_args(["allow-basic", "alice", "bob"])
+    assert args.operator == ["alice", "bob"]
+    assert args.func is MythicCommands._blocklist_assign
+
+    args = p.operation_whitelist_unassign_parser.parse_args(["allow-basic", "alice", "bob"])
+    assert args.operator == ["alice", "bob"]
+    assert args.func is MythicCommands._blocklist_unassign
+
+
+async def test_blocklist_assign_multi_operator_all_succeed(mythic_commands, monkeypatch):
+    ids = {"alice": 1, "bob": 2, "carol": 3}
+
+    async def fake_query_by_username(session, username):
+        return {"id": ids[username], "username": username}
+
+    async def fake_is_operator_member(session, operation_id, user_id):
+        return True
+
+    calls = []
+
+    async def fake_assign(self, name, user_id):
+        calls.append((name, user_id))
+
+    monkeypatch.setattr(UserQueries, "query_by_username", fake_query_by_username)
+    monkeypatch.setattr(OperationQueries, "is_operator_member", fake_is_operator_member)
+    monkeypatch.setattr(DisabledCommandsProfile, "assign", fake_assign)
+
+    result = await mythic_commands._blocklist_assign(
+        _Args(name="no-exec", operator=["alice", "bob", "carol"], force=False))
+
+    assert calls == [("no-exec", 1), ("no-exec", 2), ("no-exec", 3)]
+    assert result.style == "green"
+    for username in ("alice", "bob", "carol"):
+        assert username in result.plain
+
+
+async def test_blocklist_assign_multi_operator_partial_failure_is_warning(mythic_commands, monkeypatch):
+    async def fake_query_by_username(session, username):
+        if username == "ghost":
+            return {"username": username}
+        return {"id": 1, "username": username}
+
+    async def fake_is_operator_member(session, operation_id, user_id):
+        return True
+
+    calls = []
+
+    async def fake_assign(self, name, user_id):
+        calls.append((name, user_id))
+
+    monkeypatch.setattr(UserQueries, "query_by_username", fake_query_by_username)
+    monkeypatch.setattr(OperationQueries, "is_operator_member", fake_is_operator_member)
+    monkeypatch.setattr(DisabledCommandsProfile, "assign", fake_assign)
+
+    result = await mythic_commands._blocklist_assign(
+        _Args(name="no-exec", operator=["alice", "ghost"], force=False))
+
+    assert calls == [("no-exec", 1)]
+    assert result.style == "yellow"
+    assert "alice" in result.plain
+    assert "ghost" in result.plain
+
+
+async def test_blocklist_unassign_multi_operator_prompts_once_naming_all(mythic_commands, monkeypatch):
+    prompts = []
+
+    async def fake_prompt(screen):
+        prompts.append(screen.question)
+        return False
+
+    monkeypatch.setattr(mythic_agent, "_prompt", fake_prompt)
+
+    calls = []
+
+    async def fake_query_by_username(session, username):
+        calls.append(username)
+        return {"id": 1, "username": username}
+
+    monkeypatch.setattr(UserQueries, "query_by_username", fake_query_by_username)
+
+    result = await mythic_commands._blocklist_unassign(
+        _Args(name="no-exec", operator=["alice", "bob"], force=False))
+
+    assert len(prompts) == 1
+    assert "alice" in prompts[0]
+    assert "bob" in prompts[0]
+    assert calls == []
+    assert result.plain == "Cancelled"
+    assert result.style == "yellow"
+
+
+async def test_blocklist_unassign_multi_operator_force_skips_prompt_and_unassigns_each(mythic_commands, monkeypatch):
+    prompted = False
+
+    async def fake_prompt(screen):
+        nonlocal prompted
+        prompted = True
+        return True
+
+    monkeypatch.setattr(mythic_agent, "_prompt", fake_prompt)
+
+    ids = {"alice": 1, "bob": 2}
+
+    async def fake_query_by_username(session, username):
+        return {"id": ids[username], "username": username}
+
+    async def fake_is_operator_member(session, operation_id, user_id):
+        return True
+
+    calls = []
+
+    async def fake_unassign(self, user_id):
+        calls.append(user_id)
+
+    monkeypatch.setattr(UserQueries, "query_by_username", fake_query_by_username)
+    monkeypatch.setattr(OperationQueries, "is_operator_member", fake_is_operator_member)
+    monkeypatch.setattr(DisabledCommandsProfile, "unassign", fake_unassign)
+
+    result = await mythic_commands._blocklist_unassign(
+        _Args(name="no-exec", operator=["alice", "bob"], force=True))
+
+    assert not prompted
+    assert calls == [1, 2]
+    assert result.style == "green"
+
+
+async def test_blocklist_unassign_multi_operator_partial_failure_is_warning(mythic_commands, monkeypatch):
+    async def fake_query_by_username(session, username):
+        if username == "ghost":
+            return {"username": username}
+        return {"id": 1, "username": username}
+
+    async def fake_is_operator_member(session, operation_id, user_id):
+        return True
+
+    calls = []
+
+    async def fake_unassign(self, user_id):
+        calls.append(user_id)
+
+    monkeypatch.setattr(UserQueries, "query_by_username", fake_query_by_username)
+    monkeypatch.setattr(OperationQueries, "is_operator_member", fake_is_operator_member)
+    monkeypatch.setattr(DisabledCommandsProfile, "unassign", fake_unassign)
+
+    result = await mythic_commands._blocklist_unassign(
+        _Args(name="no-exec", operator=["alice", "ghost"], force=True))
+
+    assert calls == [1]
+    assert result.style == "yellow"
+    assert "alice" in result.plain
+    assert "ghost" in result.plain
+
+
+# ---- membership guard on assign / unassign ----
+
+
+async def test_blocklist_assign_non_member_is_reported_without_mutation(mythic_commands, monkeypatch):
+    async def fake_query_by_username(session, username):
+        return {"id": 9, "username": username}
+
+    async def fake_is_operator_member(session, operation_id, user_id):
+        return False
+
+    async def fake_query_operation_name(session, operation_id):
+        return "red-team"
+
+    calls = []
+
+    async def fake_assign(self, name, user_id):
+        calls.append((name, user_id))
+
+    monkeypatch.setattr(UserQueries, "query_by_username", fake_query_by_username)
+    monkeypatch.setattr(OperationQueries, "is_operator_member", fake_is_operator_member)
+    monkeypatch.setattr(OperationQueries, "query_operation_name", fake_query_operation_name)
+    monkeypatch.setattr(DisabledCommandsProfile, "assign", fake_assign)
+
+    result = await mythic_commands._blocklist_assign(_Args(name="no-exec", operator=["ghost"], force=False))
+
+    assert calls == []
+    assert result.style == "red"
+    assert "ghost" in result.plain
+    assert "red-team" in result.plain
+    assert "operation operator add" in result.plain
+
+
+async def test_blocklist_unassign_non_member_is_reported_without_mutation(mythic_commands, monkeypatch):
+    async def fake_query_by_username(session, username):
+        return {"id": 9, "username": username}
+
+    async def fake_is_operator_member(session, operation_id, user_id):
+        return False
+
+    async def fake_query_operation_name(session, operation_id):
+        return "red-team"
+
+    calls = []
+
+    async def fake_unassign(self, user_id):
+        calls.append(user_id)
+
+    monkeypatch.setattr(UserQueries, "query_by_username", fake_query_by_username)
+    monkeypatch.setattr(OperationQueries, "is_operator_member", fake_is_operator_member)
+    monkeypatch.setattr(OperationQueries, "query_operation_name", fake_query_operation_name)
+    monkeypatch.setattr(DisabledCommandsProfile, "unassign", fake_unassign)
+
+    result = await mythic_commands._blocklist_unassign(
+        _Args(name="no-exec", operator=["ghost"], force=True))
+
+    assert calls == []
+    assert result.style == "red"
+    assert "ghost" in result.plain
+    assert "red-team" in result.plain
+    assert "operation operator add" in result.plain
+
+
+async def test_blocklist_assign_multi_operator_member_and_non_member_is_warning(mythic_commands, monkeypatch):
+    ids = {"alice": 1, "ghost": 2}
+    members = {"alice": True, "ghost": False}
+
+    async def fake_query_by_username(session, username):
+        return {"id": ids[username], "username": username}
+
+    async def fake_is_operator_member(session, operation_id, user_id):
+        return members["alice"] if user_id == 1 else members["ghost"]
+
+    async def fake_query_operation_name(session, operation_id):
+        return "red-team"
+
+    calls = []
+
+    async def fake_assign(self, name, user_id):
+        calls.append((name, user_id))
+
+    monkeypatch.setattr(UserQueries, "query_by_username", fake_query_by_username)
+    monkeypatch.setattr(OperationQueries, "is_operator_member", fake_is_operator_member)
+    monkeypatch.setattr(OperationQueries, "query_operation_name", fake_query_operation_name)
+    monkeypatch.setattr(DisabledCommandsProfile, "assign", fake_assign)
+
+    result = await mythic_commands._blocklist_assign(
+        _Args(name="no-exec", operator=["alice", "ghost"], force=False))
+
+    assert calls == [("no-exec", 1)]
+    assert result.style == "yellow"
+    assert "alice" in result.plain
+    assert "ghost" in result.plain
+
+
+async def test_blocklist_unassign_multi_operator_member_and_non_member_is_warning(mythic_commands, monkeypatch):
+    ids = {"alice": 1, "ghost": 2}
+    members = {"alice": True, "ghost": False}
+
+    async def fake_query_by_username(session, username):
+        return {"id": ids[username], "username": username}
+
+    async def fake_is_operator_member(session, operation_id, user_id):
+        return members["alice"] if user_id == 1 else members["ghost"]
+
+    async def fake_query_operation_name(session, operation_id):
+        return "red-team"
+
+    calls = []
+
+    async def fake_unassign(self, user_id):
+        calls.append(user_id)
+
+    monkeypatch.setattr(UserQueries, "query_by_username", fake_query_by_username)
+    monkeypatch.setattr(OperationQueries, "is_operator_member", fake_is_operator_member)
+    monkeypatch.setattr(OperationQueries, "query_operation_name", fake_query_operation_name)
+    monkeypatch.setattr(DisabledCommandsProfile, "unassign", fake_unassign)
+
+    result = await mythic_commands._blocklist_unassign(
+        _Args(name="no-exec", operator=["alice", "ghost"], force=True))
+
+    assert calls == [1]
+    assert result.style == "yellow"
+    assert "alice" in result.plain
+    assert "ghost" in result.plain
+
+
+async def test_whitelist_assign_non_member_is_guarded_through_shared_handler(mythic_commands, monkeypatch):
+    from mythic_console.backend.mythic_agent import mythic_command_parsers as p
+
+    async def fake_query_by_username(session, username):
+        return {"id": 9, "username": username}
+
+    async def fake_is_operator_member(session, operation_id, user_id):
+        return False
+
+    async def fake_query_operation_name(session, operation_id):
+        return "red-team"
+
+    calls = []
+
+    async def fake_assign(self, name, user_id):
+        calls.append((name, user_id))
+
+    monkeypatch.setattr(UserQueries, "query_by_username", fake_query_by_username)
+    monkeypatch.setattr(OperationQueries, "is_operator_member", fake_is_operator_member)
+    monkeypatch.setattr(OperationQueries, "query_operation_name", fake_query_operation_name)
+    monkeypatch.setattr(DisabledCommandsProfile, "assign", fake_assign)
+
+    args = p.operation_whitelist_assign_parser.parse_args(["allow-basic", "ghost"])
+
+    result = await args.func(mythic_commands, args)
+
+    assert calls == []
+    assert result.style == "red"
+    assert "ghost" in result.plain
+
+
+async def test_is_operator_member_sends_operation_and_user_filter(monkeypatch):
+    import mythic_console.backend.operation.queries as operation_queries_module
+
+    captured = {}
+
+    async def fake_execute_custom_query(mythic, query, variables=None):
+        captured["variables"] = variables
+        return {"operation": [{"operatoroperations": [{"id": 1}]}]}
+
+    monkeypatch.setattr(operation_queries_module.mythic, "execute_custom_query", fake_execute_custom_query)
+
+    is_member = await OperationQueries.is_operator_member(None, 7, 3)
+
+    assert is_member is True
+    assert captured["variables"] == {"operation_id": 7, "user_id": 3}
+
+
+async def test_is_operator_member_false_when_no_membership_rows(monkeypatch):
+    import mythic_console.backend.operation.queries as operation_queries_module
+
+    async def fake_execute_custom_query(mythic, query, variables=None):
+        return {"operation": [{"operatoroperations": []}]}
+
+    monkeypatch.setattr(operation_queries_module.mythic, "execute_custom_query", fake_execute_custom_query)
+
+    is_member = await OperationQueries.is_operator_member(None, 7, 3)
+
+    assert is_member is False

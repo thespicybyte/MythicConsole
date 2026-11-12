@@ -159,6 +159,29 @@ class OperationQueries:
         return resp
 
     @staticmethod
+    async def is_operator_member(session: Mythic, operation_id: int, user_id: int) -> bool:
+        """Whether the operator has an operatoroperation (membership) row in the operation."""
+        resp = await mythic.execute_custom_query(
+            mythic=session,
+            query="""
+                query OperatorIsMember($operation_id: Int!, $user_id: Int!) {
+                  operation(where: {id: {_eq: $operation_id}}) {
+                    operatoroperations(where: {operator_id: {_eq: $user_id}}) {
+                      id
+                    }
+                  }
+                }
+                """,
+            variables={"operation_id": operation_id, "user_id": user_id},
+        )
+
+        operations = resp.get("operation") or []
+        if not operations:
+            return False
+
+        return bool(operations[0].get("operatoroperations"))
+
+    @staticmethod
     async def get_all_operations(session: Mythic, include_deleted: bool = False) -> List[int]:
         where_clause = "" if include_deleted else "(where: {deleted: {_eq: false}})"
         resp = await mythic.execute_custom_query(

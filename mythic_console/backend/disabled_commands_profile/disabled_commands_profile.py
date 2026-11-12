@@ -1,4 +1,4 @@
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Tuple
 
 from mythic import mythic as mythic_lib
 
@@ -80,6 +80,33 @@ class DisabledCommandsProfile:
                 f"command '{cmd_name}' is ambiguous across payload types ({candidates}); use --payload-type")
 
         return matches[0][1]
+
+    async def complement_command_ids(self, allowed: List[str],
+                                      payload_type: Optional[str] = None) -> Tuple[List[int], List[str]]:
+        """Command ids of every command in scope whose name is not in `allowed`.
+        Scope is the one payload_type if given, else every non-deleted payload type (union).
+        Returns (blocked_command_ids, unknown_allowed_names)."""
+        if payload_type:
+            scope_names = [payload_type]
+        else:
+            payload_types = await PayloadTypeQueries.query_all_payload_types(self.mythic)
+            scope_names = [entry["name"] for entry in payload_types or []
+                           if entry.get("name") and not entry.get("deleted")]
+
+        universe: List[Tuple[str, int]] = []
+        for name in scope_names:
+            commands = await mythic_lib.get_all_commands_for_payloadtype(
+                self.mythic, name, custom_return_attributes="id cmd attributes")
+            for command in commands:
+                if command.get("cmd") and command.get("id") is not None:
+                    universe.append((command["cmd"], command["id"]))
+
+        allowed_set = set(allowed)
+        blocked_ids = [command_id for cmd, command_id in universe if cmd not in allowed_set]
+        known_names = {cmd for cmd, _ in universe}
+        unknown = [name for name in allowed if name not in known_names]
+
+        return blocked_ids, unknown
 
     async def _resolve_row_id(self, name: str, command_id: int) -> int:
         rows = await DisabledCommandsProfileQueries.get_by_name(self.mythic, self.operation_id, name)
