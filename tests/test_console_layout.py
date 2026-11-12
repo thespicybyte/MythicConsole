@@ -49,3 +49,22 @@ async def test_on_mount_seeds_operation_cache(fake_instance, monkeypatch):
         await pilot.pause()
 
         assert calls == [True]
+
+
+async def test_on_mount_seeds_blocklist_caches(fake_instance, monkeypatch):
+    calls = []
+
+    async def fake_cache_blocklists(self):
+        calls.append("blocklists")
+
+    async def fake_cache_blocklist_commands(self):
+        calls.append("blocklist_commands")
+
+    monkeypatch.setattr(MythicCommands, "cache_blocklists", fake_cache_blocklists)
+    monkeypatch.setattr(MythicCommands, "cache_blocklist_commands", fake_cache_blocklist_commands)
+
+    app = _Harness(fake_instance)
+    async with app.run_test() as pilot:
+        await pilot.pause()
+
+        assert set(calls) == {"blocklists", "blocklist_commands"}
