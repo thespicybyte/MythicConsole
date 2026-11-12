@@ -37,7 +37,8 @@ class LogViewer(Container):
 
     def show(self) -> None:
         self.remove_class("-hidden")
-        self.console_output.scroll_end(animate=False)
+        if self.console_output.auto_scroll:
+            self.console_output.scroll_end(animate=False)
 
     def hide(self) -> None:
         self.add_class("-hidden")
