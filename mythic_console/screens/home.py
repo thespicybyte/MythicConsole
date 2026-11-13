@@ -17,7 +17,7 @@ from textual.containers import Container, VerticalScroll
 from textual.reactive import reactive, var
 from textual.screen import Screen
 from textual.widget import Widget
-from textual.widgets import Footer, Header, DataTable, TabbedContent, TabPane
+from textual.widgets import Header, DataTable, TabbedContent, TabPane
 from textual.css.query import NoMatches
 from textual.widgets._data_table import DuplicateKey, CellDoesNotExist
 from textual.worker import WorkerFailed
@@ -282,7 +282,6 @@ class Home(Screen):
         log_viewer = LogViewer()
         log_viewer.add_class("-hidden")
         yield log_viewer
-        yield Footer()
 
     @on(ConsolePanel.NewInput)
     def _new_input(self, event: ConsolePanel.NewInput):

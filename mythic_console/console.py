@@ -10,7 +10,7 @@ from textual.errors import NoWidget
 from textual.reactive import var
 from textual.timer import Timer
 from textual.widget import Widget
-from textual.widgets import Header, Footer
+from textual.widgets import Header
 
 from mythic_console.backend import MythicInstance
 from mythic_console.backend.payload_type.queries import PayloadTypeQueries
@@ -139,7 +139,6 @@ class MythicConsole(App, inherit_bindings=False):
 
     def compose(self) -> ComposeResult:
         yield Header()
-        yield Footer()
 
     def handle_login_response(self, response: MythicInstance):
         self.instance = response
