@@ -147,6 +147,8 @@ class Home(Screen):
         Binding(key="ctrl+l", action="app.logout", description="logout", key_display="^l"),
         Binding(key="ctrl+pagedown", action="previous_tab", description="previous tab", key_display="^pagedown"),
         Binding(key="ctrl+pageup", action="next_tab", description="next tab", key_display="^pageup"),
+        Binding(key="alt+tab", action="next_tab", description="next tab", show=False),
+        Binding(key="alt+shift+tab", action="previous_tab", description="previous tab", show=False),
         Binding(key="ctrl+q", action="close_tab", description="close tab", key_display="^q"),
         Binding(key="ctrl+shift+comma", action="shrink_sidebar", description="shrink sidebar", key_display="<"),
         Binding(key="ctrl+shift+full_stop", action="grow_sidebar", description="grow sidebar", key_display=">"),
@@ -717,7 +719,7 @@ class Home(Screen):
             logger.debug(tab_key)
             self.query_one(Sidebar).view_mode = ViewMode.HOME
             self.query_one("#callback_table", DataTable).show_cursor = False
-            # self.query_one(Input).focus()
+            self._focus_callback_table()
             return
 
         row_key = tab_key.removeprefix("--content-tab-callback-")
@@ -726,11 +728,31 @@ class Home(Screen):
             self.query_one(Callbacks).current_tab_id = row_key
             self.query_one(Sidebar).view_mode = ViewMode.CALLBACK
             self._populate_sidebar()
-            # self.query_one(Input).focus()
 
         except Exception as e:
             logger.error(e)
             logger.debug(row_key)
+
+        self._focus_active_console_input()
+
+    def _focus_active_console_input(self) -> None:
+        """Focus the active callback tab's console command input."""
+        active_pane = self.query_one(CallbackTabs).active_pane
+        if active_pane is None:
+            return
+        try:
+            panel = active_pane.query_one(ConsolePanel)
+        except NoMatches:
+            return
+        panel.console_input.focus()
+
+    def _focus_callback_table(self) -> None:
+        """Focus the callbacks table on the home tab."""
+        try:
+            table = self.query_one("#callback_table", DataTable)
+        except NoMatches:
+            return
+        table.focus()
 
     @on(ReplayTask)
     async def _replay_task_output(self, replay: ReplayTask):
