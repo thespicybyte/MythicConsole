@@ -47,6 +47,7 @@ class LoginScreen(ModalScreen):
         yield Footer()
 
     @on(Button.Pressed, "#login_button")
+    @on(Input.Submitted, "#username, #password, #server")
     def login(self):
         self._username = self.query_one("#username", Input).value
         self._password = self.query_one("#password", Input).value
