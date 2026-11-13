@@ -7,7 +7,7 @@ from textual.containers import Container, Vertical
 from textual.reactive import reactive
 from textual.screen import ModalScreen
 from textual.widget import Widget
-from textual.widgets import Input, Button, Header, Footer
+from textual.widgets import Input, Button, Header
 from textual.worker import Worker
 
 from mythic_console.backend.mythic_instance.mythic_instance import MythicInstance
@@ -44,7 +44,6 @@ class LoginScreen(ModalScreen):
     def compose(self) -> ComposeResult:
         yield Header()
         yield LoginPrompt()
-        yield Footer()
 
     @on(Button.Pressed, "#login_button")
     @on(Input.Submitted, "#username, #password, #server")
