@@ -172,6 +172,8 @@ class Home(Screen):
                 id="toggle_log_viewer"),
         Binding(key="f3", action="toggle_word_wrap", description="toggle word wrap", key_display="F3",
                 id="toggle_word_wrap"),
+        Binding(key="ctrl+f", action="toggle_log_filter", description="find in log", key_display="^f",
+                id="toggle_log_filter"),
     ]
 
     async def _on_mount(self, _event: events.Mount) -> None:
@@ -312,6 +314,12 @@ class Home(Screen):
 
     def action_toggle_log_viewer(self) -> None:
         self.query_one(LogViewer).toggle()
+
+    def action_toggle_log_filter(self) -> None:
+        log_viewer = self.query_one(LogViewer)
+        if log_viewer.has_class("-hidden"):
+            return
+        log_viewer.toggle_filter()
 
     def action_toggle_autoscroll(self) -> None:
         active_pane = self.query_one(CallbackTabs).active_pane

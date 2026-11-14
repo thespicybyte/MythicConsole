@@ -5,7 +5,7 @@ import threading
 from mythic_console.utils.logger import LogBufferHandler, get_log_buffer_handler, logger
 
 
-def test_emit_appends_formatted_line():
+def test_emit_appends_formatted_record():
     handler = LogBufferHandler(maxlen=10)
     formatter = logging.Formatter('%(asctime)s - %(filename)s:%(lineno)d - %(levelname)s - %(message)s')
     handler.setFormatter(formatter)
@@ -15,8 +15,14 @@ def test_emit_appends_formatted_line():
 
     test_logger.info("hello world")
 
-    assert len(handler.snapshot()) == 1
-    assert re.match(r".+ - test_log_buffer_handler.py:\d+ - INFO - hello world", handler.snapshot()[0])
+    records = handler.snapshot()
+    assert len(records) == 1
+    record = records[0]
+    assert record.levelname == "INFO"
+    assert record.levelno == logging.INFO
+    assert record.message == "hello world"
+    assert re.match(r"test_log_buffer_handler\.py:\d+", record.location)
+    assert re.match(r".+ - test_log_buffer_handler\.py:\d+ - INFO - hello world", record.plain())
 
 
 def test_buffer_is_bounded_by_maxlen():
@@ -29,7 +35,7 @@ def test_buffer_is_bounded_by_maxlen():
     for i in range(5):
         test_logger.info(f"line {i}")
 
-    assert handler.snapshot() == ["line 2", "line 3", "line 4"]
+    assert [record.message for record in handler.snapshot()] == ["line 2", "line 3", "line 4"]
     assert handler.count == 5
 
 
@@ -44,7 +50,7 @@ def test_records_below_level_are_excluded():
     test_logger.debug("quiet")
     test_logger.warning("loud")
 
-    assert handler.snapshot() == ["loud"]
+    assert [record.message for record in handler.snapshot()] == ["loud"]
 
 
 def test_drain_state_returns_count_and_snapshot_together():
@@ -59,7 +65,7 @@ def test_drain_state_returns_count_and_snapshot_together():
 
     count, snapshot = handler.drain_state()
     assert count == 4
-    assert snapshot == ["line 0", "line 1", "line 2", "line 3"]
+    assert [record.message for record in snapshot] == ["line 0", "line 1", "line 2", "line 3"]
 
 
 def test_snapshot_and_drain_state_acquire_the_handler_lock():
@@ -129,4 +135,15 @@ def test_mythic_tui_logger_feeds_the_module_level_buffer():
 
     snapshot = handler.snapshot()
     assert len(snapshot) == before + 1
-    assert "module level buffer check" in snapshot[-1]
+    assert "module level buffer check" in snapshot[-1].message
+
+
+def test_module_logger_buffers_debug_regardless_of_configured_level():
+    handler = get_log_buffer_handler()
+    before = len(handler.snapshot())
+
+    logger.debug("debug buffered regardless of log level")
+
+    snapshot = handler.snapshot()
+    assert len(snapshot) == before + 1
+    assert snapshot[-1].levelname == "DEBUG"
