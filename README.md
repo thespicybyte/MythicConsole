@@ -23,7 +23,7 @@ its command set from the server's own catalog, with no agent-specific code requi
 plugin system for curation, new `payload` and `profiles` commands, an interactive payload builder,
 command and file pickers, autocomplete, and live callback management.
 
-![tasking a callback](https://raw.githubusercontent.com/thespicybyte/MythicConsole/main/docs/images/callback-tasking.svg)
+![tasking a callback](docs/images/callback-tasking.svg)
 
 See [What's New in 1.0](docs/whats-new-1.0.md) for more details.
 
