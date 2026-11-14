@@ -7,11 +7,50 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.0.0-rc2] - 2026-11-14
+
+### Added
+- In-app Settings panel, opened from the command palette (Ctrl+P), for rebinding console key
+  bindings: each action's key is set by pressing the key combination, checked for conflicts and
+  reserved keys, and persisted across restarts. Save, cancel, and reset are available as buttons or
+  with Ctrl+S, Ctrl+X, and Ctrl+R.
+- Operation management from the console: `operation` subcommands to list, create, and select
+  operations and set their lead and member roles, with live operation-name completion.
+- Per-operation command block list and allow list: subcommands to block or allow specific commands
+  for operators, including assigning the same list to several operators at once. Assignments are
+  guarded so they only take effect for operators who belong to the operation.
+- User management from the console: `user set` and `user delete` subcommands with live username
+  completion.
+- In-app log viewer toggled with F2, backed by expanded diagnostic logging across task issue,
+  execute, wait, and download, the login flow, the Home monitor workers, the live-sync generators,
+  and the completion caches.
+- Toggle word wrap in console output with F3.
+- Toggle autoscroll in console output with Ctrl+Shift+A.
+- Switch console tabs with Option+Tab and Option+Shift+Tab, restoring focus to the prompt after a
+  switch.
+- Submit the login form by pressing Enter in any field, not just the Login button.
+
 ### Changed
+- Theme selection moved from the command palette into a Themes tab in the Settings panel, keeping
+  the live preview and persistence.
 - Packaged for PyPI: the console now installs via `pipx install mythic-console` or
   `uvx mythic-console` and runs as a `mythic-console` command. All first-party modules moved
   under a `mythic_console/` package; `requirements.txt`/`requirements-dev.txt` were replaced by
   `pyproject.toml`.
+- Console tab completion now runs through a shared argparse-based completer, with help flags offered
+  in the global command completer and kept as completion candidates for agent commands.
+- Console outcome messages are colored by severity (success, warning, error) through a shared helper
+  and the active theme.
+- The default operation list shows only active operations and highlights the one in use, and tables
+  can style individual rows.
+- The login and home screens no longer show a footer bar; the command palette (Ctrl+P) remains the
+  entry point to keyboard shortcuts.
+
+### Fixed
+- Operation and operator name completion now refresh so new and renamed entries appear without a
+  restart.
+- Fixed unsynchronized reads in the log buffer that could race the live log viewer.
+- Word wrap no longer fights the scroll anchor when toggled.
 
 ### Breaking
 - Plugin import paths changed: a plugin that imports `from backend ...`, `from plugins.base ...`,
@@ -76,6 +115,7 @@ Initial pre-release: a Textual terminal UI for interacting with a Mythic C2 serv
 operator interface to the web UI, with callback interaction, tasking and results, session info, and
 a hand-written Poseidon agent.
 
-[Unreleased]: https://github.com/thespicybyte/MythicConsole/compare/v1.0.0-rc1...HEAD
+[Unreleased]: https://github.com/thespicybyte/MythicConsole/compare/v1.0.0-rc2...HEAD
+[1.0.0-rc2]: https://github.com/thespicybyte/MythicConsole/compare/v1.0.0-rc1...v1.0.0-rc2
 [1.0.0-rc1]: https://github.com/thespicybyte/MythicConsole/compare/v0.1.0...v1.0.0-rc1
 [0.1.0]: https://github.com/thespicybyte/MythicConsole/releases/tag/v0.1.0
