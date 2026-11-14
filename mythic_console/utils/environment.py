@@ -82,6 +82,16 @@ class Environment:
             return os.path.expanduser(history_file)
         return os.path.join(self.config_directory(), "history.json")
 
+    def keybindings_file(self) -> str:
+        """
+        check environment variables for `KEYBINDINGS_FILE`.
+        Returns `config_directory()/keybindings.json` if not set
+        """
+        keybindings_file = os.getenv("KEYBINDINGS_FILE") or self.get_value_from_config("KEYBINDINGS_FILE")
+        if keybindings_file:
+            return os.path.expanduser(keybindings_file)
+        return os.path.join(self.config_directory(), "keybindings.json")
+
     def log_level(self) -> int:
         """
         check environment variables for `LOG_LEVEL`.

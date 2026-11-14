@@ -1,13 +1,15 @@
 import sys
 from enum import Enum
-from typing import List, Optional
+from typing import Iterable, List, Optional
 
 import asyncio
-from textual import events, on
-from textual.app import App, ComposeResult
-from textual.command import CommandPalette
+from textual import events
+from textual.app import App, ComposeResult, SystemCommand
+from textual.binding import Binding
+from textual.dom import DOMNode
 from textual.errors import NoWidget
 from textual.reactive import var
+from textual.screen import Screen
 from textual.timer import Timer
 from textual.widget import Widget
 from textual.widgets import Header
@@ -17,7 +19,8 @@ from mythic_console.backend.payload_type.queries import PayloadTypeQueries
 from mythic_console.plugins import get_plugin_registry, load_installed_plugins
 from mythic_console.screens.home import Home
 from mythic_console.screens.login import LoginScreen
-from mythic_console.utils import state
+from mythic_console.screens.settings import SettingsScreen
+from mythic_console.utils import keybindings, state
 from mythic_console.utils.logger import logger
 
 
@@ -54,9 +57,8 @@ class MythicConsole(App, inherit_bindings=False):
     def __init__(self):
         super().__init__()
         self.state = State.Login
-        self._theme_preview_active = False
-        self._theme_before_preview: Optional[str] = None
         self._scrollbar_hide_timers: dict[Widget, Timer] = {}
+        self.keybinding_overrides: dict[str, str] = {}
 
     async def on_event(self, event: events.Event) -> None:
         if isinstance(event, VERTICAL_SCROLL_EVENTS + HORIZONTAL_SCROLL_EVENTS) and not event.is_forwarded:
@@ -89,34 +91,26 @@ class MythicConsole(App, inherit_bindings=False):
         self._scrollbar_hide_timers.pop(widget, None)
         widget.remove_class("-scrolling")
 
-    def search_themes(self) -> None:
-        self._theme_before_preview = self.theme
-        self._theme_preview_active = True
-        super().search_themes()
+    def get_system_commands(self, screen: Screen) -> Iterable[SystemCommand]:
+        for command in super().get_system_commands(screen):
+            if command.callback == self.action_change_theme:
+                continue
+            yield command
+        yield SystemCommand("Settings", "Configure key bindings and themes", self.action_open_settings)
 
-    @on(CommandPalette.OptionHighlighted)
-    def _preview_highlighted_theme(self, event: CommandPalette.OptionHighlighted) -> None:
-        if not self._theme_preview_active:
+    def action_open_settings(self) -> None:
+        self.push_screen(SettingsScreen(self.keybinding_overrides), callback=self._handle_settings_result)
+
+    def _handle_settings_result(self, overrides: Optional[dict[str, str]]) -> None:
+        if overrides is None:
             return
-        name = event.highlighted_event.option.hit.text
-        if name in self.available_themes:
-            self.theme = name
-            # App.refresh_css skips the topmost screen; restyle the open palette here.
-            self.call_next(self._restyle_open_screen)
+        self.keybinding_overrides = overrides
+        self.set_keymap(overrides)
 
-    def _restyle_open_screen(self) -> None:
-        if self._theme_preview_active and self.screen.is_mounted:
-            self.stylesheet.update(self.screen, animate=False)
-
-    @on(CommandPalette.Closed)
-    def _end_theme_preview(self, event: CommandPalette.Closed) -> None:
-        if not self._theme_preview_active:
-            return
-        self._theme_preview_active = False
-        if event.option_selected:
-            state.set_theme(self.theme)
-        elif self._theme_before_preview is not None:
-            self.theme = self._theme_before_preview
+    def handle_bindings_clash(self, clashed_bindings: set[Binding], node: DOMNode) -> None:
+        keys = ", ".join(sorted({binding.key for binding in clashed_bindings}))
+        logger.warning(f"key binding clash on {keys}")
+        self.notify(f"Key binding clash: {keys}", severity="warning", timeout=10)
 
     def copy_to_clipboard(self, text: str) -> None:
         super().copy_to_clipboard(text)
@@ -134,6 +128,15 @@ class MythicConsole(App, inherit_bindings=False):
         saved_theme = state.get_theme()
         if saved_theme and saved_theme in self.available_themes:
             self.theme = saved_theme
+
+        overrides, messages = keybindings.load_keymap()
+        self.keybinding_overrides = overrides
+        self.set_keymap(overrides)
+        for message in messages:
+            logger.warning(message)
+        if messages:
+            self.notify("\n".join(messages), severity="warning", timeout=10)
+
         logger.debug("pushing login screen")
         self.push_screen(LoginScreen(), callback=self.handle_login_response)
 
