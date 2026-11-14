@@ -37,6 +37,7 @@ REBINDABLE_ACTIONS: tuple[RebindableAction, ...] = (
     RebindableAction("toggle_autoscroll", "ctrl+shift+a", "Toggle autoscroll", "Console"),
     RebindableAction("toggle_log_viewer", "f2", "Log viewer", "Console"),
     RebindableAction("toggle_word_wrap", "f3", "Toggle word wrap", "Console"),
+    RebindableAction("toggle_log_filter", "ctrl+f", "Find in log", "Console"),
     RebindableAction("logout", "ctrl+l", "Logout", "Session"),
     RebindableAction("login_quit", "ctrl+q", "Quit (login screen)", "Session", namespace="login"),
 )

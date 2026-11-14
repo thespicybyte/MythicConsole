@@ -1,12 +1,13 @@
 import os
 import textwrap
-from typing import List, Optional
+from typing import Callable, List, Optional
 
 from textual import on
 from textual.app import ComposeResult
 from textual.binding import Binding
 from textual.containers import Container, Horizontal
 from textual.content import Content
+from textual.events import Click
 from textual.screen import ModalScreen
 from textual.widgets import Button, DirectoryTree, Label, SelectionList
 
@@ -110,6 +111,46 @@ class FilePrompt(TaskPrompt):
         self.query_one("#tree", DirectoryTree).action_select_cursor()
 
     def action_cancel(self):
+        self.dismiss(None)
+
+
+class LogLevelMenu(TaskPrompt):
+    """Modal for toggling which log levels are shown in the log panel. Each
+    toggle is applied live through a callback; the menu itself always
+    dismisses with no result."""
+
+    LEVELS = ("DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL")
+
+    BINDINGS = [Binding(key="escape", action="cancel", description="cancel", show=False)]
+
+    def __init__(self, enabled_levels: set, on_change: Callable[[set], None]):
+        super().__init__()
+        self.enabled_levels = set(enabled_levels)
+        self.on_change = on_change
+
+    def compose(self) -> ComposeResult:
+        yield Container(
+            Label("Log levels"),
+            CheckSelectionList(id="levels"),
+        )
+
+    def on_mount(self) -> None:
+        level_list = self.query_one("#levels", CheckSelectionList)
+        with level_list.prevent(SelectionList.SelectedChanged):
+            for level in self.LEVELS:
+                level_list.add_option(CheckSelection(level, level, level in self.enabled_levels))
+
+    @on(SelectionList.SelectedChanged, "#levels")
+    def _selection_changed(self) -> None:
+        self.enabled_levels = set(self.query_one("#levels", CheckSelectionList).selected)
+        self.on_change(self.enabled_levels)
+
+    @on(Click)
+    def _background_clicked(self, event: Click) -> None:
+        if event.widget is self:
+            self.dismiss(None)
+
+    def action_cancel(self) -> None:
         self.dismiss(None)
 
 

@@ -105,6 +105,49 @@ LogViewer > ConsoleOutput {
     border: none;
 }
 
+LogViewer > #log_filter {
+    dock: top;
+    background: $panel;
+    border: solid $primary-background-lighten-1 100%;
+}
+
+LogViewer > #log_filter:focus {
+    border: solid $primary 100%;
+}
+
+LogViewer > #log_filter.-invalid {
+    border: solid $error 100%;
+}
+
+LogViewer > #log_filter.-hidden {
+    display: none;
+}
+
+LogLevelMenu {
+    align: center middle;
+}
+
+LogLevelMenu > Container {
+    width: auto;
+    height: auto;
+    padding: 1 2;
+    background: $panel;
+}
+
+LogLevelMenu > Container > Label {
+    width: 100%;
+    content-align-horizontal: center;
+    padding: 0 1;
+}
+
+LogLevelMenu > Container > CheckSelectionList {
+    width: 20;
+    height: auto;
+    margin: 1 0 0 0;
+    border: solid $primary-background-lighten-1 100%;
+    background: $panel;
+}
+
 SidebarModule {
     border: $accent;
     margin: 1;
