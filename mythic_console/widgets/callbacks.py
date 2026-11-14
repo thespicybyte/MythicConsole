@@ -45,7 +45,7 @@ class CallbackTable(DataTable):
     current_tab_id: reactive[str | None] = reactive(None)
 
     BINDINGS = [
-        Binding(key="m", action="manage_callbacks", description="manage callbacks"),
+        Binding(key="m", action="manage_callbacks", description="manage callbacks", id="manage_callbacks"),
     ]
 
     def __init__(self, instance: MythicInstance):

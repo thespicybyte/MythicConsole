@@ -31,7 +31,8 @@ class LoginPrompt(Widget):
 
 class LoginScreen(ModalScreen):
     BINDINGS = [
-        Binding(key="ctrl+q", description="quit", key_display="^q", tooltip="Exit Program", action="quit")
+        Binding(key="ctrl+q", description="quit", key_display="^q", tooltip="Exit Program", action="quit",
+                id="login_quit")
     ]
 
     def __init__(self):

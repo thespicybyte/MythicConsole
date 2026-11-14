@@ -948,3 +948,107 @@ BuildSummary #actions > Button {
 BuildSummary #actions > Button:focus {
     text-style: none;
 }
+
+/* ---- SettingsScreen: command-palette settings panel ---- */
+
+SettingsScreen {
+    align: center middle;
+}
+
+SettingsScreen > #settings-panel {
+    width: 80%;
+    max-width: 110;
+    height: 80%;
+    padding: 1 2;
+    background: $panel;
+    border: round $primary;
+}
+
+SettingsScreen > #settings-panel > #settings-title {
+    width: 100%;
+    content-align-horizontal: center;
+    text-style: bold;
+    color: $text;
+    padding: 0 0 1 0;
+    border-bottom: solid $primary-background-lighten-1;
+}
+
+SettingsScreen TabbedContent {
+    height: 1fr;
+}
+
+SettingsScreen #keybindings-fields {
+    height: 1fr;
+    background: $panel;
+    padding: 0 1;
+}
+
+SettingsScreen #theme-list {
+    height: 1fr;
+    background: $panel;
+    border: solid $primary-background-lighten-1;
+}
+
+SettingsScreen .form-section {
+    width: 100%;
+    text-style: bold;
+    color: $accent;
+    border-bottom: solid $accent-darken-1;
+    margin: 1 0 0 0;
+}
+
+SettingsScreen .keybinding-row {
+    height: auto;
+    width: 100%;
+    margin: 1 0 0 0;
+}
+
+SettingsScreen .keybinding-input-row {
+    width: 100%;
+    height: auto;
+}
+
+SettingsScreen .keybinding-input-row > .keybinding-label {
+    width: 32;
+    text-style: bold;
+    color: $text;
+    padding: 1 1 0 0;
+}
+
+SettingsScreen .keybinding-input-row > .keybinding-key-display {
+    width: 1fr;
+    height: 3;
+    content-align: left middle;
+    background: $panel;
+    border: solid $primary-background-lighten-1;
+    padding: 0 1;
+}
+
+SettingsScreen .keybinding-input-row > .keybinding-set-button {
+    margin: 0 0 0 1;
+}
+
+SettingsScreen .keybinding-input-row > .keybinding-set-button:focus {
+    text-style: none;
+}
+
+SettingsScreen .field-error {
+    height: auto;
+    color: $error;
+    text-style: italic;
+}
+
+SettingsScreen > #settings-panel > #settings-buttons {
+    width: 100%;
+    height: auto;
+    align-horizontal: right;
+    margin: 1 0 0 0;
+}
+
+SettingsScreen > #settings-panel > #settings-buttons > Button {
+    margin: 0 0 0 2;
+}
+
+SettingsScreen > #settings-panel > #settings-buttons > Button:focus {
+    text-style: none;
+}
