@@ -6,10 +6,8 @@ from .scaffold import ScaffoldError, scaffold
 from .validate import validate_plugin
 
 
-def build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(prog="console.py")
-    subparsers = parser.add_subparsers(dest="action")
-
+def register_subparsers(subparsers) -> None:
+    """Attach the install and plugin subcommands onto an existing subparsers object."""
     install_parser = subparsers.add_parser("install", help="install a plugin from a GitHub URL or local path")
     install_parser.add_argument("source", help="GitHub URL or local folder path")
     install_parser.add_argument("--branch", default=None, help="git branch to clone (GitHub source only)")
@@ -32,6 +30,11 @@ def build_parser() -> argparse.ArgumentParser:
     validate_parser = plugin_subparsers.add_parser("validate", help="validate a plugin before shipping it")
     validate_parser.add_argument("path", help="path to the plugin directory")
 
+
+def build_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(prog="console.py")
+    subparsers = parser.add_subparsers(dest="action")
+    register_subparsers(subparsers)
     return parser
 
 
@@ -41,7 +44,11 @@ def run(argv) -> int:
         args = parser.parse_args(argv)
     except SystemExit as e:
         return e.code if isinstance(e.code, int) else 2
+    return dispatch(args)
 
+
+def dispatch(args) -> int:
+    """Run the plugin action described by a parsed namespace and return an exit code."""
     plugins_dir = Environment().plugins_directory()
 
     if args.action == "install":

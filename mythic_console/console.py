@@ -1,3 +1,4 @@
+import argparse
 import sys
 from enum import Enum
 from typing import Iterable, List, Optional
@@ -17,11 +18,13 @@ from textual.widgets import Header
 from mythic_console.backend import MythicInstance
 from mythic_console.backend.payload_type.queries import PayloadTypeQueries
 from mythic_console.plugins import get_plugin_registry, load_installed_plugins
+from mythic_console.plugins.cli import dispatch as dispatch_plugin, register_subparsers
 from mythic_console.screens.home import Home
 from mythic_console.screens.login import LoginScreen
 from mythic_console.screens.settings import SettingsScreen
 from mythic_console.utils import keybindings, state
 from mythic_console.utils.logger import logger
+from mythic_console.version import __version__
 
 
 class Focus(Enum):
@@ -194,11 +197,48 @@ class MythicConsole(App, inherit_bindings=False):
         self.push_screen(LoginScreen(), callback=self.handle_login_response)
 
 
+EPILOG = """\
+Configuration:
+  Runtime configuration comes from environment variables or a .env file in the
+  working directory (no CLI flags). Recognized variables:
+
+    MYTHIC_CONSOLE_USER        username to prefill on the login screen
+    MYTHIC_CONSOLE_PASSWORD    password to prefill on the login screen
+    MYTHIC_SERVER_URL          Mythic server URL to prefill on the login screen
+    DOWNLOAD_DIRECTORY         directory downloaded files are written to
+    LOG_DIRECTORY              directory the log file is written to
+    LOG_FILE                   log file name (default: .console.log)
+    LOG_LEVEL                  logging verbosity (e.g. INFO, DEBUG)
+"""
+
+
+def build_arg_parser() -> argparse.ArgumentParser:
+    """Build the unified argument parser for the mythic-console command."""
+    parser = argparse.ArgumentParser(
+        prog="mythic-console",
+        description=(
+            "Mythic Console is a Textual terminal UI operator interface to a Mythic C2 "
+            "server. Run with no subcommand to launch the app."
+        ),
+        epilog=EPILOG,
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
+    parser.add_argument(
+        "--version",
+        action="version",
+        version=f"mythic-console {__version__}",
+    )
+    subparsers = parser.add_subparsers(dest="action")
+    register_subparsers(subparsers)
+    return parser
+
+
 def main():
-    argv = sys.argv[1:]
-    if argv and argv[0] in ("install", "plugin"):
-        from mythic_console.plugins.cli import run as run_plugin_cli
-        sys.exit(run_plugin_cli(argv))
+    parser = build_arg_parser()
+    args = parser.parse_args()
+
+    if args.action is not None:
+        sys.exit(dispatch_plugin(args))
 
     app = MythicConsole()
     app.run()
