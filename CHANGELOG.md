@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.0.0] - 2026-11-15
+
+First stable release.
+
+### Added
+- Log panel filtering: filter by log level, color-coded level labels, and a regex search over log
+  messages.
+
+### Fixed
+- `mythic-console -h`/`--help` now prints a usage summary and exits instead of launching the app,
+  through a unified argparse entry point for the console command.
+
 ## [1.0.0-rc2] - 2026-11-14
 
 ### Added
@@ -115,7 +127,8 @@ Initial pre-release: a Textual terminal UI for interacting with a Mythic C2 serv
 operator interface to the web UI, with callback interaction, tasking and results, session info, and
 a hand-written Poseidon agent.
 
-[Unreleased]: https://github.com/thespicybyte/MythicConsole/compare/v1.0.0-rc2...HEAD
+[Unreleased]: https://github.com/thespicybyte/MythicConsole/compare/v1.0.0...HEAD
+[1.0.0]: https://github.com/thespicybyte/MythicConsole/compare/v1.0.0-rc2...v1.0.0
 [1.0.0-rc2]: https://github.com/thespicybyte/MythicConsole/compare/v1.0.0-rc1...v1.0.0-rc2
 [1.0.0-rc1]: https://github.com/thespicybyte/MythicConsole/compare/v0.1.0...v1.0.0-rc1
 [0.1.0]: https://github.com/thespicybyte/MythicConsole/releases/tag/v0.1.0

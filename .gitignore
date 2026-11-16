@@ -10,3 +10,4 @@ reference_plugins/
 dist/
 build/
 *.egg-info/
+uv.lock

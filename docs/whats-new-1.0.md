@@ -1,11 +1,11 @@
-# What's New in 1.0
+# Feature Overview
 
-Mythic Console 1.0 is a large release. The headline change is that **any Mythic payload type now
-works out of the box**: the console builds its command set from the server's own catalog, so no
-agent-specific code is required. On top of that baseline, this release adds a plugin system for
-curation, new global commands for payloads and C2 profiles, an interactive payload builder, command
-and file pickers, a rebuilt console with selectable and copyable output, and quality-of-life touches
-like autocomplete and live callback management.
+The headline capability of Mythic Console is that **any Mythic payload type works out of the box**:
+the console builds its command set from the server's own catalog, so no agent-specific code is
+required. On top of that baseline, Mythic Console provides a plugin system for curation, global
+commands for payloads and C2 profiles, an interactive payload builder, command and file pickers, a
+rebuilt console with selectable and copyable output, and quality-of-life touches like autocomplete
+and live callback management.
 
 This page is a short tour. For installation and configuration, see the [README](../README.md).
 
