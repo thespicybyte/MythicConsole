@@ -128,7 +128,7 @@ operator interface to the web UI, with callback interaction, tasking and results
 a hand-written Poseidon agent.
 
 [Unreleased]: https://github.com/thespicybyte/MythicConsole/compare/v1.0.0...HEAD
-[1.0.0]: https://github.com/thespicybyte/MythicConsole/compare/v1.0.0-rc2...v1.0.0
+[1.0.0]: https://github.com/thespicybyte/MythicConsole/compare/v0.1.0...v1.0.0
 [1.0.0-rc2]: https://github.com/thespicybyte/MythicConsole/compare/v1.0.0-rc1...v1.0.0-rc2
 [1.0.0-rc1]: https://github.com/thespicybyte/MythicConsole/compare/v0.1.0...v1.0.0-rc1
 [0.1.0]: https://github.com/thespicybyte/MythicConsole/releases/tag/v0.1.0
